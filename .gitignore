@@ -1,0 +1,30 @@
+# Maven target directory
+**/target/
+
+# Temp files and directories
+**/test-output/
+*.DS_Store
+*.tmp
+
+# IDE specific files
+.idea/
+.vscode/
+
+# Log files
+*.log
+
+# Compiled classes
+*.class
+
+# Package files
+*.jar
+*.war
+
+# Environment files
+.env
+
+# Maven wrapper
+dependency-reduced-pom.xml
+
+# Examples
+examples/
