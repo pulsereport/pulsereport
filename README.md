@@ -70,7 +70,6 @@ See [Configuration Reference](docs/configuration.md) for all options.
 
 - Java 17+
 - Maven 3.6+
-- TestNG 7.0+
 
 ## Documentation
 
