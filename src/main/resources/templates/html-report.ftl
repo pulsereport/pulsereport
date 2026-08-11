@@ -785,6 +785,15 @@
             transition: opacity 0.15s;
         }
         .screenshot-thumb:hover { opacity: 0.85; }
+        .video-wrap { padding: 8px 0 4px; }
+        .artifact-video {
+            max-width: 100%;
+            max-height: 360px;
+            border-radius: 6px;
+            border: 1px solid var(--border-light);
+            display: block;
+            background: #000;
+        }
         /* Lightbox */
         #screenshot-lightbox {
             display: none;
@@ -1399,7 +1408,6 @@
             align-items: center;
             justify-content: center;
             gap: 4px;
-            transition: background 0.15s, border-color 0.15s, color 0.15s;
         }
 
         .expand-btn {
@@ -2068,9 +2076,18 @@
             <span class="toggle-icon"><svg class="chevron-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg></span>
         </div>
         <div class="artifact-content">
-            <#if oa.mimeType?? && oa.mimeType?starts_with("image/")><#assign _imgSrc = toDataUri(oa.path, oa.mimeType)><#if _imgSrc?has_content>
+            <#if oa.mimeType?? && oa.mimeType?starts_with("image/")>
+                <#-- Prefer embedded base64 content (auto-captured screenshots); fall back to reading from path -->
+                <#if oa.content?? && oa.content?has_content>
+                    <#assign _imgSrc = "data:" + oa.mimeType + ";base64," + oa.content>
+                <#else>
+                    <#assign _imgSrc = toDataUri(oa.path, oa.mimeType)>
+                </#if>
+                <#if _imgSrc?has_content>
                 <div class="screenshot-wrap"><img class="screenshot-thumb" src="${_imgSrc}" alt="${oa.name}" onclick="openLightbox(this.src)" /></div>
-            <#else><a href="${oa.path}" download="${oa.name}">Download ${oa.name}</a></#if>
+                <#else><a href="${oa.path}" download="${oa.name}">Download ${oa.name}</a></#if>
+            <#elseif oa.mimeType?? && oa.mimeType?starts_with("video/") && oa.content?? && oa.content?has_content>
+                <div class="video-wrap"><video class="artifact-video" controls preload="metadata"><source src="data:${oa.mimeType};base64,${oa.content}" type="${oa.mimeType}"></video></div>
             <#elseif oa.content??><#if oa.mimeType?? && oa.mimeType?contains("json")><pre class="artifact-code">${prettyPrintJson(oa.content)?html}</pre><#elseif oa.mimeType?? && oa.mimeType?contains("xml")><pre class="artifact-code">${prettyPrintXml(oa.content)?html}</pre><#else><pre class="artifact-code">${oa.content?html}</pre></#if>
             <#else><a href="${oa.path}" download="${oa.name}">Download ${oa.name}</a></#if>
         </div>
@@ -2103,6 +2120,8 @@
     <#assign mobDeviceModel = environment["mobile.deviceModel"]!"">
     <#assign mobAppVersion = environment["mobile.appVersion"]!"">
     <#assign mobAppiumVersion = environment["mobile.appiumServerVersion"]!"">
+    <#assign mobUdid = environment["mobile.udid"]!"">
+    <#assign mobAutomation = environment["mobile.automationName"]!"">
     <#assign heroStatusValue = (testRun.status!"")?string>
     <#assign heroStatusClass = heroStatusValue?lower_case?replace("_", "-")?replace(" ", "-")>
     <#assign hasBrowserMetadata = browserName?has_content || browserVersion?has_content || platformName?has_content>
@@ -2190,6 +2209,12 @@
                         </#if>
                         <#if mobDeviceName?has_content || mobDeviceModel?has_content>
                         <span class="report-meta-pill">Device: <#if mobDeviceName?has_content>${mobDeviceName}<#else>${mobDeviceModel}</#if></span>
+                        </#if>
+                        <#if mobUdid?has_content>
+                        <span class="report-meta-pill">UDID: ${mobUdid}</span>
+                        </#if>
+                        <#if mobAutomation?has_content>
+                        <span class="report-meta-pill">Automation: ${mobAutomation}</span>
                         </#if>
                         <#if mobAppVersion?has_content>
                         <span class="report-meta-pill">App: ${mobAppVersion}</span>

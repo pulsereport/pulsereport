@@ -78,8 +78,11 @@ public class AppiumAdapter extends TestNGAdapter {
 
     /**
      * Run-level mobile session metadata, merged into TestRun.environment.
+     * Static so test code (which may hold a different adapter instance than the
+     * TestNG-created listener) records into the same store the listener reads
+     * when building the report.
      */
-    private final Map<String, String> runSessionMetadata = new ConcurrentHashMap<>();
+    private static final Map<String, String> runSessionMetadata = new ConcurrentHashMap<>();
 
     /**
      * Constructs a new AppiumAdapter.
@@ -303,6 +306,7 @@ public class AppiumAdapter extends TestNGAdapter {
                 .mimeType("video/mp4")
                 .size(size)
                 .timestamp(Instant.now())
+                .content(base64Video)
                 .build();
 
         addArtifact(testName, video);
