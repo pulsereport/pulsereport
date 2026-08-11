@@ -383,7 +383,9 @@ public class MobileTest {
 
 #### Recording Steps
 
-Add granular, ordered steps to any mobile test:
+Add granular, ordered steps to any mobile test.
+
+**Name-based (explicit test name):**
 
 ```java
 @Test
@@ -398,6 +400,26 @@ public void testLogin() {
 }
 ```
 
+**Name-free (recommended for shared utilities / loggers):**
+
+When a helper (e.g. a logger or a `BasePage` action) doesn't know the test name,
+use the name-free overload — the current test is resolved automatically from the
+thread-local context set by the TestNG listener:
+
+```java
+adapter.recordStep("tap login button");                       // current test, PASSED
+adapter.recordStep("tap login", TestStatus.FAILED, 40, "wrong screen");
+```
+
+> **How steps attach to the right test:** the adapter's step/artifact/metric
+> stores and the per-thread test key are **static**. This means every adapter
+> instance — the TestNG-created listener *and* any instance your code creates
+> (e.g. `new AppiumAdapter()` inside a logger) — shares the same data. So a step
+> recorded from a utility lands on the same test the listener is reporting on.
+> You do **not** need a singleton; register the adapter normally via testng.xml
+> (`<listener class-name="...AppiumAdapter"/>`) and call the capture methods from
+> any instance.
+
 #### Screen Recording (Video)
 
 ```java
@@ -406,6 +428,15 @@ driver.startRecordingScreen();
 String base64Video = driver.stopRecordingScreen();
 adapter.captureVideo("testLogin", "login-recording.mp4", base64Video);
 ```
+
+The base64 content is stored on the artifact and rendered as an **inline
+`<video>` player** in the HTML report (no separate download step). Attaching in
+an `@AfterMethod` captures the recording for both passed and failed tests.
+
+> **Report size:** embedding base64 video makes the HTML file large (~1.33× the
+> video size). If you host recordings elsewhere (e.g. a file server or object
+> storage), prefer linking to the file instead of embedding — see the note in
+> the troubleshooting section.
 
 #### Crash / ANR Reports
 
