@@ -492,8 +492,8 @@
 
         .suite-class-path {
             font-size: 0.72rem;
-            font-weight: 400;
-            color: var(--text-muted);
+            font-weight: 500;
+            color: var(--text-secondary);
             font-family: var(--font-mono);
             letter-spacing: 0;
             margin-left: 6px;
