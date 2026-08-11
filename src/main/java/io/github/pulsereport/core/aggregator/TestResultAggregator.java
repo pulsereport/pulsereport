@@ -26,6 +26,7 @@ import io.github.pulsereport.core.model.Metric;
 import io.github.pulsereport.core.model.TestCase;
 import io.github.pulsereport.core.model.TestRun;
 import io.github.pulsereport.core.model.TestStatus;
+import io.github.pulsereport.core.model.TestStep;
 import io.github.pulsereport.core.model.TestSuite;
 
 /**
@@ -531,6 +532,34 @@ public class TestResultAggregator {
     public TestRun buildTestRun(ISuite suite,
             Map<String, List<Artifact>> artifactsByTest,
             Map<String, List<Metric>> metricsByTest) {
+        return buildTestRun(suite, artifactsByTest, metricsByTest, Collections.emptyMap());
+    }
+
+    /**
+     * Builds a complete TestRun with artifacts, metrics, and steps attached to
+     * test cases.
+     *
+     * <p>
+     * This method extends {@link #convertToTestRun(ISuite)} by enriching test
+     * cases with artifacts, metrics, and steps collected during test
+     * execution. Artifacts include screenshots, logs, HTTP data, etc. Metrics
+     * include response times, page load times, etc. Steps provide an ordered,
+     * granular breakdown of sub-actions within a test (useful for TestNG-,
+     * Selenium-, and Appium-based tests; BDD steps captured by the Cucumber
+     * adapter are preserved as-is).
+     * </p>
+     *
+     * @param suite the TestNG suite
+     * @param artifactsByTest map of test names to their artifacts
+     * @param metricsByTest map of test names to their metrics
+     * @param stepsByTest map of test names to their recorded steps
+     * @return the complete TestRun with enriched test cases
+     * @throws IllegalArgumentException if suite is null
+     */
+    public TestRun buildTestRun(ISuite suite,
+            Map<String, List<Artifact>> artifactsByTest,
+            Map<String, List<Metric>> metricsByTest,
+            Map<String, List<TestStep>> stepsByTest) {
         TestRun baseTestRun = convertToTestRun(suite);
 
         if (baseTestRun == null) {
@@ -542,37 +571,7 @@ public class TestResultAggregator {
             List<TestCase> enrichedTestCases = new ArrayList<>();
 
             for (TestCase testCase : suite1.getTestCases()) {
-                String testKey = testCase.getId();
-
-                // Fallback to method name for adapters that store data before the full key is
-                // available (e.g. @AfterMethod running after onTestSuccess in TestNG 7.x+).
-                List<Artifact> artifacts = artifactsByTest.getOrDefault(testKey, new ArrayList<>());
-                if (artifacts.isEmpty()) {
-                    artifacts = artifactsByTest.getOrDefault(testCase.getMethodName(), new ArrayList<>());
-                }
-                List<Metric> metrics = metricsByTest.getOrDefault(testKey, new ArrayList<>());
-                if (metrics.isEmpty()) {
-                    metrics = metricsByTest.getOrDefault(testCase.getMethodName(), new ArrayList<>());
-                }
-
-                TestCase enrichedTestCase = TestCase.builder()
-                        .id(testCase.getId())
-                        .name(testCase.getName())
-                        .className(testCase.getClassName())
-                        .methodName(testCase.getMethodName())
-                        .startTime(testCase.getStartTime())
-                        .endTime(testCase.getEndTime())
-                        .duration(testCase.getDuration())
-                        .status(testCase.getStatus())
-                        .errorMessage(testCase.getErrorMessage())
-                        .stackTrace(testCase.getStackTrace())
-                        .steps(testCase.getSteps())
-                        .artifacts(artifacts)
-                        .metrics(metrics)
-                        .retryCount(testCase.getRetryCount())
-                        .build();
-
-                enrichedTestCases.add(enrichedTestCase);
+                enrichedTestCases.add(enrichTestCase(testCase, artifactsByTest, metricsByTest, stepsByTest));
             }
 
             TestSuite enrichedSuite = TestSuite.builder()
@@ -604,6 +603,58 @@ public class TestResultAggregator {
                 .passedTests(baseTestRun.getPassedTests())
                 .failedTests(baseTestRun.getFailedTests())
                 .skippedTests(baseTestRun.getSkippedTests())
+                .build();
+    }
+
+    /**
+     * Enriches a single test case with its artifacts, metrics, and steps.
+     *
+     * <p>
+     * Falls back to the test method name when no data is stored under the full
+     * test key (e.g. data recorded in {@code @AfterMethod} running after
+     * {@code onTestSuccess} in TestNG 7.x+). Steps already captured by a
+     * framework adapter (e.g. Cucumber BDD steps) are preserved when no
+     * additional steps were recorded via the step API.
+     * </p>
+     */
+    private TestCase enrichTestCase(TestCase testCase,
+            Map<String, List<Artifact>> artifactsByTest,
+            Map<String, List<Metric>> metricsByTest,
+            Map<String, List<TestStep>> stepsByTest) {
+        String testKey = testCase.getId();
+
+        List<Artifact> artifacts = artifactsByTest.getOrDefault(testKey, new ArrayList<>());
+        if (artifacts.isEmpty()) {
+            artifacts = artifactsByTest.getOrDefault(testCase.getMethodName(), new ArrayList<>());
+        }
+        List<Metric> metrics = metricsByTest.getOrDefault(testKey, new ArrayList<>());
+        if (metrics.isEmpty()) {
+            metrics = metricsByTest.getOrDefault(testCase.getMethodName(), new ArrayList<>());
+        }
+        List<TestStep> steps = stepsByTest.getOrDefault(testKey, new ArrayList<>());
+        if (steps.isEmpty()) {
+            steps = stepsByTest.getOrDefault(testCase.getMethodName(), new ArrayList<>());
+        }
+        // Preserve steps already captured by framework adapters (e.g. Cucumber BDD steps).
+        if (steps.isEmpty()) {
+            steps = testCase.getSteps();
+        }
+
+        return TestCase.builder()
+                .id(testCase.getId())
+                .name(testCase.getName())
+                .className(testCase.getClassName())
+                .methodName(testCase.getMethodName())
+                .startTime(testCase.getStartTime())
+                .endTime(testCase.getEndTime())
+                .duration(testCase.getDuration())
+                .status(testCase.getStatus())
+                .errorMessage(testCase.getErrorMessage())
+                .stackTrace(testCase.getStackTrace())
+                .steps(steps)
+                .artifacts(artifacts)
+                .metrics(metrics)
+                .retryCount(testCase.getRetryCount())
                 .build();
     }
 }

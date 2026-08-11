@@ -3,6 +3,7 @@ package io.github.pulsereport.adapters;
 import io.github.pulsereport.core.model.Artifact;
 import io.github.pulsereport.core.model.Metric;
 import io.github.pulsereport.core.model.TestRun;
+import io.github.pulsereport.core.model.TestStep;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
@@ -27,6 +28,7 @@ public class AdapterTest {
         private int testStartCount = 0;
         private int artifactCount = 0;
         private int metricCount = 0;
+        private int stepCount = 0;
         
         @Override
         public void onSuiteStart(String suiteName) {
@@ -70,7 +72,15 @@ public class AdapterTest {
             }
             metricCount++;
         }
-        
+
+        @Override
+        public void addStep(String testName, TestStep step) {
+            if (step == null) {
+                throw new IllegalArgumentException("Step cannot be null");
+            }
+            stepCount++;
+        }
+
         @Override
         public TestRun getTestRun() {
             return null;

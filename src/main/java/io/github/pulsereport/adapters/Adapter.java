@@ -3,6 +3,7 @@ package io.github.pulsereport.adapters;
 import io.github.pulsereport.core.model.Artifact;
 import io.github.pulsereport.core.model.Metric;
 import io.github.pulsereport.core.model.TestRun;
+import io.github.pulsereport.core.model.TestStep;
 
 /**
  * Interface defining the adapter contract for test framework integrations.
@@ -298,6 +299,36 @@ public interface Adapter {
      * @throws IllegalArgumentException if metric is null
      */
     void addMetric(String testName, Metric metric);
+
+    /**
+     * Adds a step to the current test context.
+     *
+     * <p>
+     * <b>Test Code API:</b> This method is called BY test code during test
+     * execution to record a granular sub-action (a UI interaction, an API call,
+     * a verification point, etc.) within the currently running test.</p>
+     *
+     * <p>
+     * Steps provide a structured, ordered breakdown of what a test did,
+     * complementing free-form artifacts and metrics. This is the non-BDD
+     * counterpart to the steps that the Cucumber adapter captures
+     * automatically: TestNG-, Selenium-, and Appium-based tests can use this
+     * API to record meaningful steps such as "launch app", "tap login button",
+     * or "verify dashboard is displayed".</p>
+     *
+     * <p>
+     * Steps are attached to the specified test and included in the final
+     * TestRun report in insertion order.</p>
+     *
+     * <p>
+     * Thread-safe: can be called from different threads for different tests
+     * during parallel execution.</p>
+     *
+     * @param testName the name of the test to attach the step to
+     * @param step the step to add (must not be null)
+     * @throws IllegalArgumentException if step is null
+     */
+    void addStep(String testName, TestStep step);
 
     /**
      * Returns the complete TestRun after all suites have finished.

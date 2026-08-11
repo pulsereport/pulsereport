@@ -20,6 +20,7 @@ import io.github.pulsereport.core.aggregator.TestResultAggregator;
 import io.github.pulsereport.core.model.Artifact;
 import io.github.pulsereport.core.model.Metric;
 import io.github.pulsereport.core.model.TestRun;
+import io.github.pulsereport.core.model.TestStep;
 import io.github.pulsereport.outputs.html.HtmlReportGenerator;
 import io.github.pulsereport.outputs.json.JsonReportGenerator;
 
@@ -211,24 +212,34 @@ public class TestNGAdapter implements Adapter, ITestListener, ISuiteListener {
      */
     private final TestResultAggregator aggregator;
 
+    // Static so that every adapter instance (the TestNG-created listener AND any
+    // instance test code creates, e.g. via a logger) shares the same store and
+    // the same per-thread test context. Without this, TestNG's listener instance
+    // would build a report missing data recorded through other instances.
     /**
      * Thread-safe map of artifacts by test name. Each test can have multiple
      * artifacts (screenshots, logs, etc.).
      */
-    private final Map<String, List<Artifact>> artifactsByTest = new ConcurrentHashMap<>();
+    private static final Map<String, List<Artifact>> artifactsByTest = new ConcurrentHashMap<>();
 
     /**
      * Thread-safe map of metrics by test name. Each test can have multiple
      * metrics (response times, etc.).
      */
-    private final Map<String, List<Metric>> metricsByTest = new ConcurrentHashMap<>();
+    private static final Map<String, List<Metric>> metricsByTest = new ConcurrentHashMap<>();
+
+    /**
+     * Thread-safe map of steps by test name. Each test can have multiple
+     * steps recorded in execution order.
+     */
+    private static final Map<String, List<TestStep>> stepsByTest = new ConcurrentHashMap<>();
 
     /**
      * Thread-local storage for the current test key. Each thread tracks its own
      * test key to avoid collisions with parameterized tests, duplicate method
      * names across classes, and test retries.
      */
-    private final ThreadLocal<String> currentTestKey = new ThreadLocal<>();
+    private static final ThreadLocal<String> currentTestKey = new ThreadLocal<>();
 
     /**
      * Complete TestRun after suite finishes.
@@ -400,9 +411,57 @@ public class TestNGAdapter implements Adapter, ITestListener, ISuiteListener {
         logger.debug("Added metric '{}' to test '{}' (key: '{}')", metric.getName(), testName, testKey);
     }
 
+    /**
+     * Adds a step to a test.
+     *
+     * <p>
+     * <b>Test Code API:</b> Call this from your test code to record a granular
+     * sub-action (a UI interaction, an API call, a verification point, etc.)
+     * within the currently executing test. Steps are rendered in the report in
+     * insertion order, giving a structured breakdown of the test's behavior.
+     * </p>
+     *
+     * <p>
+     * Uses thread-local test key set by {@link #onTestStart(ITestResult)} for
+     * correct association, even with parameterized tests. Falls back to
+     * testName if called outside of TestNG listener context (may cause
+     * collisions).</p>
+     *
+     * @param testName the name of the test
+     * @param step the step to add
+     * @throws IllegalArgumentException if step is null
+     */
+    @Override
+    public void addStep(String testName, TestStep step) {
+        if (step == null) {
+            throw new IllegalArgumentException("Step cannot be null");
+        }
+
+        String testKey = currentTestKey.get();
+        if (testKey == null) {
+            testKey = testName;
+            logger.warn("Adding step without test context. May collide for parameterized tests: {}", testName);
+        }
+
+        stepsByTest.computeIfAbsent(testKey, k -> new CopyOnWriteArrayList<>()).add(step);
+        logger.debug("Added step '{}' to test '{}' (key: '{}')", step.getName(), testName, testKey);
+    }
+
     @Override
     public TestRun getTestRun() {
         return testRun;
+    }
+
+    /**
+     * Returns the thread-local test key for the currently executing test on
+     * this thread, or null if no test is in progress. Exposed so subclasses
+     * (e.g. AppiumAdapter) can offer name-free capture methods that resolve
+     * the current test automatically.
+     *
+     * @return the current test key, or null
+     */
+    protected String getCurrentTestKey() {
+        return currentTestKey.get();
     }
 
     /**
@@ -425,12 +484,13 @@ public class TestNGAdapter implements Adapter, ITestListener, ISuiteListener {
     public void onFinish(ISuite suite) {
         onSuiteFinish(suite.getName());
 
-        testRun = enrichTestRun(aggregator.buildTestRun(suite, artifactsByTest, metricsByTest));
+        testRun = enrichTestRun(aggregator.buildTestRun(suite, artifactsByTest, metricsByTest, stepsByTest));
         logger.info("TestRun built for suite: {}", suite.getName());
 
         artifactsByTest.clear();
         metricsByTest.clear();
-        logger.debug("Cleared artifact and metric maps after building TestRun");
+        stepsByTest.clear();
+        logger.debug("Cleared artifact, metric, and step maps after building TestRun");
 
         generateReports();
     }

@@ -351,7 +351,10 @@ Extends TestNGAdapter with Appium-specific features for mobile testing.
 
 ### Features
 
-#### Automatic Screenshot Capture
+#### Automatic Failure Capture
+
+Register the driver once per test thread and the adapter automatically attaches
+a **failure screenshot** and **page source** when a test fails:
 
 ```java
 @Listeners(AppiumAdapter.class)
@@ -367,56 +370,77 @@ public class MobileTest {
         
         driver = new AndroidDriver(
             new URL("http://localhost:4723/wd/hub"), caps);
+        MobileDriverHolder.set(driver);   // enable automatic failure capture
     }
     
-    @Test
-    public void testMobileApp() {
-        // Test logic...
-        // Screenshot automatically captured
-    }
-    
-    @AfterMethod
+    @AfterMethod(alwaysRun = true)
     public void teardown() {
+        MobileDriverHolder.remove();      // always clean up
         driver.quit();
     }
 }
 ```
 
-#### Device Information
+#### Recording Steps
 
-Automatically captured:
-
-- Platform (iOS/Android)
-- Device model
-- OS version
-- App version
-- Screen resolution
-
-#### App Logs
+Add granular, ordered steps to any mobile test:
 
 ```java
 @Test
-public void testWithLogs() {
-    // Perform actions...
-    
-    // Capture app logs
-    List<LogEntry> logs = driver.manage().logs().get("logcat").getAll();
-    
-    String logContent = logs.stream()
-        .map(LogEntry::toString)
-        .collect(Collectors.joining("\n"));
-    
-    Artifact logArtifact = Artifact.builder()
-        .name("app-logs.txt")
-        .type("log")
-        .content(logContent)
-        .mimeType("text/plain")
-        .timestamp(Instant.now())
-        .build();
-    
-    adapter.addArtifact("testWithLogs", logArtifact);
+public void testLogin() {
+    long start = System.currentTimeMillis();
+    driver.findElement(By.id("login")).click();
+    adapter.recordStep("testLogin", "tap login button",
+        System.currentTimeMillis() - start);
+
+    adapter.recordStep("testLogin", "verify dashboard",
+        TestStatus.PASSED, 80, "dashboard is visible");
 }
 ```
+
+#### Screen Recording (Video)
+
+```java
+driver.startRecordingScreen();
+// ... test actions ...
+String base64Video = driver.stopRecordingScreen();
+adapter.captureVideo("testLogin", "login-recording.mp4", base64Video);
+```
+
+#### Crash / ANR Reports
+
+```java
+String crashLog = // ... read from logcat crash buffer / iOS crash logs
+adapter.captureCrashReport("testLogin", "crash.log", crashLog);
+```
+
+#### Session Metadata (Environment)
+
+Recorded once per run, surfaced in the report header / CI filters:
+
+```java
+@BeforeSuite
+public void recordSession() {
+    adapter.recordSessionMetadata(MobileSessionMetadata.builder()
+        .platformName("Android")
+        .platformVersion("14")
+        .deviceName("Pixel 7")
+        .appVersion("3.2.1")
+        .appiumServerVersion("2.4.1")
+        .build());
+}
+```
+
+#### Device Health Metrics
+
+```java
+adapter.recordDeviceHealth("testLogin", 85, 512.0); // battery %, memory MB
+```
+
+#### Manual Capture
+
+All manual capture methods remain available: `captureScreenshot`,
+`captureAppLogs`, `captureDeviceInfo`, `capturePageSource`.
 
 #### App Performance Metrics
 
@@ -432,15 +456,7 @@ public void testAppLaunch() {
     wait.until(d -> d.findElement(By.id("main-screen")).isDisplayed());
     
     long launchTime = System.currentTimeMillis() - start;
-    
-    Metric launchMetric = Metric.builder()
-        .name("app.launch.time")
-        .value(launchTime)
-        .unit("ms")
-        .timestamp(Instant.now())
-        .build();
-    
-    adapter.addMetric("testAppLaunch", launchMetric);
+    adapter.recordAppLaunchTime("testAppLaunch", launchTime);
 }
 ```
 
@@ -777,7 +793,13 @@ mvn test -Dpulsereport.output.dir=custom/output/path
 | --------- | -------- | ---------- | -------- | -------------- |
 | Test Results | ✅ | ✅ | ✅ | ✅ |
 | Timing Metrics | ✅ | ✅ | ✅ | ✅ |
-| Screenshots | ❌ | ✅ Auto | ✅ Auto | ❌ |
+| Screenshots | ❌ | ✅ Auto | ✅ Auto (on failure) | ❌ |
+| Steps | ✅ Manual | ✅ Manual | ✅ Manual | ❌ |
+| Video Recording | ❌ | ❌ | ✅ | ❌ |
+| Crash / ANR Reports | ❌ | ❌ | ✅ | ❌ |
+| Page Source | ❌ | ❌ | ✅ Auto (on failure) | ❌ |
+| Session Metadata | ❌ | ✅ Browser | ✅ Device/App | ❌ |
+| Device Health | ❌ | ❌ | ✅ | ❌ |
 | Page Metrics | ❌ | ✅ | ✅ | ❌ |
 | Request/Response | ❌ | ❌ | ❌ | ✅ Auto |
 | Device Info | ❌ | ✅ | ✅ | ❌ |
