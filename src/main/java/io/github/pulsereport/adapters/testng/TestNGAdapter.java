@@ -436,6 +436,10 @@ public class TestNGAdapter implements Adapter, ITestListener, ISuiteListener {
         if (step == null) {
             throw new IllegalArgumentException("Step cannot be null");
         }
+        if (step.getStatus() == null) {
+            throw new IllegalArgumentException(
+                    "Step status cannot be null (the report renderer requires a status): " + step.getName());
+        }
 
         String testKey = currentTestKey.get();
         if (testKey == null) {
@@ -487,10 +491,15 @@ public class TestNGAdapter implements Adapter, ITestListener, ISuiteListener {
         testRun = enrichTestRun(aggregator.buildTestRun(suite, artifactsByTest, metricsByTest, stepsByTest));
         logger.info("TestRun built for suite: {}", suite.getName());
 
-        artifactsByTest.clear();
-        metricsByTest.clear();
-        stepsByTest.clear();
-        logger.debug("Cleared artifact, metric, and step maps after building TestRun");
+        // The shared stores are static (shared across all adapter instances), so a
+        // blanket clear() would delete artifacts/metrics/steps belonging to other
+        // suites that are still running in parallel. Remove only this suite's entries.
+        // Test keys are prefixed with "<suiteName>." (see TestResultAggregator.getTestKey).
+        String suitePrefix = suite.getName() + ".";
+        artifactsByTest.keySet().removeIf(k -> k.startsWith(suitePrefix));
+        metricsByTest.keySet().removeIf(k -> k.startsWith(suitePrefix));
+        stepsByTest.keySet().removeIf(k -> k.startsWith(suitePrefix));
+        logger.debug("Cleared artifact, metric, and step entries for suite: {}", suite.getName());
 
         generateReports();
     }

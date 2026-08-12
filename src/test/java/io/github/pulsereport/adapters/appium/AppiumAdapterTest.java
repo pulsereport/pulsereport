@@ -247,9 +247,7 @@ public class AppiumAdapterTest {
     public void testCaptureVideo() {
         ITestResult mockResult = createMockTestResult("testVideo", ITestResult.SUCCESS);
         adapter.onTestStart(mockResult);
-        // small valid base64 payload
-        String base64 = java.util.Base64.getEncoder().encodeToString("fake-video".getBytes());
-        assertDoesNotThrow(() -> adapter.captureVideo("testVideo", "recording.mp4", base64));
+        assertDoesNotThrow(() -> adapter.captureVideo("testVideo", "recording.mp4", "/tmp/recording.mp4"));
         adapter.onTestSuccess(mockResult);
     }
 

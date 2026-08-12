@@ -25,7 +25,7 @@ import static org.mockito.Mockito.*;
 public class RenderingVerificationTest {
 
     @Test
-    public void rendersAllMobileFeatures() {
+    public void rendersAllMobileFeatures() throws Exception {
         AppiumAdapter adapter = new AppiumAdapter();
 
         ITestResult result = mockResult("testMobileLogin", ITestResult.SUCCESS);
@@ -42,8 +42,7 @@ public class RenderingVerificationTest {
 
         adapter.recordStep("testMobileLogin", "launch app", 1200);
         adapter.recordStep("testMobileLogin", "tap login", TestStatus.PASSED, 150, "tapped login btn");
-        adapter.captureVideo("testMobileLogin", "rec.mp4",
-                java.util.Base64.getEncoder().encodeToString("video".getBytes()));
+        adapter.captureVideo("testMobileLogin", "rec.mp4", "/tmp/rec.mp4");
         adapter.captureCrashReport("testMobileLogin", "crash.log", "FATAL EXCEPTION");
         adapter.capturePageSource("testMobileLogin", "<hierarchy><node/></hierarchy>");
         adapter.captureScreenshot("testMobileLogin", "shot.png", "/tmp/shot.png", 1234);
@@ -64,6 +63,25 @@ public class RenderingVerificationTest {
         assertTrue(tc.getArtifacts().stream().anyMatch(a -> "video".equals(a.getType())));
         assertTrue(tc.getArtifacts().stream().anyMatch(a -> "crash".equals(a.getType())));
         assertTrue(tc.getMetrics().stream().anyMatch(m -> "device.battery.percent".equals(m.getName())));
+
+        // --- rendered-output assertions (steps, metadata, media must reach HTML/JSON) ---
+        String html = java.nio.file.Files.readString(
+                java.nio.file.Paths.get("target/pulsereport/test-report.html"));
+        String json = java.nio.file.Files.readString(
+                java.nio.file.Paths.get("target/pulsereport/test-report.json"));
+
+        // steps rendered
+        assertTrue(html.contains("launch app"), "HTML should render step names");
+        assertTrue(html.contains("tap login"), "HTML should render step names");
+        // metadata rendered
+        assertTrue(html.contains("iPhone 14 Pro"), "HTML should render device metadata");
+        assertTrue(html.contains("iOS"), "HTML should render platform metadata");
+        // video + crash artifacts rendered
+        assertTrue(html.contains("artifact-video"), "HTML should render inline video player");
+        assertTrue(html.contains("crash"), "HTML should render crash artifact");
+        // JSON model carries them too
+        assertTrue(json.contains("launch app"), "JSON should contain step names");
+        assertTrue(json.contains("mobile.platform"), "JSON should contain environment metadata");
     }
 
     private ITestResult mockResult(String name, int status) {

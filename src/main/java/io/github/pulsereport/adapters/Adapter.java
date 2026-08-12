@@ -324,11 +324,22 @@ public interface Adapter {
      * Thread-safe: can be called from different threads for different tests
      * during parallel execution.</p>
      *
+     * <p>
+     * <b>Compatibility:</b> This is a {@code default} method so existing
+     * third-party {@code Adapter} implementations remain source- and
+     * binary-compatible. Implementations that support steps should override it;
+     * the default throws {@link UnsupportedOperationException} to signal that
+     * the adapter does not record steps.</p>
+     *
      * @param testName the name of the test to attach the step to
      * @param step the step to add (must not be null)
      * @throws IllegalArgumentException if step is null
+     * @throws UnsupportedOperationException if the adapter does not support steps
      */
-    void addStep(String testName, TestStep step);
+    default void addStep(String testName, TestStep step) {
+        throw new UnsupportedOperationException(
+                getClass().getName() + " does not support recording steps");
+    }
 
     /**
      * Returns the complete TestRun after all suites have finished.

@@ -2084,10 +2084,14 @@
                     <#assign _imgSrc = toDataUri(oa.path, oa.mimeType)>
                 </#if>
                 <#if _imgSrc?has_content>
-                <div class="screenshot-wrap"><img class="screenshot-thumb" src="${_imgSrc}" alt="${oa.name}" onclick="openLightbox(this.src)" /></div>
-                <#else><a href="${oa.path}" download="${oa.name}">Download ${oa.name}</a></#if>
-            <#elseif oa.mimeType?? && oa.mimeType?starts_with("video/") && oa.content?? && oa.content?has_content>
-                <div class="video-wrap"><video class="artifact-video" controls preload="metadata"><source src="data:${oa.mimeType};base64,${oa.content}" type="${oa.mimeType}"></video></div>
+                <div class="screenshot-wrap"><img class="screenshot-thumb" src="${_imgSrc?html}" alt="${oa.name?html}" onclick="openLightbox(this.src)" /></div>
+                <#else><a href="${oa.path?html}" download="${oa.name?html}">Download ${oa.name?html}</a></#if>
+            <#elseif oa.mimeType?? && oa.mimeType?starts_with("video/")>
+                <#if oa.content?? && oa.content?has_content>
+                <div class="video-wrap"><video class="artifact-video" controls preload="metadata"><source src="data:${oa.mimeType?html};base64,${oa.content}" type="${oa.mimeType?html}"></video></div>
+                <#else>
+                <div class="video-wrap"><video class="artifact-video" controls preload="metadata"><source src="${oa.path?html}" type="${oa.mimeType?html}"></video></div>
+                </#if>
             <#elseif oa.content??><#if oa.mimeType?? && oa.mimeType?contains("json")><pre class="artifact-code">${prettyPrintJson(oa.content)?html}</pre><#elseif oa.mimeType?? && oa.mimeType?contains("xml")><pre class="artifact-code">${prettyPrintXml(oa.content)?html}</pre><#else><pre class="artifact-code">${oa.content?html}</pre></#if>
             <#else><a href="${oa.path}" download="${oa.name}">Download ${oa.name}</a></#if>
         </div>
@@ -2205,22 +2209,22 @@
                         <span class="report-meta-pill">Platform: ${platformName}</span>
                         </#if>
                         <#if mobPlatform?has_content>
-                        <span class="report-meta-pill">Platform: ${mobPlatform}<#if mobPlatformVersion?has_content> ${mobPlatformVersion}</#if></span>
+                        <span class="report-meta-pill">Platform: ${mobPlatform?html}<#if mobPlatformVersion?has_content> ${mobPlatformVersion?html}</#if></span>
                         </#if>
                         <#if mobDeviceName?has_content || mobDeviceModel?has_content>
-                        <span class="report-meta-pill">Device: <#if mobDeviceName?has_content>${mobDeviceName}<#else>${mobDeviceModel}</#if></span>
+                        <span class="report-meta-pill">Device: <#if mobDeviceName?has_content>${mobDeviceName?html}<#else>${mobDeviceModel?html}</#if></span>
                         </#if>
                         <#if mobUdid?has_content>
-                        <span class="report-meta-pill">UDID: ${mobUdid}</span>
+                        <span class="report-meta-pill">UDID: ${mobUdid?html}</span>
                         </#if>
                         <#if mobAutomation?has_content>
-                        <span class="report-meta-pill">Automation: ${mobAutomation}</span>
+                        <span class="report-meta-pill">Automation: ${mobAutomation?html}</span>
                         </#if>
                         <#if mobAppVersion?has_content>
-                        <span class="report-meta-pill">App: ${mobAppVersion}</span>
+                        <span class="report-meta-pill">App: ${mobAppVersion?html}</span>
                         </#if>
                         <#if mobAppiumVersion?has_content>
-                        <span class="report-meta-pill">Appium: ${mobAppiumVersion}</span>
+                        <span class="report-meta-pill">Appium: ${mobAppiumVersion?html}</span>
                         </#if>
                     </div>
                 </div>
@@ -2447,7 +2451,7 @@
                         <#list testCase.steps as mStep>
                             <li class="bdd-step<#if mStep.errorMessage??> has-error error-expanded</#if>">
                                 <span class="bdd-step-status"><span class="bdd-step-icon ${mStep.status?lower_case}"><#if mStep.status == "PASSED"><svg viewBox="0 0 14 14" width="14" height="14" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="7" cy="7" r="5.5"/><path d="M4.2 7.2 6.2 9.1 9.9 5.3"/></svg><#elseif mStep.status == "FAILED"><svg viewBox="0 0 14 14" width="14" height="14" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="7" cy="7" r="5.5"/><path d="M5 5 9 9M9 5 5 9"/></svg><#elseif mStep.status == "SKIPPED"><svg viewBox="0 0 14 14" width="14" height="14" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="7" cy="7" r="5.5"/><path d="M4.5 7h5"/></svg><#else><svg viewBox="0 0 14 14" width="14" height="14" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="7" cy="7" r="5.5"/></svg></#if><span class="sr-only">${mStep.status}</span></span></span>
-                                <span class="bdd-step-name">${mStep.name!""}</span>
+                                <span class="bdd-step-name">${(mStep.name!"")?html}</span>
                                 <#if mStep.duration gt 0><span class="bdd-step-duration">${formatDuration(mStep.duration)}</span></#if>
                             </li>
                             <#if mStep.description?? && mStep.description?has_content>

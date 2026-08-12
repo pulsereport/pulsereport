@@ -623,18 +623,19 @@ public class TestResultAggregator {
             Map<String, List<TestStep>> stepsByTest) {
         String testKey = testCase.getId();
 
-        List<Artifact> artifacts = artifactsByTest.getOrDefault(testKey, new ArrayList<>());
-        if (artifacts.isEmpty()) {
-            artifacts = artifactsByTest.getOrDefault(testCase.getMethodName(), new ArrayList<>());
-        }
-        List<Metric> metrics = metricsByTest.getOrDefault(testKey, new ArrayList<>());
-        if (metrics.isEmpty()) {
-            metrics = metricsByTest.getOrDefault(testCase.getMethodName(), new ArrayList<>());
-        }
-        List<TestStep> steps = stepsByTest.getOrDefault(testKey, new ArrayList<>());
-        if (steps.isEmpty()) {
-            steps = stepsByTest.getOrDefault(testCase.getMethodName(), new ArrayList<>());
-        }
+        // Merge data stored under the full test key AND under the bare method name.
+        // Some captures land under the full key (thread-local set during the listener
+        // callback, e.g. failure screenshots) while others land under the method name
+        // (recorded later in @AfterMethod after the thread-local is cleared, e.g. video).
+        // Merging — rather than fallback-only-when-empty — ensures both are included.
+        List<Artifact> artifacts = new ArrayList<>(artifactsByTest.getOrDefault(testKey, new ArrayList<>()));
+        artifacts.addAll(artifactsByTest.getOrDefault(testCase.getMethodName(), new ArrayList<>()));
+
+        List<Metric> metrics = new ArrayList<>(metricsByTest.getOrDefault(testKey, new ArrayList<>()));
+        metrics.addAll(metricsByTest.getOrDefault(testCase.getMethodName(), new ArrayList<>()));
+
+        List<TestStep> steps = new ArrayList<>(stepsByTest.getOrDefault(testKey, new ArrayList<>()));
+        steps.addAll(stepsByTest.getOrDefault(testCase.getMethodName(), new ArrayList<>()));
         // Preserve steps already captured by framework adapters (e.g. Cucumber BDD steps).
         if (steps.isEmpty()) {
             steps = testCase.getSteps();

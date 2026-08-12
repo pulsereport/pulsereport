@@ -422,21 +422,33 @@ adapter.recordStep("tap login", TestStatus.FAILED, 40, "wrong screen");
 
 #### Screen Recording (Video)
 
+How the video is stored is **configurable** via `reporter.video.storage`:
+
+| Mode | `captureVideo` 3rd arg | Report behavior |
+| ---- | ---------------------- | --------------- |
+| `path` (default) | local/hosted file path | inline `<video>` streaming from the path |
+| `url` | external URL (Minio, S3, …) | inline `<video>` streaming from the URL |
+| `embed` | raw Base64 video | bytes embedded in the HTML (self-contained, larger) |
+
+```properties
+# reporter.properties
+reporter.video.storage=path   # or url, embed
+```
+
 ```java
 driver.startRecordingScreen();
 // ... test actions ...
-String base64Video = driver.stopRecordingScreen();
-adapter.captureVideo("testLogin", "login-recording.mp4", base64Video);
+String base64 = driver.stopRecordingScreen();
+// path mode: save to disk, pass the path
+adapter.captureVideo("testLogin", "login-recording.mp4", "videos/testLogin.mp4");
+// url mode: upload, pass the URL
+// adapter.captureVideo("testLogin", "login-recording.mp4", minioUrl);
+// embed mode: pass the base64 directly
+// adapter.captureVideo("testLogin", "login-recording.mp4", base64);
 ```
 
-The base64 content is stored on the artifact and rendered as an **inline
-`<video>` player** in the HTML report (no separate download step). Attaching in
-an `@AfterMethod` captures the recording for both passed and failed tests.
-
-> **Report size:** embedding base64 video makes the HTML file large (~1.33× the
-> video size). If you host recordings elsewhere (e.g. a file server or object
-> storage), prefer linking to the file instead of embedding — see the note in
-> the troubleshooting section.
+The report renders an inline `<video>` player in all modes. Attaching in an
+`@AfterMethod` captures the recording for both passed and failed tests.
 
 #### Crash / ANR Reports
 

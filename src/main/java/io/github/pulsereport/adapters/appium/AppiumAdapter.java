@@ -81,8 +81,19 @@ public class AppiumAdapter extends TestNGAdapter {
      * Static so test code (which may hold a different adapter instance than the
      * TestNG-created listener) records into the same store the listener reads
      * when building the report.
+     *
+     * <p>Keyed by suite name so concurrent suites do not overwrite each other.
+     * Test code records into the bucket for the suite whose context is active on
+     * the calling thread; the listener merges the bucket for the suite it is
+     * finishing.</p>
      */
-    private static final Map<String, String> runSessionMetadata = new ConcurrentHashMap<>();
+    private static final Map<String, Map<String, String>> sessionMetadataBySuite = new ConcurrentHashMap<>();
+
+    /**
+     * Tracks the active suite name per thread so name-free metadata recording
+     * attributes entries to the correct suite during parallel execution.
+     */
+    private static final ThreadLocal<String> currentSuiteName = new ThreadLocal<>();
 
     /**
      * Constructs a new AppiumAdapter.
@@ -151,10 +162,12 @@ public class AppiumAdapter extends TestNGAdapter {
      *
      * <p>This is the convenient entry point for framework utilities (e.g. a
      * logger) that don't know the test name — the current test is resolved
-     * from the thread-local context set by the TestNG listener. Use it from
-     * anywhere in test code:</p>
+     * from the thread-local context set by the TestNG listener. Because the
+     * adapter's stores are static, any instance (including the TestNG-created
+     * listener) shares the same data, so you can call it on any adapter
+     * instance:</p>
      * <pre>{@code
-     * AppiumAdapter.getInstance().recordStep("tap login button");
+     * new AppiumAdapter().recordStep("tap login button");
      * }</pre>
      *
      * <p>If called when no test is running on this thread, the step is
@@ -280,37 +293,84 @@ public class AppiumAdapter extends TestNGAdapter {
     /**
      * Attaches a screen recording (video) to the specified test.
      *
-     * <p>Appium can record the device screen via
-     * {@code driver.startRecordingScreen()} / {@code driver.stopRecordingScreen()}.
-     * The stop call returns a Base64-encoded video string — pass it here along
-     * with the desired file name and the adapter will attach it as a video
-     * artifact. The caller is responsible for starting/stopping the recording
-     * and (optionally) persisting the decoded bytes to disk.</p>
+     * <p>How the third argument is interpreted depends on the configured video
+     * storage mode ({@code reporter.video.storage}):</p>
+     * <ul>
+     *   <li><b>path</b> (default) — {@code source} is a local/hosted file path;
+     *       the report renders an inline {@code <video>} player streaming from it.</li>
+     *   <li><b>url</b> — {@code source} is an external URL (e.g. Minio/S3); same
+     *       rendering, pointing at the URL.</li>
+     *   <li><b>embed</b> — {@code source} is the raw Base64 video; bytes are
+     *       embedded in the report (larger file, fully self-contained).</li>
+     * </ul>
      *
      * @param testName the name of the test to attach the video to
      * @param fileName the video file name (e.g., "test-recording.mp4")
-     * @param base64Video the Base64-encoded video content from Appium
+     * @param source the video source: file path, URL, or Base64 content depending on mode
      * @throws IllegalArgumentException if any parameter is null or empty
      */
-    public void captureVideo(String testName, String fileName, String base64Video) {
+    public void captureVideo(String testName, String fileName, String source) {
         validateParameter(testName, "testName");
         validateParameter(fileName, "fileName");
-        validateParameter(base64Video, "base64Video");
+        validateParameter(source, "source");
 
-        long size = estimateDecodedSize(base64Video);
-
-        Artifact video = Artifact.builder()
+        String mode = videoStorageMode();
+        Artifact.Builder builder = Artifact.builder()
                 .name(fileName)
                 .type("video")
-                .path("/artifacts/videos/" + fileName)
                 .mimeType("video/mp4")
-                .size(size)
-                .timestamp(Instant.now())
-                .content(base64Video)
-                .build();
+                .timestamp(Instant.now());
 
-        addArtifact(testName, video);
-        logger.debug("Captured screen recording '{}' for test '{}'", fileName, testName);
+        if ("embed".equals(mode)) {
+            builder.path("/artifacts/videos/" + fileName)
+                    .content(source)
+                    .size(estimateDecodedSize(source));
+        } else {
+            // path or url: reference, do not embed
+            builder.path(source).size(fileSizeOf(source));
+        }
+
+        addArtifact(testName, builder.build());
+        logger.debug("Captured screen recording '{}' for test '{}' (mode={})", fileName, testName, mode);
+    }
+
+    /**
+     * Resolves the configured video storage mode, defaulting to "path".
+     */
+    private static String videoStorageMode() {
+        try {
+            io.github.pulsereport.config.ReporterConfig cfg =
+                    io.github.pulsereport.config.ReporterConfig.autoDetect();
+            if (cfg != null && cfg.getVideoStorage() != null && !cfg.getVideoStorage().isBlank()) {
+                return cfg.getVideoStorage();
+            }
+        } catch (Exception e) {
+            logger.debug("Could not load reporter config for video storage mode: {}", e.getMessage());
+        }
+        return "path";
+    }
+
+    private static long fileSizeOf(String path) {
+        try {
+            return java.nio.file.Files.size(java.nio.file.Paths.get(path));
+        } catch (Exception e) {
+            return 0;
+        }
+    }
+
+    /**
+     * Estimates the decoded byte size of a Base64 string without decoding it.
+     */
+    private static long estimateDecodedSize(String base64) {
+        long len = base64.length();
+        long padding = 0;
+        if (len > 0 && base64.charAt(base64.length() - 1) == '=') {
+            padding++;
+        }
+        if (len > 1 && base64.charAt(base64.length() - 2) == '=') {
+            padding++;
+        }
+        return (len * 3 / 4) - padding;
     }
 
     // ------------------------------------------------------------------
@@ -342,6 +402,7 @@ public class AppiumAdapter extends TestNGAdapter {
                 .mimeType("text/plain")
                 .size((long) content.length())
                 .timestamp(Instant.now())
+                .content(content)
                 .build();
 
         addArtifact(testName, crash);
@@ -401,19 +462,57 @@ public class AppiumAdapter extends TestNGAdapter {
         if (metadata == null) {
             throw new IllegalArgumentException("Metadata cannot be null");
         }
-        runSessionMetadata.putAll(metadata.toEnvironmentMap());
-        logger.debug("Recorded mobile session metadata: {}", metadata);
+        String suiteKey = currentSuiteKey();
+        sessionMetadataBySuite.computeIfAbsent(suiteKey, k -> new ConcurrentHashMap<>())
+                .putAll(metadata.toEnvironmentMap());
+        logger.debug("Recorded mobile session metadata for suite '{}': {}", suiteKey, metadata);
+    }
+
+    /**
+     * Derives the suite bucket for metadata: from the active suite on this
+     * thread, else from the suite prefix of the current test key, else a
+     * shared default bucket.
+     */
+    private String currentSuiteKey() {
+        String suite = currentSuiteName.get();
+        if (suite != null) {
+            return suite;
+        }
+        String testKey = getCurrentTestKey();
+        if (testKey != null) {
+            int dot = testKey.indexOf('.');
+            if (dot > 0) {
+                return testKey.substring(0, dot);
+            }
+        }
+        return "default";
     }
 
     @Override
     public void onSuiteStart(String suiteName) {
-        runSessionMetadata.clear();
+        currentSuiteName.set(suiteName);
+        sessionMetadataBySuite.remove(suiteName);
         super.onSuiteStart(suiteName);
     }
 
+    /**
+     * Merges the metadata recorded for the suite that owns this TestRun. The
+     * suite name is taken from the run; when the run has multiple suites, all
+     * their metadata buckets are merged (single-suite mobile runs use one).
+     */
     @Override
     protected TestRun enrichTestRun(TestRun builtTestRun) {
-        if (builtTestRun == null || runSessionMetadata.isEmpty()) {
+        if (builtTestRun == null) {
+            return builtTestRun;
+        }
+
+        Map<String, String> metadata = collectMetadataForRun(builtTestRun);
+        String finishingSuite = currentSuiteName.get();
+        if (finishingSuite != null) {
+            sessionMetadataBySuite.remove(finishingSuite);
+            currentSuiteName.remove();
+        }
+        if (metadata.isEmpty()) {
             return builtTestRun;
         }
 
@@ -421,7 +520,7 @@ public class AppiumAdapter extends TestNGAdapter {
         if (builtTestRun.getEnvironment() != null) {
             mergedEnvironment.putAll(builtTestRun.getEnvironment());
         }
-        mergedEnvironment.putAll(runSessionMetadata);
+        mergedEnvironment.putAll(metadata);
 
         return TestRun.builder()
                 .id(builtTestRun.getId())
@@ -437,6 +536,29 @@ public class AppiumAdapter extends TestNGAdapter {
                 .failedTests(builtTestRun.getFailedTests())
                 .skippedTests(builtTestRun.getSkippedTests())
                 .build();
+    }
+
+    /**
+     * Collects metadata buckets matching the run's suite names, falling back to
+     * all buckets (and the default) so name-free recording still surfaces.
+     */
+    private Map<String, String> collectMetadataForRun(TestRun builtTestRun) {
+        Map<String, String> result = new LinkedHashMap<>();
+        for (var suite : builtTestRun.getSuites()) {
+            Map<String, String> bucket = sessionMetadataBySuite.get(suite.getName());
+            if (bucket != null) {
+                result.putAll(bucket);
+            }
+        }
+        // Session metadata is run-level (one device/app per run in practice), so when
+        // name-matching finds nothing — e.g. name-free recording before a suite context,
+        // or the recorded bucket key not matching the built suite name — merge the rest.
+        if (result.isEmpty()) {
+            for (Map<String, String> bucket : sessionMetadataBySuite.values()) {
+                result.putAll(bucket);
+            }
+        }
+        return result;
     }
 
     // ------------------------------------------------------------------
@@ -458,6 +580,9 @@ public class AppiumAdapter extends TestNGAdapter {
     public void recordDeviceHealth(String testName, int batteryPercent, double usedMemoryMb) {
         validateParameter(testName, "testName");
 
+        if (batteryPercent > 100) {
+            throw new IllegalArgumentException("batteryPercent must be between 0 and 100 (or -1 if unknown), got: " + batteryPercent);
+        }
         if (batteryPercent >= 0) {
             addMetric(testName, Metric.builder()
                     .name("device.battery.percent")
@@ -599,21 +724,6 @@ public class AppiumAdapter extends TestNGAdapter {
     // ------------------------------------------------------------------
     // Helpers
     // ------------------------------------------------------------------
-
-    /**
-     * Estimates the decoded byte size of a Base64 string without decoding it.
-     */
-    private static long estimateDecodedSize(String base64) {
-        long len = base64.length();
-        long padding = 0;
-        if (len > 0 && base64.charAt(base64.length() - 1) == '=') {
-            padding++;
-        }
-        if (len > 1 && base64.charAt(base64.length() - 2) == '=') {
-            padding++;
-        }
-        return (len * 3 / 4) - padding;
-    }
 
     /**
      * Validates that a parameter is not null or empty.
