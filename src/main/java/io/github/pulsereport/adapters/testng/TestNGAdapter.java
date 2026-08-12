@@ -242,6 +242,15 @@ public class TestNGAdapter implements Adapter, ITestListener, ISuiteListener {
     private static final ThreadLocal<String> currentTestKey = new ThreadLocal<>();
 
     /**
+     * Registry mapping bare method names to the full invocation key(s) seen for
+     * them. Used to re-scope captures that happen outside the listener window
+     * (e.g. in {@code @AfterMethod} after the thread-local key was cleared) so
+     * they associate with the correct invocation instead of a globally ambiguous
+     * bare-name bucket. Entries are removed when the owning suite finishes.
+     */
+    private static final Map<String, java.util.Set<String>> keysByMethodName = new ConcurrentHashMap<>();
+
+    /**
      * Complete TestRun after suite finishes.
      */
     private TestRun testRun;
@@ -368,9 +377,10 @@ public class TestNGAdapter implements Adapter, ITestListener, ISuiteListener {
         // Prefer ThreadLocal (set by TestNG listener or Adapter API)
         String testKey = currentTestKey.get();
         if (testKey == null) {
-            // Fallback: use testName (may collide for parameterized tests)
-            testKey = testName;
-            logger.warn("Adding artifact without test context. May collide for parameterized tests: {}", testName);
+            // Fallback: resolve the scoped key from the method-name registry so
+            // late captures (e.g. video in @AfterMethod) attach to the correct
+            // invocation instead of a globally ambiguous bare-name bucket.
+            testKey = resolveFallbackKey(testName);
         }
 
         artifactsByTest.computeIfAbsent(testKey, k -> new CopyOnWriteArrayList<>()).add(artifact);
@@ -403,8 +413,7 @@ public class TestNGAdapter implements Adapter, ITestListener, ISuiteListener {
 
         String testKey = currentTestKey.get();
         if (testKey == null) {
-            testKey = testName;
-            logger.warn("Adding metric without test context. May collide for parameterized tests: {}", testName);
+            testKey = resolveFallbackKey(testName);
         }
 
         metricsByTest.computeIfAbsent(testKey, k -> new CopyOnWriteArrayList<>()).add(metric);
@@ -443,8 +452,7 @@ public class TestNGAdapter implements Adapter, ITestListener, ISuiteListener {
 
         String testKey = currentTestKey.get();
         if (testKey == null) {
-            testKey = testName;
-            logger.warn("Adding step without test context. May collide for parameterized tests: {}", testName);
+            testKey = resolveFallbackKey(testName);
         }
 
         stepsByTest.computeIfAbsent(testKey, k -> new CopyOnWriteArrayList<>()).add(step);
@@ -499,9 +507,42 @@ public class TestNGAdapter implements Adapter, ITestListener, ISuiteListener {
         artifactsByTest.keySet().removeIf(k -> k.startsWith(suitePrefix));
         metricsByTest.keySet().removeIf(k -> k.startsWith(suitePrefix));
         stepsByTest.keySet().removeIf(k -> k.startsWith(suitePrefix));
+        keysByMethodName.values().forEach(set -> set.removeIf(k -> k.startsWith(suitePrefix)));
+        keysByMethodName.entrySet().removeIf(e -> e.getValue().isEmpty());
         logger.debug("Cleared artifact, metric, and step entries for suite: {}", suite.getName());
 
         generateReports();
+    }
+
+    /**
+     * Registers the full invocation key under its bare method name so late
+     * captures (outside the listener window) can be re-scoped to the correct
+     * invocation.
+     */
+    private static void registerMethodKey(ITestResult result, String testKey) {
+        String methodName = result.getMethod() != null ? result.getMethod().getMethodName() : null;
+        if (methodName != null && testKey != null) {
+            keysByMethodName.computeIfAbsent(methodName, k -> ConcurrentHashMap.newKeySet()).add(testKey);
+        }
+    }
+
+    /**
+     * Resolves the scoped fallback key for a capture that happened outside the
+     * listener window (no thread-local). When the method name maps to exactly
+     * one known invocation key, that key is used so the capture attaches to the
+     * correct parameterized invocation. Otherwise the bare name is used as a
+     * last resort and a warning is logged.
+     */
+    private static String resolveFallbackKey(String testName) {
+        java.util.Set<String> keys = keysByMethodName.get(testName);
+        if (keys != null && keys.size() == 1) {
+            String scopedKey = keys.iterator().next();
+            logger.debug("Resolved fallback key for '{}' to scoped invocation key '{}'", testName, scopedKey);
+            return scopedKey;
+        }
+        logger.warn("Adding data without an active test context; using bare name '{}'. "
+                + "May be ambiguous for parameterized tests.", testName);
+        return testName;
     }
 
     /**
@@ -595,6 +636,7 @@ public class TestNGAdapter implements Adapter, ITestListener, ISuiteListener {
         String testKey = aggregator.getTestKey(result);
         currentTestKey.set(testKey);
         setRestAssuredTestContext(testKey);
+        registerMethodKey(result, testKey);
 
         logger.info("Test started (TestNG listener): {}", result.getName());
     }

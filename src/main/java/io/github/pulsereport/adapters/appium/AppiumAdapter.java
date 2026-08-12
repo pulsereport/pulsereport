@@ -496,9 +496,13 @@ public class AppiumAdapter extends TestNGAdapter {
     }
 
     /**
-     * Merges the metadata recorded for the suite that owns this TestRun. The
-     * suite name is taken from the run; when the run has multiple suites, all
-     * their metadata buckets are merged (single-suite mobile runs use one).
+     * Merges the metadata recorded for the suite that owns this TestRun.
+     * Metadata is bucketed by the owning TestNG suite name (the same key used by
+     * {@link #recordSessionMetadata}). Only that suite's bucket is consumed, so a
+     * report never shows another suite's device/app values; the shared
+     * {@code default} bucket (name-free recording before a suite context exists)
+     * is consumed exactly once by the first suite that finishes, then removed so
+     * it cannot leak into later runs.
      */
     @Override
     protected TestRun enrichTestRun(TestRun builtTestRun) {
@@ -506,8 +510,8 @@ public class AppiumAdapter extends TestNGAdapter {
             return builtTestRun;
         }
 
-        Map<String, String> metadata = collectMetadataForRun(builtTestRun);
         String finishingSuite = currentSuiteName.get();
+        Map<String, String> metadata = collectMetadataForRun(finishingSuite);
         if (finishingSuite != null) {
             sessionMetadataBySuite.remove(finishingSuite);
             currentSuiteName.remove();
@@ -539,24 +543,23 @@ public class AppiumAdapter extends TestNGAdapter {
     }
 
     /**
-     * Collects metadata buckets matching the run's suite names, falling back to
-     * all buckets (and the default) so name-free recording still surfaces.
+     * Collects the metadata bucket owned by the finishing suite, plus the shared
+     * {@code default} bucket (name-free recording before a suite context exists).
+     * Consumed buckets are removed so they cannot leak into other suites; other
+     * suites' buckets are never merged, so a report only shows its own device/app
+     * values even when suites run concurrently.
      */
-    private Map<String, String> collectMetadataForRun(TestRun builtTestRun) {
+    private Map<String, String> collectMetadataForRun(String finishingSuite) {
         Map<String, String> result = new LinkedHashMap<>();
-        for (var suite : builtTestRun.getSuites()) {
-            Map<String, String> bucket = sessionMetadataBySuite.get(suite.getName());
+        if (finishingSuite != null) {
+            Map<String, String> bucket = sessionMetadataBySuite.get(finishingSuite);
             if (bucket != null) {
                 result.putAll(bucket);
             }
         }
-        // Session metadata is run-level (one device/app per run in practice), so when
-        // name-matching finds nothing — e.g. name-free recording before a suite context,
-        // or the recorded bucket key not matching the built suite name — merge the rest.
-        if (result.isEmpty()) {
-            for (Map<String, String> bucket : sessionMetadataBySuite.values()) {
-                result.putAll(bucket);
-            }
+        Map<String, String> defaultBucket = sessionMetadataBySuite.remove("default");
+        if (defaultBucket != null) {
+            result.putAll(defaultBucket);
         }
         return result;
     }

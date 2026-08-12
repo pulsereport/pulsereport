@@ -486,11 +486,13 @@ public class TestResultAggregatorTest {
     }
 
     /**
-     * Regression: artifacts stored under the full test key AND under the bare
-     * method name must BOTH appear on the enriched TestCase. Previously the
-     * method-name bucket was only consulted when the full-key bucket was empty,
-     * so a failure screenshot (full key) would hide a video recorded later in
-     * @AfterMethod (method-name key).
+     * The aggregator consults only the full invocation key for a TestCase. Late
+     * captures that were once stored under the bare method name are now re-scoped
+     * to the full key by TestNGAdapter.resolveFallbackKey before they reach these
+     * maps, so merging a bare-method bucket here would re-introduce
+     * cross-invocation/cross-class contamination. This test verifies that data
+     * stored under the full key is attached, and that a stray bare-name bucket is
+     * NOT leaked into the TestCase.
      */
     @Test
     public void testMergesArtifactsFromFullKeyAndMethodName() {
@@ -511,8 +513,7 @@ public class TestResultAggregatorTest {
                 .mimeType("video/mp4").size(20L).timestamp(Instant.now()).build();
 
         Map<String, List<io.github.pulsereport.core.model.Artifact>> artifactsByTest = new HashMap<>();
-        artifactsByTest.put(fullKey, new ArrayList<>(List.of(screenshot)));       // failure capture path
-        artifactsByTest.put("customerLoginTest", new ArrayList<>(List.of(video))); // @AfterMethod path
+        artifactsByTest.put(fullKey, new ArrayList<>(List.of(screenshot, video))); // failure + late capture, both re-scoped to full key
 
         TestRun run = aggregator.buildTestRun(suite, artifactsByTest, new HashMap<>(), new HashMap<>());
 
@@ -523,7 +524,7 @@ public class TestResultAggregatorTest {
         List<String> types = tc.getArtifacts().stream()
                 .map(io.github.pulsereport.core.model.Artifact::getType).toList();
         assertTrue(types.contains("screenshot"), "should include full-key screenshot");
-        assertTrue(types.contains("video"), "should include method-name video");
+        assertTrue(types.contains("video"), "should include video re-scoped to the full key");
     }
 
     private ISuite wiredSuiteWithResult(String suiteName, String contextName, ITestResult result) {
