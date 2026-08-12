@@ -351,7 +351,10 @@ Extends TestNGAdapter with Appium-specific features for mobile testing.
 
 ### Features
 
-#### Automatic Screenshot Capture
+#### Automatic Failure Capture
+
+Register the driver once per test thread and the adapter automatically attaches
+a **failure screenshot** and **page source** when a test fails:
 
 ```java
 @Listeners(AppiumAdapter.class)
@@ -367,56 +370,120 @@ public class MobileTest {
         
         driver = new AndroidDriver(
             new URL("http://localhost:4723/wd/hub"), caps);
+        MobileDriverHolder.set(driver);   // enable automatic failure capture
     }
     
-    @Test
-    public void testMobileApp() {
-        // Test logic...
-        // Screenshot automatically captured
-    }
-    
-    @AfterMethod
+    @AfterMethod(alwaysRun = true)
     public void teardown() {
+        MobileDriverHolder.remove();      // always clean up
         driver.quit();
     }
 }
 ```
 
-#### Device Information
+#### Recording Steps
 
-Automatically captured:
+Add granular, ordered steps to any mobile test.
 
-- Platform (iOS/Android)
-- Device model
-- OS version
-- App version
-- Screen resolution
-
-#### App Logs
+**Name-based (explicit test name):**
 
 ```java
 @Test
-public void testWithLogs() {
-    // Perform actions...
-    
-    // Capture app logs
-    List<LogEntry> logs = driver.manage().logs().get("logcat").getAll();
-    
-    String logContent = logs.stream()
-        .map(LogEntry::toString)
-        .collect(Collectors.joining("\n"));
-    
-    Artifact logArtifact = Artifact.builder()
-        .name("app-logs.txt")
-        .type("log")
-        .content(logContent)
-        .mimeType("text/plain")
-        .timestamp(Instant.now())
-        .build();
-    
-    adapter.addArtifact("testWithLogs", logArtifact);
+public void testLogin() {
+    long start = System.currentTimeMillis();
+    driver.findElement(By.id("login")).click();
+    adapter.recordStep("testLogin", "tap login button",
+        System.currentTimeMillis() - start);
+
+    adapter.recordStep("testLogin", "verify dashboard",
+        TestStatus.PASSED, 80, "dashboard is visible");
 }
 ```
+
+**Name-free (recommended for shared utilities / loggers):**
+
+When a helper (e.g. a logger or a `BasePage` action) doesn't know the test name,
+use the name-free overload — the current test is resolved automatically from the
+thread-local context set by the TestNG listener:
+
+```java
+adapter.recordStep("tap login button");                       // current test, PASSED
+adapter.recordStep("tap login", TestStatus.FAILED, 40, "wrong screen");
+```
+
+> **How steps attach to the right test:** the adapter's step/artifact/metric
+> stores and the per-thread test key are **static**. This means every adapter
+> instance — the TestNG-created listener *and* any instance your code creates
+> (e.g. `new AppiumAdapter()` inside a logger) — shares the same data. So a step
+> recorded from a utility lands on the same test the listener is reporting on.
+> You do **not** need a singleton; register the adapter normally via testng.xml
+> (`<listener class-name="...AppiumAdapter"/>`) and call the capture methods from
+> any instance.
+
+#### Screen Recording (Video)
+
+How the video is stored is **configurable** via `reporter.video.storage`:
+
+| Mode | `captureVideo` 3rd arg | Report behavior |
+| ---- | ---------------------- | --------------- |
+| `path` (default) | local/hosted file path | inline `<video>` streaming from the path |
+| `url` | external URL (Minio, S3, …) | inline `<video>` streaming from the URL |
+| `embed` | raw Base64 video | bytes embedded in the HTML (self-contained, larger) |
+
+```properties
+# reporter.properties
+reporter.video.storage=path   # or url, embed
+```
+
+```java
+driver.startRecordingScreen();
+// ... test actions ...
+String base64 = driver.stopRecordingScreen();
+// path mode: save to disk, pass the path
+adapter.captureVideo("testLogin", "login-recording.mp4", "videos/testLogin.mp4");
+// url mode: upload, pass the URL
+// adapter.captureVideo("testLogin", "login-recording.mp4", minioUrl);
+// embed mode: pass the base64 directly
+// adapter.captureVideo("testLogin", "login-recording.mp4", base64);
+```
+
+The report renders an inline `<video>` player in all modes. Attaching in an
+`@AfterMethod` captures the recording for both passed and failed tests.
+
+#### Crash / ANR Reports
+
+```java
+String crashLog = // ... read from logcat crash buffer / iOS crash logs
+adapter.captureCrashReport("testLogin", "crash.log", crashLog);
+```
+
+#### Session Metadata (Environment)
+
+Recorded once per run, surfaced in the report header / CI filters:
+
+```java
+@BeforeSuite
+public void recordSession() {
+    adapter.recordSessionMetadata(MobileSessionMetadata.builder()
+        .platformName("Android")
+        .platformVersion("14")
+        .deviceName("Pixel 7")
+        .appVersion("3.2.1")
+        .appiumServerVersion("2.4.1")
+        .build());
+}
+```
+
+#### Device Health Metrics
+
+```java
+adapter.recordDeviceHealth("testLogin", 85, 512.0); // battery %, memory MB
+```
+
+#### Manual Capture
+
+All manual capture methods remain available: `captureScreenshot`,
+`captureAppLogs`, `captureDeviceInfo`, `capturePageSource`.
 
 #### App Performance Metrics
 
@@ -432,15 +499,7 @@ public void testAppLaunch() {
     wait.until(d -> d.findElement(By.id("main-screen")).isDisplayed());
     
     long launchTime = System.currentTimeMillis() - start;
-    
-    Metric launchMetric = Metric.builder()
-        .name("app.launch.time")
-        .value(launchTime)
-        .unit("ms")
-        .timestamp(Instant.now())
-        .build();
-    
-    adapter.addMetric("testAppLaunch", launchMetric);
+    adapter.recordAppLaunchTime("testAppLaunch", launchTime);
 }
 ```
 
@@ -777,7 +836,13 @@ mvn test -Dpulsereport.output.dir=custom/output/path
 | --------- | -------- | ---------- | -------- | -------------- |
 | Test Results | ✅ | ✅ | ✅ | ✅ |
 | Timing Metrics | ✅ | ✅ | ✅ | ✅ |
-| Screenshots | ❌ | ✅ Auto | ✅ Auto | ❌ |
+| Screenshots | ❌ | ✅ Auto | ✅ Auto (on failure) | ❌ |
+| Steps | ✅ Manual | ✅ Manual | ✅ Manual | ❌ |
+| Video Recording | ❌ | ❌ | ✅ | ❌ |
+| Crash / ANR Reports | ❌ | ❌ | ✅ | ❌ |
+| Page Source | ❌ | ❌ | ✅ Auto (on failure) | ❌ |
+| Session Metadata | ❌ | ✅ Browser | ✅ Device/App | ❌ |
+| Device Health | ❌ | ❌ | ✅ | ❌ |
 | Page Metrics | ❌ | ✅ | ✅ | ❌ |
 | Request/Response | ❌ | ❌ | ❌ | ✅ Auto |
 | Device Info | ❌ | ✅ | ✅ | ❌ |

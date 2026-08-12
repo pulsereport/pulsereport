@@ -392,6 +392,25 @@ public class TestNGAdapterTest {
     }
 
     @Test
+    public void testLateCaptureRescopedToSingleInvocation() {
+        // Single invocation of a method: after onTestSuccess clears the thread-local,
+        // a late capture (e.g. video in @AfterMethod) must resolve back to that
+        // invocation's full key via the method-name registry, not an ambiguous
+        // bare-name bucket. With exactly one registered invocation the fallback is
+        // unambiguous, so this must not throw and must associate the artifact.
+        ITestResult result = createMockTestResult("soloTest", ITestResult.SUCCESS);
+        adapter.onTestStart(result);
+        adapter.onTestSuccess(result); // clears the thread-local
+
+        Artifact video = Artifact.builder()
+                .name("soloTest.mp4").type("video").path("/videos/soloTest.mp4")
+                .mimeType("video/mp4").size(20L).timestamp(Instant.now()).build();
+
+        // Called with no active thread-local (simulates @AfterMethod).
+        assertDoesNotThrow(() -> adapter.addArtifact("soloTest", video));
+    }
+
+    @Test
     public void testAddArtifactWithoutTestStart() {
         Artifact artifact = Artifact.builder()
                 .name("test.png")

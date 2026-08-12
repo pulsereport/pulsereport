@@ -4,6 +4,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
@@ -482,6 +483,75 @@ public class TestResultAggregatorTest {
         TestSuite suite = aggregator.convertToTestSuite(mockContext, Arrays.asList(normalPass, passResult));
 
         assertEquals(TestStatus.FLAKY, suite.getStatus());
+    }
+
+    /**
+     * The aggregator consults only the full invocation key for a TestCase. Late
+     * captures that were once stored under the bare method name are now re-scoped
+     * to the full key by TestNGAdapter.resolveFallbackKey before they reach these
+     * maps, so merging a bare-method bucket here would re-introduce
+     * cross-invocation/cross-class contamination. This test verifies that data
+     * stored under the full key is attached, and that a stray bare-name bucket is
+     * NOT leaked into the TestCase.
+     */
+    @Test
+    public void testMergesArtifactsFromFullKeyAndMethodName() {
+        ITestResult result = createMockTestResult(
+                "customerLoginTest", "com.Test", ITestResult.FAILURE, 100L, 200L, new AssertionError("boom"));
+        ISuite suite = wiredSuiteWithResult("Suite", "Automation suite", result);
+        aggregator.recordTestResult(result);
+
+        String fullKey = aggregator.getTestKey(result);
+
+        io.github.pulsereport.core.model.Artifact screenshot = io.github.pulsereport.core.model.Artifact.builder()
+                .name("failure-screenshot.png").type("screenshot")
+                .path("/artifacts/screenshots/failure-screenshot.png")
+                .mimeType("image/png").size(10L).timestamp(Instant.now()).build();
+        io.github.pulsereport.core.model.Artifact video = io.github.pulsereport.core.model.Artifact.builder()
+                .name("customerLoginTest.mp4").type("video")
+                .path("/videos/customerLoginTest.mp4")
+                .mimeType("video/mp4").size(20L).timestamp(Instant.now()).build();
+
+        Map<String, List<io.github.pulsereport.core.model.Artifact>> artifactsByTest = new HashMap<>();
+        artifactsByTest.put(fullKey, new ArrayList<>(List.of(screenshot, video))); // failure + late capture, both re-scoped to full key
+
+        TestRun run = aggregator.buildTestRun(suite, artifactsByTest, new HashMap<>(), new HashMap<>());
+
+        assertNotNull(run);
+        TestCase tc = run.getSuites().get(0).getTestCases().stream()
+                .filter(c -> "customerLoginTest".equals(c.getMethodName()))
+                .findFirst().orElseThrow();
+        List<String> types = tc.getArtifacts().stream()
+                .map(io.github.pulsereport.core.model.Artifact::getType).toList();
+        assertTrue(types.contains("screenshot"), "should include full-key screenshot");
+        assertTrue(types.contains("video"), "should include video re-scoped to the full key");
+    }
+
+    private ISuite wiredSuiteWithResult(String suiteName, String contextName, ITestResult result) {
+        ISuite suite = mock(ISuite.class);
+        when(suite.getName()).thenReturn(suiteName);
+
+        ITestContext ctx = mock(ITestContext.class);
+        when(ctx.getName()).thenReturn(contextName);
+        when(ctx.getSuite()).thenReturn(suite);
+        when(ctx.getStartDate()).thenReturn(new java.util.Date(1000L));
+        when(ctx.getEndDate()).thenReturn(new java.util.Date(2000L));
+
+        IResultMap passed = mock(IResultMap.class);
+        IResultMap failed = mock(IResultMap.class);
+        IResultMap skipped = mock(IResultMap.class);
+        when(passed.getAllResults()).thenReturn(new HashSet<>());
+        when(failed.getAllResults()).thenReturn(new HashSet<>(List.of(result)));
+        when(skipped.getAllResults()).thenReturn(new HashSet<>());
+        when(ctx.getPassedTests()).thenReturn(passed);
+        when(ctx.getFailedTests()).thenReturn(failed);
+        when(ctx.getSkippedTests()).thenReturn(skipped);
+        when(result.getTestContext()).thenReturn(ctx);
+
+        ISuiteResult sr = mock(ISuiteResult.class);
+        when(sr.getTestContext()).thenReturn(ctx);
+        when(suite.getResults()).thenReturn(Map.of(contextName, sr));
+        return suite;
     }
 
     /**

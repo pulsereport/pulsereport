@@ -20,6 +20,7 @@ import io.github.pulsereport.core.aggregator.TestResultAggregator;
 import io.github.pulsereport.core.model.Artifact;
 import io.github.pulsereport.core.model.Metric;
 import io.github.pulsereport.core.model.TestRun;
+import io.github.pulsereport.core.model.TestStep;
 import io.github.pulsereport.outputs.html.HtmlReportGenerator;
 import io.github.pulsereport.outputs.json.JsonReportGenerator;
 
@@ -211,24 +212,43 @@ public class TestNGAdapter implements Adapter, ITestListener, ISuiteListener {
      */
     private final TestResultAggregator aggregator;
 
+    // Static so that every adapter instance (the TestNG-created listener AND any
+    // instance test code creates, e.g. via a logger) shares the same store and
+    // the same per-thread test context. Without this, TestNG's listener instance
+    // would build a report missing data recorded through other instances.
     /**
      * Thread-safe map of artifacts by test name. Each test can have multiple
      * artifacts (screenshots, logs, etc.).
      */
-    private final Map<String, List<Artifact>> artifactsByTest = new ConcurrentHashMap<>();
+    private static final Map<String, List<Artifact>> artifactsByTest = new ConcurrentHashMap<>();
 
     /**
      * Thread-safe map of metrics by test name. Each test can have multiple
      * metrics (response times, etc.).
      */
-    private final Map<String, List<Metric>> metricsByTest = new ConcurrentHashMap<>();
+    private static final Map<String, List<Metric>> metricsByTest = new ConcurrentHashMap<>();
+
+    /**
+     * Thread-safe map of steps by test name. Each test can have multiple
+     * steps recorded in execution order.
+     */
+    private static final Map<String, List<TestStep>> stepsByTest = new ConcurrentHashMap<>();
 
     /**
      * Thread-local storage for the current test key. Each thread tracks its own
      * test key to avoid collisions with parameterized tests, duplicate method
      * names across classes, and test retries.
      */
-    private final ThreadLocal<String> currentTestKey = new ThreadLocal<>();
+    private static final ThreadLocal<String> currentTestKey = new ThreadLocal<>();
+
+    /**
+     * Registry mapping bare method names to the full invocation key(s) seen for
+     * them. Used to re-scope captures that happen outside the listener window
+     * (e.g. in {@code @AfterMethod} after the thread-local key was cleared) so
+     * they associate with the correct invocation instead of a globally ambiguous
+     * bare-name bucket. Entries are removed when the owning suite finishes.
+     */
+    private static final Map<String, java.util.Set<String>> keysByMethodName = new ConcurrentHashMap<>();
 
     /**
      * Complete TestRun after suite finishes.
@@ -357,9 +377,10 @@ public class TestNGAdapter implements Adapter, ITestListener, ISuiteListener {
         // Prefer ThreadLocal (set by TestNG listener or Adapter API)
         String testKey = currentTestKey.get();
         if (testKey == null) {
-            // Fallback: use testName (may collide for parameterized tests)
-            testKey = testName;
-            logger.warn("Adding artifact without test context. May collide for parameterized tests: {}", testName);
+            // Fallback: resolve the scoped key from the method-name registry so
+            // late captures (e.g. video in @AfterMethod) attach to the correct
+            // invocation instead of a globally ambiguous bare-name bucket.
+            testKey = resolveFallbackKey(testName);
         }
 
         artifactsByTest.computeIfAbsent(testKey, k -> new CopyOnWriteArrayList<>()).add(artifact);
@@ -392,17 +413,67 @@ public class TestNGAdapter implements Adapter, ITestListener, ISuiteListener {
 
         String testKey = currentTestKey.get();
         if (testKey == null) {
-            testKey = testName;
-            logger.warn("Adding metric without test context. May collide for parameterized tests: {}", testName);
+            testKey = resolveFallbackKey(testName);
         }
 
         metricsByTest.computeIfAbsent(testKey, k -> new CopyOnWriteArrayList<>()).add(metric);
         logger.debug("Added metric '{}' to test '{}' (key: '{}')", metric.getName(), testName, testKey);
     }
 
+    /**
+     * Adds a step to a test.
+     *
+     * <p>
+     * <b>Test Code API:</b> Call this from your test code to record a granular
+     * sub-action (a UI interaction, an API call, a verification point, etc.)
+     * within the currently executing test. Steps are rendered in the report in
+     * insertion order, giving a structured breakdown of the test's behavior.
+     * </p>
+     *
+     * <p>
+     * Uses thread-local test key set by {@link #onTestStart(ITestResult)} for
+     * correct association, even with parameterized tests. Falls back to
+     * testName if called outside of TestNG listener context (may cause
+     * collisions).</p>
+     *
+     * @param testName the name of the test
+     * @param step the step to add
+     * @throws IllegalArgumentException if step is null
+     */
+    @Override
+    public void addStep(String testName, TestStep step) {
+        if (step == null) {
+            throw new IllegalArgumentException("Step cannot be null");
+        }
+        if (step.getStatus() == null) {
+            throw new IllegalArgumentException(
+                    "Step status cannot be null (the report renderer requires a status): " + step.getName());
+        }
+
+        String testKey = currentTestKey.get();
+        if (testKey == null) {
+            testKey = resolveFallbackKey(testName);
+        }
+
+        stepsByTest.computeIfAbsent(testKey, k -> new CopyOnWriteArrayList<>()).add(step);
+        logger.debug("Added step '{}' to test '{}' (key: '{}')", step.getName(), testName, testKey);
+    }
+
     @Override
     public TestRun getTestRun() {
         return testRun;
+    }
+
+    /**
+     * Returns the thread-local test key for the currently executing test on
+     * this thread, or null if no test is in progress. Exposed so subclasses
+     * (e.g. AppiumAdapter) can offer name-free capture methods that resolve
+     * the current test automatically.
+     *
+     * @return the current test key, or null
+     */
+    protected String getCurrentTestKey() {
+        return currentTestKey.get();
     }
 
     /**
@@ -425,14 +496,53 @@ public class TestNGAdapter implements Adapter, ITestListener, ISuiteListener {
     public void onFinish(ISuite suite) {
         onSuiteFinish(suite.getName());
 
-        testRun = enrichTestRun(aggregator.buildTestRun(suite, artifactsByTest, metricsByTest));
+        testRun = enrichTestRun(aggregator.buildTestRun(suite, artifactsByTest, metricsByTest, stepsByTest));
         logger.info("TestRun built for suite: {}", suite.getName());
 
-        artifactsByTest.clear();
-        metricsByTest.clear();
-        logger.debug("Cleared artifact and metric maps after building TestRun");
+        // The shared stores are static (shared across all adapter instances), so a
+        // blanket clear() would delete artifacts/metrics/steps belonging to other
+        // suites that are still running in parallel. Remove only this suite's entries.
+        // Test keys are prefixed with "<suiteName>." (see TestResultAggregator.getTestKey).
+        String suitePrefix = suite.getName() + ".";
+        artifactsByTest.keySet().removeIf(k -> k.startsWith(suitePrefix));
+        metricsByTest.keySet().removeIf(k -> k.startsWith(suitePrefix));
+        stepsByTest.keySet().removeIf(k -> k.startsWith(suitePrefix));
+        keysByMethodName.values().forEach(set -> set.removeIf(k -> k.startsWith(suitePrefix)));
+        keysByMethodName.entrySet().removeIf(e -> e.getValue().isEmpty());
+        logger.debug("Cleared artifact, metric, and step entries for suite: {}", suite.getName());
 
         generateReports();
+    }
+
+    /**
+     * Registers the full invocation key under its bare method name so late
+     * captures (outside the listener window) can be re-scoped to the correct
+     * invocation.
+     */
+    private static void registerMethodKey(ITestResult result, String testKey) {
+        String methodName = result.getMethod() != null ? result.getMethod().getMethodName() : null;
+        if (methodName != null && testKey != null) {
+            keysByMethodName.computeIfAbsent(methodName, k -> ConcurrentHashMap.newKeySet()).add(testKey);
+        }
+    }
+
+    /**
+     * Resolves the scoped fallback key for a capture that happened outside the
+     * listener window (no thread-local). When the method name maps to exactly
+     * one known invocation key, that key is used so the capture attaches to the
+     * correct parameterized invocation. Otherwise the bare name is used as a
+     * last resort and a warning is logged.
+     */
+    private static String resolveFallbackKey(String testName) {
+        java.util.Set<String> keys = keysByMethodName.get(testName);
+        if (keys != null && keys.size() == 1) {
+            String scopedKey = keys.iterator().next();
+            logger.debug("Resolved fallback key for '{}' to scoped invocation key '{}'", testName, scopedKey);
+            return scopedKey;
+        }
+        logger.warn("Adding data without an active test context; using bare name '{}'. "
+                + "May be ambiguous for parameterized tests.", testName);
+        return testName;
     }
 
     /**
@@ -526,6 +636,7 @@ public class TestNGAdapter implements Adapter, ITestListener, ISuiteListener {
         String testKey = aggregator.getTestKey(result);
         currentTestKey.set(testKey);
         setRestAssuredTestContext(testKey);
+        registerMethodKey(result, testKey);
 
         logger.info("Test started (TestNG listener): {}", result.getName());
     }

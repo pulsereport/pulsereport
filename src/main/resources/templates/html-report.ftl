@@ -492,8 +492,8 @@
 
         .suite-class-path {
             font-size: 0.72rem;
-            font-weight: 400;
-            color: var(--text-muted);
+            font-weight: 500;
+            color: var(--text-secondary);
             font-family: var(--font-mono);
             letter-spacing: 0;
             margin-left: 6px;
@@ -785,6 +785,15 @@
             transition: opacity 0.15s;
         }
         .screenshot-thumb:hover { opacity: 0.85; }
+        .video-wrap { padding: 8px 0 4px; }
+        .artifact-video {
+            max-width: 100%;
+            max-height: 360px;
+            border-radius: 6px;
+            border: 1px solid var(--border-light);
+            display: block;
+            background: #000;
+        }
         /* Lightbox */
         #screenshot-lightbox {
             display: none;
@@ -992,6 +1001,24 @@
         .bdd-step-name {
             flex: 1;
             color: var(--text-primary);
+        }
+
+        .bdd-step-duration {
+            flex-shrink: 0;
+            color: var(--text-secondary);
+            font-size: 0.8rem;
+            margin-left: 8px;
+        }
+
+        .bdd-step-desc-row { list-style: none; }
+        .step-description {
+            margin: 0 0 4px 34px;
+            padding: 0;
+            color: var(--text-secondary);
+            font-size: 0.84rem;
+            line-height: 1.4;
+            white-space: pre-wrap;
+            word-break: break-word;
         }
 
         .bdd-step-status { flex-shrink: 0; display: inline-flex; align-items: center; }
@@ -1381,7 +1408,6 @@
             align-items: center;
             justify-content: center;
             gap: 4px;
-            transition: background 0.15s, border-color 0.15s, color 0.15s;
         }
 
         .expand-btn {
@@ -2050,9 +2076,22 @@
             <span class="toggle-icon"><svg class="chevron-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg></span>
         </div>
         <div class="artifact-content">
-            <#if oa.mimeType?? && oa.mimeType?starts_with("image/")><#assign _imgSrc = toDataUri(oa.path, oa.mimeType)><#if _imgSrc?has_content>
-                <div class="screenshot-wrap"><img class="screenshot-thumb" src="${_imgSrc}" alt="${oa.name}" onclick="openLightbox(this.src)" /></div>
-            <#else><a href="${oa.path}" download="${oa.name}">Download ${oa.name}</a></#if>
+            <#if oa.mimeType?? && oa.mimeType?starts_with("image/")>
+                <#-- Prefer embedded base64 content (auto-captured screenshots); fall back to reading from path -->
+                <#if oa.content?? && oa.content?has_content>
+                    <#assign _imgSrc = "data:" + oa.mimeType + ";base64," + oa.content>
+                <#else>
+                    <#assign _imgSrc = toDataUri(oa.path, oa.mimeType)>
+                </#if>
+                <#if _imgSrc?has_content>
+                <div class="screenshot-wrap"><img class="screenshot-thumb" src="${_imgSrc?html}" alt="${oa.name?html}" onclick="openLightbox(this.src)" /></div>
+                <#else><a href="${oa.path?html}" download="${oa.name?html}">Download ${oa.name?html}</a></#if>
+            <#elseif oa.mimeType?? && oa.mimeType?starts_with("video/")>
+                <#if oa.content?? && oa.content?has_content>
+                <div class="video-wrap"><video class="artifact-video" controls preload="metadata"><source src="data:${oa.mimeType?html};base64,${oa.content}" type="${oa.mimeType?html}"></video></div>
+                <#else>
+                <div class="video-wrap"><video class="artifact-video" controls preload="metadata"><source src="${oa.path?html}" type="${oa.mimeType?html}"></video></div>
+                </#if>
             <#elseif oa.content??><#if oa.mimeType?? && oa.mimeType?contains("json")><pre class="artifact-code">${prettyPrintJson(oa.content)?html}</pre><#elseif oa.mimeType?? && oa.mimeType?contains("xml")><pre class="artifact-code">${prettyPrintXml(oa.content)?html}</pre><#else><pre class="artifact-code">${oa.content?html}</pre></#if>
             <#else><a href="${oa.path}" download="${oa.name}">Download ${oa.name}</a></#if>
         </div>
@@ -2078,6 +2117,15 @@
     <#assign browserName = environment["browser"]!"">
     <#assign browserVersion = environment["browserVersion"]!"">
     <#assign platformName = environment["platform"]!"">
+    <#-- Mobile session metadata (recorded via AppiumAdapter.recordSessionMetadata) -->
+    <#assign mobPlatform = environment["mobile.platform"]!"">
+    <#assign mobPlatformVersion = environment["mobile.platformVersion"]!"">
+    <#assign mobDeviceName = environment["mobile.deviceName"]!"">
+    <#assign mobDeviceModel = environment["mobile.deviceModel"]!"">
+    <#assign mobAppVersion = environment["mobile.appVersion"]!"">
+    <#assign mobAppiumVersion = environment["mobile.appiumServerVersion"]!"">
+    <#assign mobUdid = environment["mobile.udid"]!"">
+    <#assign mobAutomation = environment["mobile.automationName"]!"">
     <#assign heroStatusValue = (testRun.status!"")?string>
     <#assign heroStatusClass = heroStatusValue?lower_case?replace("_", "-")?replace(" ", "-")>
     <#assign hasBrowserMetadata = browserName?has_content || browserVersion?has_content || platformName?has_content>
@@ -2159,6 +2207,24 @@
                         </#if>
                         <#if isWebRun && platformName?has_content>
                         <span class="report-meta-pill">Platform: ${platformName}</span>
+                        </#if>
+                        <#if mobPlatform?has_content>
+                        <span class="report-meta-pill">Platform: ${mobPlatform?html}<#if mobPlatformVersion?has_content> ${mobPlatformVersion?html}</#if></span>
+                        </#if>
+                        <#if mobDeviceName?has_content || mobDeviceModel?has_content>
+                        <span class="report-meta-pill">Device: <#if mobDeviceName?has_content>${mobDeviceName?html}<#else>${mobDeviceModel?html}</#if></span>
+                        </#if>
+                        <#if mobUdid?has_content>
+                        <span class="report-meta-pill">UDID: ${mobUdid?html}</span>
+                        </#if>
+                        <#if mobAutomation?has_content>
+                        <span class="report-meta-pill">Automation: ${mobAutomation?html}</span>
+                        </#if>
+                        <#if mobAppVersion?has_content>
+                        <span class="report-meta-pill">App: ${mobAppVersion?html}</span>
+                        </#if>
+                        <#if mobAppiumVersion?has_content>
+                        <span class="report-meta-pill">Appium: ${mobAppiumVersion?html}</span>
                         </#if>
                     </div>
                 </div>
@@ -2248,9 +2314,6 @@
             </div>
             <div class="test-suite-body">
             <#list suite.testCases as testCase>
-            <#if testCase.className?? && !testCase.bddType?? && suiteClassPath == "" && (testCase?is_first || testCase.className != suite.testCases[testCase?index - 1].className!)>
-            <div class="class-file-header"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>${testCase.className}</div>
-            </#if>
             <#assign hasTestError = testCase.errorMessage?? && testCase.errorMessage?has_content>
             <#assign hasArtifacts = testCase.artifacts?? && (testCase.artifacts?size > 0)>
             <#assign hasMetrics = testCase.metrics?? && (testCase.metrics?size > 0)>
@@ -2262,7 +2325,7 @@
                     <span class="status-badge ${testCase.status?lower_case}"></span>
                     <span class="test-case-name">
                         <#if testCase.methodName??>${testCase.methodName?html}<#if testCase.name?? && testCase.name != testCase.methodName>
-                        <span class="test-case-method">${testCase.name?html}</span></#if><#elseif testCase.name??>${testCase.name?html}</#if>
+                        <span class="test-case-method">${testCase.name?html}</span></#if><#elseif testCase.name??>${testCase.name?html}</#if><#if testCase.className?? && !testCase.bddType??><span class="suite-class-path">${testCase.className?replace(".", "/")}.java</span></#if>
                         <#if testCase.tags?? && (testCase.tags?size > 0)><span class="test-case-tags"><#list testCase.tags as tag><span class="tag-label">${tag}</span></#list></span></#if>
                     </span>
                     <span class="test-case-time">${formatDuration(testCase.duration)}</span>
@@ -2380,7 +2443,32 @@
                             </#if>
                         </div>
                         </#if>
-                        
+
+                        <#-- Steps recorded via the step API (TestNG/Selenium/Appium) -->
+                        <#if testCase.steps?? && (testCase.steps?size > 0)>
+                        <div class="bdd-scenario-steps-title">Steps</div>
+                        <ul class="bdd-steps-list">
+                        <#list testCase.steps as mStep>
+                            <li class="bdd-step<#if mStep.errorMessage??> has-error error-expanded</#if>">
+                                <span class="bdd-step-status"><span class="bdd-step-icon ${mStep.status?lower_case}"><#if mStep.status == "PASSED"><svg viewBox="0 0 14 14" width="14" height="14" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="7" cy="7" r="5.5"/><path d="M4.2 7.2 6.2 9.1 9.9 5.3"/></svg><#elseif mStep.status == "FAILED"><svg viewBox="0 0 14 14" width="14" height="14" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="7" cy="7" r="5.5"/><path d="M5 5 9 9M9 5 5 9"/></svg><#elseif mStep.status == "SKIPPED"><svg viewBox="0 0 14 14" width="14" height="14" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="7" cy="7" r="5.5"/><path d="M4.5 7h5"/></svg><#else><svg viewBox="0 0 14 14" width="14" height="14" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="7" cy="7" r="5.5"/></svg></#if><span class="sr-only">${mStep.status}</span></span></span>
+                                <span class="bdd-step-name">${(mStep.name!"")?html}</span>
+                                <#if mStep.duration gt 0><span class="bdd-step-duration">${formatDuration(mStep.duration)}</span></#if>
+                            </li>
+                            <#if mStep.description?? && mStep.description?has_content>
+                            <li class="bdd-step-desc-row"><div class="step-description">${mStep.description?html}</div></li>
+                            </#if>
+                            <#if mStep.errorMessage??>
+                            <li class="bdd-step-error-row">
+                                <div class="bdd-step-error">
+                                    <div class="bdd-step-error-title">${mStep.errorMessage?html}</div>
+                                    <#if mStep.stackTrace??><div class="bdd-step-stack">${mStep.stackTrace?html}</div></#if>
+                                </div>
+                            </li>
+                            </#if>
+                        </#list>
+                        </ul>
+                        </#if>
+
                         <#if testCase.artifacts?? && (testCase.artifacts?size > 0)>
                         <div class="artifact-section">
                             <@renderArtifacts artifacts=testCase.artifacts />

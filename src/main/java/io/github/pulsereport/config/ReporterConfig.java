@@ -27,6 +27,7 @@ public class ReporterConfig {
     private int maxArtifactContentSize;
     private boolean maskSensitiveData;
     private String sensitiveHeaders;
+    private String videoStorage;
 
     /**
      * Private constructor - use builder or load methods.
@@ -38,6 +39,7 @@ public class ReporterConfig {
         this.maxArtifactContentSize = 51200; // 50KB default
         this.maskSensitiveData = true;
         this.sensitiveHeaders = "Authorization,X-API-Key,Cookie,Set-Cookie";
+        this.videoStorage = "path"; // path | embed | url
     }
 
     /**
@@ -139,6 +141,8 @@ public class ReporterConfig {
         config.maxArtifactContentSize = Integer.parseInt(props.getProperty("reporter.maxArtifactContentSize", "51200"));
         config.maskSensitiveData = Boolean.parseBoolean(props.getProperty("reporter.maskSensitiveData", "true"));
         config.sensitiveHeaders = interpolate(props.getProperty("reporter.sensitiveHeaders", "Authorization,X-API-Key,Cookie,Set-Cookie"));
+        String videoStorageValue = interpolate(props.getProperty("reporter.video.storage", "path"));
+        config.videoStorage = videoStorageValue == null ? "path" : videoStorageValue.trim().toLowerCase();
 
         return config;
     }
@@ -208,6 +212,14 @@ public class ReporterConfig {
                 throw new ConfigException("Slack webhook URL must be specified when Slack is enabled");
             }
         }
+
+        if (videoStorage != null
+                && !videoStorage.equals("path")
+                && !videoStorage.equals("embed")
+                && !videoStorage.equals("url")) {
+            throw new ConfigException("Invalid video storage: " + videoStorage
+                    + ". Valid values are: path, embed, url");
+        }
     }
 
     // Getters
@@ -243,6 +255,16 @@ public class ReporterConfig {
         return sensitiveHeaders;
     }
 
+    /**
+     * Gets the video storage mode: "path" (reference local/hosted file),
+     * "embed" (inline base64), or "url" (external URL). Defaults to "path".
+     *
+     * @return the video storage mode
+     */
+    public String getVideoStorage() {
+        return videoStorage;
+    }
+
     @Override
     public String toString() {
         return "ReporterConfig{"
@@ -254,6 +276,7 @@ public class ReporterConfig {
                 + ", maxArtifactContentSize=" + maxArtifactContentSize
                 + ", maskSensitiveData=" + maskSensitiveData
                 + ", sensitiveHeaders='" + sensitiveHeaders + '\''
+                + ", videoStorage='" + videoStorage + '\''
                 + '}';
     }
 
@@ -305,6 +328,11 @@ public class ReporterConfig {
 
         public Builder sensitiveHeaders(String sensitiveHeaders) {
             config.sensitiveHeaders = sensitiveHeaders;
+            return this;
+        }
+
+        public Builder videoStorage(String videoStorage) {
+            config.videoStorage = videoStorage;
             return this;
         }
 
