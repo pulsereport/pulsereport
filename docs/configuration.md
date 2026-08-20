@@ -6,9 +6,9 @@ Use PulseReport configuration to control how the reporting layer captures eviden
 
 ### PulseReport configuration file (`reporter.properties`)
 
-PulseReport includes `src/main/resources/reporter.properties` as a sample starter file. The CLI auto-detects this file when `--config` is omitted, searching in:
+PulseReport includes `src/main/resources/reporter.properties` as a sample starter file. **All adapters** (RestAssured, Cucumber, TestNG, Appium) and the CLI auto-detect this file — no client-side configuration code is needed when `reporter.properties` is on the classpath or in the working directory. Auto-detection searches in:
 
-1. `./reporter.properties` (project root)
+1. `./reporter.properties` (working directory / project root)
 2. `./src/main/resources/reporter.properties`
 3. The classpath (`/reporter.properties`)
 
@@ -55,7 +55,15 @@ The current `ReporterConfig` implementation actively reads these keys:
 - `reporter.slack.reportUrl`
 - `reporter.maxArtifactContentSize`
 - `reporter.maskSensitiveData`
-- `reporter.sensitiveHeaders`
+- `reporter.maskHeaders.enabled`
+- `reporter.maskHeaders.fields`
+- `reporter.maskBody.enabled`
+- `reporter.maskBody.fields`
+- `reporter.maskBody.maskTokens`
+- `reporter.maskXml.enabled`
+- `reporter.maskXml.fields`
+
+The masking keys are described in detail in [Sensitive Data Masking](#sensitive-data-masking).
 
 Other property examples in this document preserve the current PulseReport naming, but they are not all mapped by `ReporterConfig` yet.
 
@@ -180,14 +188,152 @@ reporter.restassured.logging.cookies=false
 reporter.restassured.logging.maxBodySize=10240
 # In bytes (10KB default)
 
-# Mask sensitive data
-reporter.restassured.mask.credentials=true
-reporter.restassured.mask.headers=Authorization,X-API-Key
-reporter.restassured.mask.cookies=session,auth_token
+# Sensitive data masking uses the reporter.mask* keys documented in
+# Sensitive Data Masking below (enabled by default).
+reporter.maskSensitiveData=true
 
 # Response time tracking
 reporter.restassured.metrics.responseTime=true
 ```
+
+## Sensitive Data Masking
+
+The REST-assured adapter masks credentials, tokens, and other sensitive values in captured request/response artifacts before they reach any report. Masking is **enabled by default** and requires no configuration.
+
+### Master Switch
+
+```properties
+# Gates ALL masking (headers, bodies, XML, tokens). Default: true
+reporter.maskSensitiveData=true
+```
+
+When `reporter.maskSensitiveData=false`, no masking of any kind is applied, regardless of the per-category toggles below.
+
+### Header Masking
+
+```properties
+# Whether header masking is applied (default: true)
+reporter.maskHeaders.enabled=true
+
+# Comma-separated header names to mask
+# Default: Authorization,X-API-Key,Cookie,Set-Cookie
+reporter.maskHeaders.fields=Authorization,X-API-Key,Cookie,Set-Cookie
+```
+
+Header name matching is case-insensitive. Masked header values become `***REDACTED***`.
+
+### Body Masking (JSON and form-urlencoded)
+
+```properties
+# Whether body masking is applied (default: true)
+reporter.maskBody.enabled=true
+
+# Comma-separated body field names to mask
+# Default: password,secret,token,access_token,refresh_token,id_token,client_secret,api_key,apiKey,authorization
+reporter.maskBody.fields=password,secret,token,access_token,refresh_token,id_token,client_secret,api_key,apiKey,authorization
+
+# Whether Bearer/JWT regex masking passes are applied to ALL body types (default: true)
+reporter.maskBody.maskTokens=true
+```
+
+- **JSON bodies** (body starts with `{` or `[`) are parsed and masked recursively at any depth: any field whose name case-insensitively matches the list has its value replaced with `***REDACTED***`. String, number, boolean, and null values are all replaced with the redacted string.
+- **Form-urlencoded bodies** (`key=value&...`) are masked by key, case-insensitively.
+- **All body types**: when `reporter.maskBody.maskTokens=true`, a Bearer/JWT regex pass additionally redacts tokens (JWTs are anchored on the `eyJ` prefix to avoid false positives like version numbers).
+
+### XML Body Masking
+
+```properties
+# Whether XML element masking is applied (default: true)
+reporter.maskXml.enabled=true
+
+# Comma-separated XML element names to mask.
+# When unset, inherits the reporter.maskBody.fields list.
+reporter.maskXml.fields=password,secret,token
+```
+
+For XML bodies (body starts with `<`), the text content of any element whose tag name case-insensitively matches the list is replaced with `***REDACTED***`. Namespace prefixes are ignored (e.g. `ns:password` matches `password`). **Attributes are NOT masked.** Parsing is XXE-safe (DOCTYPE declarations are disallowed and external entities are disabled), and malformed XML safely falls back to token-only masking — the masker never throws and never logs the unmasked body.
+
+### Field Lists Are Authoritative
+
+Setting a field list **fully replaces** the built-in defaults — lists are not additive. For example, `reporter.maskHeaders.fields=X-Custom-Secret` means only `X-Custom-Secret` is masked; `Authorization` is no longer masked unless you add it to the list.
+
+### Configuration Auto-Detection
+
+Auto-detection applies to **all adapters and the CLI**. When `reporter.properties` is in the working directory or on the classpath, no client-side configuration code is needed:
+
+- `new RestAssuredAdapter()` (default constructor) resolves configuration in this order:
+  1. `./reporter.properties` (working directory)
+  2. `./src/main/resources/reporter.properties`
+  3. `/reporter.properties` on the classpath
+  4. Built-in defaults (all masking enabled)
+- The Cucumber and TestNG adapters auto-detect `reporter.properties` from the same locations when resolving the report output directory at the end of the run.
+- The Appium adapter auto-detects `reporter.properties` (e.g. for `reporter.video.storage`) from the same locations.
+- The CLI auto-detects `reporter.properties` when `--config` is omitted.
+
+An explicit configuration always wins: `new RestAssuredAdapter(config)` and `ReporterConfig.loadFromFile(...)` bypass auto-detection entirely.
+
+### Output Directory Precedence
+
+The Cucumber and TestNG adapters resolve the report output directory with `ReporterConfig.resolveOutputDirectory(...)`, using this precedence (highest first):
+
+1. The `-Dreporter.output.directory` system property, if set and non-blank
+2. The `reporter.output.directory` value from an auto-detected `reporter.properties` file
+3. The default `target/pulsereport`
+
+This means a `reporter.properties` file alone is enough to redirect reports — a system property is only needed to override the file, and resolution never fails: if no file is found, reports go to `target/pulsereport`.
+
+Relative output directories are resolved against the working directory (`user.dir`); under Maven Surefire this is the module directory.
+
+### Complete Example
+
+```properties
+# ---- Sensitive data masking ----
+# Master switch: gates ALL masking below (default: true)
+reporter.maskSensitiveData=true
+
+# Header masking (default: true)
+reporter.maskHeaders.enabled=true
+# Authoritative list of header names to mask (case-insensitive);
+# values become ***REDACTED***
+reporter.maskHeaders.fields=Authorization,X-API-Key,Cookie,Set-Cookie
+
+# Body masking for JSON and form-urlencoded bodies (default: true)
+reporter.maskBody.enabled=true
+# Authoritative list of body field names to mask; JSON is masked
+# recursively at any depth and values of any type (string, number,
+# boolean, null) become ***REDACTED***
+reporter.maskBody.fields=password,secret,token,access_token,refresh_token,id_token,client_secret,api_key,apiKey,authorization
+# Bearer/JWT regex pass applied to ALL body types (default: true)
+reporter.maskBody.maskTokens=true
+
+# XML body masking (default: true); element text masked by tag name
+# (case-insensitive, namespace prefixes ignored); attributes are NOT
+# masked; malformed XML falls back to token-only masking
+reporter.maskXml.enabled=true
+# When unset, inherits reporter.maskBody.fields
+reporter.maskXml.fields=password,secret,token,access_token,refresh_token,id_token,client_secret,api_key,apiKey,authorization
+```
+
+### Programmatic Masking Configuration
+
+```java
+ReporterConfig config = ReporterConfig.builder()
+    .maskSensitiveData(true)
+    .maskHeadersEnabled(true)
+    .maskHeaderFields("Authorization,X-API-Key,Cookie,Set-Cookie,X-Custom-Secret")
+    .maskBodyEnabled(true)
+    .sensitiveBodyFields("password,secret,token,cvv")
+    .maskXmlEnabled(true)
+    .maskXmlFields("password,secret") // omit to inherit sensitiveBodyFields
+    .maskTokens(true)
+    .build();
+```
+
+The matching getters are `isMaskSensitiveData()`, `isMaskHeadersEnabled()`, `getMaskHeaderFields()`, `isMaskBodyEnabled()`, `getSensitiveBodyFields()`, `isMaskXmlEnabled()`, `getXmlFields()`, and `isMaskTokens()`.
+
+### Migrating from `reporter.sensitiveHeaders`
+
+The `reporter.sensitiveHeaders` key and the `sensitiveHeaders(...)` / `getSensitiveHeaders()` builder API were **removed** in this release. Configurations using the old key must rename it to `reporter.maskHeaders.fields`, and code using the old builder methods must switch to `maskHeaderFields(...)` / `getMaskHeaderFields()`.
 
 ## Output Format Configuration
 
@@ -462,7 +608,10 @@ ReporterConfig config = ReporterConfig.builder()
     .s3Config(s3Config)
     .maxArtifactContentSize(64 * 1024)
     .maskSensitiveData(true)
-    .sensitiveHeaders("Authorization,X-API-Key")
+    .maskHeadersEnabled(true)
+    .maskHeaderFields("Authorization,X-API-Key")
+    .maskBodyEnabled(true)
+    .maskTokens(true)
     .build();
 ```
 
@@ -489,7 +638,13 @@ ReporterConfig effectiveConfig = ReporterConfig.builder()
     .slackConfig(loadedConfig.getSlackConfig())
     .maxArtifactContentSize(loadedConfig.getMaxArtifactContentSize())
     .maskSensitiveData(loadedConfig.isMaskSensitiveData())
-    .sensitiveHeaders(loadedConfig.getSensitiveHeaders())
+    .maskHeadersEnabled(loadedConfig.isMaskHeadersEnabled())
+    .maskHeaderFields(loadedConfig.getMaskHeaderFields())
+    .maskBodyEnabled(loadedConfig.isMaskBodyEnabled())
+    .sensitiveBodyFields(loadedConfig.getSensitiveBodyFields())
+    .maskXmlEnabled(loadedConfig.isMaskXmlEnabled())
+    .maskXmlFields(loadedConfig.getXmlFields())
+    .maskTokens(loadedConfig.isMaskTokens())
     .build();
 ```
 
@@ -528,7 +683,13 @@ reporter.slack.enabled=false
 
 reporter.maxArtifactContentSize=51200
 reporter.maskSensitiveData=true
-reporter.sensitiveHeaders=Authorization,X-API-Key,Cookie,Set-Cookie
+reporter.maskHeaders.enabled=true
+reporter.maskHeaders.fields=Authorization,X-API-Key,Cookie,Set-Cookie
+reporter.maskBody.enabled=true
+reporter.maskBody.fields=password,secret,token,access_token,refresh_token,id_token,client_secret,api_key,apiKey,authorization
+reporter.maskBody.maskTokens=true
+reporter.maskXml.enabled=true
+# reporter.maskXml.fields inherits reporter.maskBody.fields when unset
 ```
 
 ## Best Practices

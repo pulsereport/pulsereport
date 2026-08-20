@@ -4,6 +4,7 @@ import java.io.File;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -17,6 +18,13 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import io.cucumber.gherkin.GherkinParser;
+import io.cucumber.messages.types.Examples;
+import io.cucumber.messages.types.FeatureChild;
+import io.cucumber.messages.types.Scenario;
+import io.cucumber.messages.types.TableCell;
+import io.cucumber.messages.types.TableRow;
 
 import io.cucumber.plugin.EventListener;
 import io.cucumber.plugin.event.DataTableArgument;
@@ -41,6 +49,7 @@ import io.github.pulsereport.core.model.TestRun;
 import io.github.pulsereport.core.model.TestStatus;
 import io.github.pulsereport.core.model.TestStep;
 import io.github.pulsereport.core.model.TestSuite;
+import io.github.pulsereport.config.ReporterConfig;
 import io.github.pulsereport.outputs.html.HtmlReportGenerator;
 import io.github.pulsereport.outputs.json.JsonReportGenerator;
 
@@ -111,6 +120,15 @@ public class CucumberAdapter implements EventListener {
      * appears in this set belongs to the Background section.
      */
     private final Map<URI, java.util.Set<Integer>> backgroundLinesByUri = new ConcurrentHashMap<>();
+
+    /**
+     * Examples body row data per feature URI, keyed by the row's 1-based
+     * source line. Populated by parsing the Gherkin AST on
+     * {@link TestSourceRead}. A Scenario Outline pickle's
+     * {@code TestCase.getLine()} points at its Examples body row, which is
+     * used as the join key.
+     */
+    private final Map<URI, Map<Integer, ExampleRowData>> exampleRowsByUri = new ConcurrentHashMap<>();
 
     /**
      * When the whole test run started.
@@ -186,6 +204,77 @@ public class CucumberAdapter implements EventListener {
             backgroundLinesByUri.put(event.getUri(), bgLines);
             logger.debug("Background step lines for {}: {}", event.getUri(), bgLines);
         }
+        indexExampleRows(event.getUri(), source);
+    }
+
+    /**
+     * Parses the Gherkin AST to index Examples body rows so that flattened
+     * Scenario Outline pickles can be enriched with the un-substituted
+     * outline name and per-row parameter values. Failures are non-fatal:
+     * outline cases simply carry no example data.
+     */
+    private void indexExampleRows(URI uri, String source) {
+        if (source == null || source.isBlank()) {
+            return;
+        }
+        try {
+            Map<Integer, ExampleRowData> rows = new LinkedHashMap<>();
+            GherkinParser.builder().build()
+                    .parse(uri.toString(), source.getBytes(StandardCharsets.UTF_8))
+                    .forEach(envelope -> envelope.getGherkinDocument()
+                            .flatMap(doc -> doc.getFeature())
+                            .ifPresent(feature ->
+                                    collectExampleRows(feature.getChildren(), rows)));
+            if (!rows.isEmpty()) {
+                exampleRowsByUri.put(uri, rows);
+                logger.debug("Indexed {} example rows for {}", rows.size(), uri);
+            }
+        } catch (RuntimeException e) {
+            logger.debug("Could not parse Gherkin AST for {}: {}", uri, e.getMessage());
+        }
+    }
+
+    private void collectExampleRows(List<FeatureChild> children, Map<Integer, ExampleRowData> rows) {
+        for (FeatureChild child : children) {
+            child.getScenario().ifPresent(scenario -> collectScenarioExamples(scenario, rows));
+            child.getRule().ifPresent(rule -> rule.getChildren().forEach(ruleChild ->
+                    ruleChild.getScenario().ifPresent(scenario ->
+                            collectScenarioExamples(scenario, rows))));
+        }
+    }
+
+    private void collectScenarioExamples(Scenario scenario, Map<Integer, ExampleRowData> rows) {
+        for (Examples examples : scenario.getExamples()) {
+            List<String> headers = examples.getTableHeader()
+                    .map(header -> header.getCells().stream()
+                            .map(TableCell::getValue)
+                            .toList())
+                    .orElse(List.of());
+            for (TableRow row : examples.getTableBody()) {
+                Map<String, String> params = new LinkedHashMap<>();
+                List<TableCell> cells = row.getCells();
+                for (int i = 0; i < headers.size() && i < cells.size(); i++) {
+                    params.put(headers.get(i), cells.get(i).getValue());
+                }
+                rows.put(row.getLocation().getLine().intValue(),
+                        new ExampleRowData(scenario.getName(), params));
+            }
+        }
+    }
+
+    /**
+     * Example row data extracted from the Gherkin AST: the un-substituted
+     * Scenario Outline name plus this row's parameter values in column
+     * order.
+     */
+    private static final class ExampleRowData {
+        private final String outlineName;
+        private final Map<String, String> params;
+
+        private ExampleRowData(String outlineName, Map<String, String> params) {
+            this.outlineName = outlineName;
+            this.params = params;
+        }
     }
 
     private void onTestSourceParsed(TestSourceParsed event) {
@@ -222,6 +311,14 @@ public class CucumberAdapter implements EventListener {
                 tags
         );
         ctx.setStartTime(event.getInstant());
+
+        if (isOutline) {
+            ExampleRowData rowData = findExampleRowData(tc);
+            if (rowData != null) {
+                ctx.setScenarioOutlineName(rowData.outlineName);
+                ctx.setExampleParams(rowData.params);
+            }
+        }
 
         currentScenario.set(ctx);
         CucumberStepContext.currentStepArtifacts.set(new ArrayList<>());
@@ -347,6 +444,8 @@ public class CucumberAdapter implements EventListener {
                 .featureName(ctx.getFeatureName())
                 .featureDescription(ctx.getFeatureDescription())
                 .tags(ctx.getTags())
+                .scenarioOutlineName(ctx.getScenarioOutlineName())
+                .exampleParams(ctx.getExampleParams())
                 .build();
 
         URI featureUri = tc.getUri();
@@ -469,7 +568,8 @@ public class CucumberAdapter implements EventListener {
 
     private void generateReports(TestRun testRun) {
         try {
-            String outputDir = System.getProperty("reporter.output.directory", "target/pulsereport");
+            String outputDir = ReporterConfig.resolveOutputDirectory("reporter.output.directory",
+                    "target/pulsereport");
             File reportDir = resolveOutputDirectory(outputDir);
             reportDir.mkdirs();
 
@@ -500,6 +600,18 @@ public class CucumberAdapter implements EventListener {
     }
 
     // Helpers
+    /**
+     * Looks up the Examples body row data for a Scenario Outline pickle.
+     * The pickle's line points at its Examples body row in the source.
+     */
+    private ExampleRowData findExampleRowData(io.cucumber.plugin.event.TestCase tc) {
+        Map<Integer, ExampleRowData> rows = exampleRowsByUri.get(tc.getUri());
+        if (rows == null || tc.getLocation() == null) {
+            return null;
+        }
+        return rows.get(tc.getLocation().getLine());
+    }
+
     private TestStatus convertStatus(Status status) {
         return switch (status) {
             case PASSED ->

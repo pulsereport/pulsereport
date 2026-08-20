@@ -69,6 +69,8 @@ reporter.output.formats=html,json,junit
 reporter.output.directory=target/pulsereport
 ```
 
+All adapters and the CLI auto-detect this file (working directory, `src/main/resources/`, or classpath), so no client-side configuration code is needed. If present, `-Dreporter.output.directory` overrides the file's `reporter.output.directory`; otherwise reports go to the directory in the file, falling back to `target/pulsereport`.
+
 ### Step 5: (Optional) View HTML Reports
 
 After running tests, open:

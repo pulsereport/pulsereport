@@ -503,8 +503,11 @@ mv target/pulsereport target/pulsereport-$(date +%Y%m%d-%H%M%S)
 Mask sensitive information in reports:
 
 ```properties
-# Mask credentials in REST API tests
-reporter.restassured.mask.credentials=true
+# Masking is enabled by default; these are the master switch and
+# per-category controls for REST API tests
+reporter.maskSensitiveData=true
+reporter.maskHeaders.fields=Authorization,X-API-Key,Cookie,Set-Cookie
+reporter.maskBody.fields=password,secret,token
 
 # Exclude environment variables
 reporter.json.excludeEnvVars=PASSWORD,API_KEY,SECRET

@@ -543,11 +543,11 @@ public class Hooks {
 #### Option 2: With custom configuration
 
 ```java
-import io.github.pulsereport.core.ReporterConfig;
+import io.github.pulsereport.config.ReporterConfig;
 
 ReporterConfig config = ReporterConfig.builder()
     .maskSensitiveData(true)
-    .sensitiveHeaders("Authorization,X-API-Key,Cookie,Set-Cookie,X-Custom-Secret")
+    .maskHeaderFields("Authorization,X-API-Key,Cookie,Set-Cookie,X-Custom-Secret")
     .build();
 
 RestAssured.filters(new RestAssuredAdapter(config));
@@ -690,11 +690,16 @@ reporter.restassured.logging.request=true
 reporter.restassured.logging.response=true
 reporter.restassured.logging.headers=true
 reporter.restassured.logging.body=true
-reporter.restassured.mask.credentials=true
 
-# Sensitive data masking (enabled by default)
+# Sensitive data masking (enabled by default; see configuration.md
+# for the full masking reference, including body, XML, and token masking)
 reporter.maskSensitiveData=true
-reporter.sensitiveHeaders=Authorization,X-API-Key,Cookie,Set-Cookie
+reporter.maskHeaders.enabled=true
+reporter.maskHeaders.fields=Authorization,X-API-Key,Cookie,Set-Cookie
+reporter.maskBody.enabled=true
+reporter.maskBody.fields=password,secret,token,access_token,refresh_token,id_token,client_secret,api_key,apiKey,authorization
+reporter.maskBody.maskTokens=true
+reporter.maskXml.enabled=true
 ```
 
 ### Example
@@ -822,11 +827,13 @@ On test run completion, the adapter generates:
 
 ### Configuration
 
-The Cucumber adapter uses the default PulseReport output directory (`target/pulsereport/`). To customize, set system properties:
+The Cucumber adapter auto-detects `reporter.properties` from the working directory, `src/main/resources/`, or the classpath — no client-side configuration code is needed. To customize the output directory, set `reporter.output.directory` in that file, or override it with a system property (highest precedence):
 
 ```bash
-mvn test -Dpulsereport.output.dir=custom/output/path
+mvn test -Dreporter.output.directory=custom/output/path
 ```
+
+Precedence: `-Dreporter.output.directory` system property > `reporter.properties` value > default `target/pulsereport`.
 
 ---
 

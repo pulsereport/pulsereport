@@ -671,6 +671,22 @@ Or enable auto-creation:
 reporter.output.createDirectory=true
 ```
 
+### Report written to `target/pulsereport` instead of my configured directory
+
+**Cause**: The Cucumber and TestNG adapters resolve the output directory in this precedence order (highest first):
+
+1. `-Dreporter.output.directory` system property
+2. `reporter.output.directory` from an auto-detected `reporter.properties`
+3. Default `target/pulsereport`
+
+So either your `reporter.properties` was not auto-detected (it must be at `./reporter.properties`, `./src/main/resources/reporter.properties`, or `/reporter.properties` on the classpath), or a `-Dreporter.output.directory` system property is overriding the file.
+
+**Solution**:
+
+- Check the adapter logs at startup/run completion — the Cucumber and TestNG adapters log the absolute path of each generated report (`PulseReport: HTML report generated / Location: ...`).
+- Under Maven Surefire the working directory is the module directory, so `./reporter.properties` means the module root, not necessarily the repo root. Putting the file in `src/main/resources/` (classpath) is the most reliable location.
+- Check whether a `-Dreporter.output.directory` system property is set (e.g. in the Maven command line or `surefire` `<systemPropertyVariables>`); it overrides the file value.
+
 ### "Failed to serialize TestRun"
 
 **Cause**: TestRun contains non-serializable objects.
