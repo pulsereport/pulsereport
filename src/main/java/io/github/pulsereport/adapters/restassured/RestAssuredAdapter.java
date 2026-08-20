@@ -105,6 +105,11 @@ public class RestAssuredAdapter implements Filter {
 
     private static final Logger logger = LoggerFactory.getLogger(RestAssuredAdapter.class);
 
+    private static final String HEADERS_PREFIX = "Headers:\n";
+    private static final String BODY_PREFIX = "Body:\n";
+    private static final String BINARY_SIZE_SUFFIX = " bytes]";
+    private static final String MIME_TEXT_PLAIN = "text/plain";
+
     // Static ThreadLocal to share test name across all adapter instances in the same thread
     // This enables the listener instance and filter instance to coordinate
     private static final ThreadLocal<String> currentTestName = new ThreadLocal<>();
@@ -121,11 +126,24 @@ public class RestAssuredAdapter implements Filter {
     private final ReporterConfig config;
 
     /**
-     * Constructs a new RestAssuredAdapter with default configuration.
+     * Constructs a new RestAssuredAdapter. Configuration is auto-detected via
+     * {@link ReporterConfig#autoDetect()} (working-directory
+     * {@code reporter.properties}, then
+     * {@code src/main/resources/reporter.properties}, then the classpath
+     * {@code /reporter.properties}); if nothing is found, a built-in default
+     * configuration is used.
      */
     public RestAssuredAdapter() {
-        this.config = createDefaultConfig();
-        logger.info("RestAssuredAdapter initialized with default config");
+        ReporterConfig detected = ReporterConfig.autoDetect();
+        if (detected != null) {
+            this.config = detected;
+            logger.info("RestAssuredAdapter initialized with auto-detected config"
+                    + " (reporter.properties from working directory or classpath)");
+        } else {
+            this.config = createDefaultConfig();
+            logger.info("RestAssuredAdapter initialized with default config"
+                    + " (no reporter.properties found, using built-in defaults)");
+        }
     }
 
     /**
@@ -241,8 +259,65 @@ public class RestAssuredAdapter implements Filter {
         return ReporterConfig.builder()
                 .maxArtifactContentSize(51200) // 50KB default
                 .maskSensitiveData(true)
-                .sensitiveHeaders("Authorization,X-API-Key,Cookie,Set-Cookie")
+                .maskHeaderFields("Authorization,X-API-Key,Cookie,Set-Cookie")
+                .maskBodyEnabled(true)
+                .sensitiveBodyFields("password,secret,token,access_token,refresh_token,"
+                        + "id_token,client_secret,api_key,apiKey,authorization")
+                .maskTokens(true)
                 .build();
+    }
+
+    /**
+     * Masks sensitive fields in an HTTP body when masking is enabled.
+     *
+     * <p>
+     * Masking is applied only when both {@code maskSensitiveData} and
+     * {@code maskBodyEnabled} are true. The configured comma-separated
+     * sensitive body fields are parsed the same way as sensitive headers.</p>
+     *
+     * @param body the body to mask (can be null)
+     * @return the masked body, or the original body when masking is disabled
+     */
+    private String maskBodyIfEnabled(String body) {
+        if (body == null || body.isEmpty()) {
+            return body;
+        }
+        if (!config.isMaskSensitiveData() || !config.isMaskBodyEnabled()) {
+            return body;
+        }
+        List<String> sensitiveFields = Arrays.asList(
+                config.getSensitiveBodyFields().split(","));
+        List<String> xmlFields = Arrays.asList(
+                config.getXmlFields().split(","));
+        return SensitiveDataMasker.maskBody(body, sensitiveFields, xmlFields,
+                config.isMaskXmlEnabled(), config.isMaskTokens());
+    }
+
+    /**
+     * Masks sensitive headers in a header map when masking is enabled.
+     *
+     * <p>
+     * The map is converted to REST-assured {@link Headers} so the shared
+     * {@link SensitiveDataMasker#maskHeaders} logic is reused, then converted
+     * back to a map. Returns the original map when masking is disabled.</p>
+     *
+     * @param headers the header map to mask (can be null)
+     * @return a map with sensitive header values redacted, or the original map
+     */
+    private Map<String, String> maskHeadersIfEnabled(Map<String, String> headers) {
+        if (headers == null || headers.isEmpty()
+                || !config.isMaskSensitiveData() || !config.isMaskHeadersEnabled()) {
+            return headers;
+        }
+        List<String> sensitiveHeadersList = Arrays.asList(
+                config.getMaskHeaderFields().split(","));
+        List<io.restassured.http.Header> headerList = new java.util.ArrayList<>();
+        headers.forEach((name, value)
+                -> headerList.add(new io.restassured.http.Header(name, value)));
+        Headers masked = SensitiveDataMasker.maskHeaders(new Headers(headerList), sensitiveHeadersList);
+        Map<String, String> result = new java.util.LinkedHashMap<>();
+        masked.forEach(header -> result.put(header.getName(), header.getValue()));
+        return result;
     }
 
     /**
@@ -308,15 +383,15 @@ public class RestAssuredAdapter implements Filter {
             requestContent.append(method).append(" ").append(uri).append("\n\n");
 
             Headers processedHeaders = headers;
-            if (config.isMaskSensitiveData()) {
+            if (config.isMaskSensitiveData() && config.isMaskHeadersEnabled()) {
                 List<String> sensitiveHeadersList = Arrays.asList(
-                        config.getSensitiveHeaders().split(",")
+                        config.getMaskHeaderFields().split(",")
                 );
                 processedHeaders = SensitiveDataMasker.maskHeaders(headers, sensitiveHeadersList);
             }
 
             if (processedHeaders != null && processedHeaders.iterator().hasNext()) {
-                requestContent.append("Headers:\n");
+                requestContent.append(HEADERS_PREFIX);
                 processedHeaders.forEach(header
                         -> requestContent.append(header.getName()).append(": ")
                                 .append(header.getValue()).append("\n"));
@@ -332,9 +407,9 @@ public class RestAssuredAdapter implements Filter {
                             .append(contentType)
                             .append(", size: ")
                             .append(bodyString.length())
-                            .append(" bytes]");
+                            .append(BINARY_SIZE_SUFFIX);
                 } else {
-                    requestContent.append("Body:\n").append(bodyString);
+                    requestContent.append(BODY_PREFIX).append(maskBodyIfEnabled(bodyString));
                 }
             }
 
@@ -344,7 +419,7 @@ public class RestAssuredAdapter implements Filter {
                     .name("http-request.txt")
                     .type("http-request")
                     .path("/artifacts/http/http-request.txt")
-                    .mimeType("text/plain")
+                    .mimeType(MIME_TEXT_PLAIN)
                     .size((long) finalContent.length())
                     .timestamp(Instant.now())
                     .content(finalContent)
@@ -376,15 +451,15 @@ public class RestAssuredAdapter implements Filter {
             responseContent.append("Status: ").append(statusCode).append("\n\n");
 
             Headers processedHeaders = headers;
-            if (config.isMaskSensitiveData()) {
+            if (config.isMaskSensitiveData() && config.isMaskHeadersEnabled()) {
                 List<String> sensitiveHeadersList = Arrays.asList(
-                        config.getSensitiveHeaders().split(",")
+                        config.getMaskHeaderFields().split(",")
                 );
                 processedHeaders = SensitiveDataMasker.maskHeaders(headers, sensitiveHeadersList);
             }
 
             if (processedHeaders != null && processedHeaders.iterator().hasNext()) {
-                responseContent.append("Headers:\n");
+                responseContent.append(HEADERS_PREFIX);
                 processedHeaders.forEach(header
                         -> responseContent.append(header.getName()).append(": ")
                                 .append(header.getValue()).append("\n"));
@@ -400,9 +475,9 @@ public class RestAssuredAdapter implements Filter {
                             .append(contentType)
                             .append(", size: ")
                             .append(body.length())
-                            .append(" bytes]");
+                            .append(BINARY_SIZE_SUFFIX);
                 } else {
-                    responseContent.append("Body:\n").append(body);
+                    responseContent.append(BODY_PREFIX).append(maskBodyIfEnabled(body));
                 }
             }
 
@@ -412,7 +487,7 @@ public class RestAssuredAdapter implements Filter {
                     .name("http-response.txt")
                     .type("http-response")
                     .path("/artifacts/http/http-response.txt")
-                    .mimeType("text/plain")
+                    .mimeType(MIME_TEXT_PLAIN)
                     .size((long) finalContent.length())
                     .timestamp(Instant.now())
                     .content(finalContent)
@@ -458,7 +533,7 @@ public class RestAssuredAdapter implements Filter {
         // Truncate and add message
         String truncated = content.substring(0, maxSize);
         String truncationMessage = "\n\n[Content truncated at " + maxSize
-                + " bytes. Total size: " + content.length() + " bytes]";
+                + " bytes. Total size: " + content.length() + BINARY_SIZE_SUFFIX;
         return truncated + truncationMessage;
     }
 
@@ -486,15 +561,16 @@ public class RestAssuredAdapter implements Filter {
         StringBuilder requestContent = new StringBuilder();
         requestContent.append(method).append(" ").append(url).append("\n\n");
 
-        if (headers != null && !headers.isEmpty()) {
-            requestContent.append("Headers:\n");
-            headers.forEach((key, value)
+        Map<String, String> processedHeaders = maskHeadersIfEnabled(headers);
+        if (processedHeaders != null && !processedHeaders.isEmpty()) {
+            requestContent.append(HEADERS_PREFIX);
+            processedHeaders.forEach((key, value)
                     -> requestContent.append(key).append(": ").append(value).append("\n"));
             requestContent.append("\n");
         }
 
         if (body != null && !body.isEmpty()) {
-            requestContent.append("Body:\n").append(body);
+            requestContent.append(BODY_PREFIX).append(maskBodyIfEnabled(body));
         }
 
         String finalContent = requestContent.toString();
@@ -503,7 +579,7 @@ public class RestAssuredAdapter implements Filter {
                 .name("http-request.txt")
                 .type("http-request")
                 .path("/artifacts/http/http-request.txt")
-                .mimeType("text/plain")
+                .mimeType(MIME_TEXT_PLAIN)
                 .size((long) finalContent.length())
                 .timestamp(Instant.now())
                 .content(finalContent)
@@ -533,15 +609,16 @@ public class RestAssuredAdapter implements Filter {
         StringBuilder responseContent = new StringBuilder();
         responseContent.append("Status: ").append(statusCode).append("\n\n");
 
-        if (headers != null && !headers.isEmpty()) {
-            responseContent.append("Headers:\n");
-            headers.forEach((key, value)
+        Map<String, String> processedHeaders = maskHeadersIfEnabled(headers);
+        if (processedHeaders != null && !processedHeaders.isEmpty()) {
+            responseContent.append(HEADERS_PREFIX);
+            processedHeaders.forEach((key, value)
                     -> responseContent.append(key).append(": ").append(value).append("\n"));
             responseContent.append("\n");
         }
 
         if (body != null && !body.isEmpty()) {
-            responseContent.append("Body:\n").append(body);
+            responseContent.append(BODY_PREFIX).append(maskBodyIfEnabled(body));
         }
 
         String finalContent = responseContent.toString();
@@ -550,7 +627,7 @@ public class RestAssuredAdapter implements Filter {
                 .name("http-response.txt")
                 .type("http-response")
                 .path("/artifacts/http/http-response.txt")
-                .mimeType("text/plain")
+                .mimeType(MIME_TEXT_PLAIN)
                 .size((long) finalContent.length())
                 .timestamp(Instant.now())
                 .content(finalContent)
@@ -579,13 +656,16 @@ public class RestAssuredAdapter implements Filter {
         validateParameter(fileName, "fileName");
         validateParameter(jsonContent, "jsonContent");
 
+        String finalContent = maskBodyIfEnabled(jsonContent);
+
         Artifact jsonPayload = Artifact.builder()
                 .name(fileName)
                 .type("json")
                 .path("/artifacts/json/" + fileName)
                 .mimeType("application/json")
-                .size((long) jsonContent.length())
+                .size((long) finalContent.length())
                 .timestamp(Instant.now())
+                .content(finalContent)
                 .build();
 
         addArtifact(testName, jsonPayload);
@@ -611,13 +691,16 @@ public class RestAssuredAdapter implements Filter {
         validateParameter(fileName, "fileName");
         validateParameter(xmlContent, "xmlContent");
 
+        String finalContent = maskBodyIfEnabled(xmlContent);
+
         Artifact xmlPayload = Artifact.builder()
                 .name(fileName)
                 .type("xml")
                 .path("/artifacts/xml/" + fileName)
                 .mimeType("application/xml")
-                .size((long) xmlContent.length())
+                .size((long) finalContent.length())
                 .timestamp(Instant.now())
+                .content(finalContent)
                 .build();
 
         addArtifact(testName, xmlPayload);
