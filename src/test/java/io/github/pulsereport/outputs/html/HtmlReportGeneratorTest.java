@@ -267,6 +267,101 @@ class HtmlReportGeneratorTest {
     }
 
     @Test
+    void testStatusFilterButtonsHaveNoTintedDefaultState() throws IOException {
+        String content = generateHtml(createSampleTestRun());
+        String styles = extractStyleContent(content);
+
+        assertAll(
+                () -> assertTrue(
+                        extractCssRuleDeclarations(styles, ".filter-btn-failed:not(.active)").isEmpty(),
+                        "HTML should not define a tinted default-state rule for the failed filter button"),
+                () -> assertTrue(
+                        extractCssRuleDeclarations(styles, ".filter-btn-passed:not(.active)").isEmpty(),
+                        "HTML should not define a tinted default-state rule for the passed filter button"),
+                () -> assertTrue(
+                        extractCssRuleDeclarations(styles, ".filter-btn-skipped:not(.active)").isEmpty(),
+                        "HTML should not define a tinted default-state rule for the skipped filter button"),
+                () -> assertTrue(
+                        extractCssRuleDeclarations(styles, "body.dark .filter-btn-failed:not(.active)").isEmpty(),
+                        "HTML should not define a dark-mode tinted default-state rule for the failed filter button"),
+                () -> assertTrue(
+                        extractCssRuleDeclarations(styles, "body.dark .filter-btn-passed:not(.active)").isEmpty(),
+                        "HTML should not define a dark-mode tinted default-state rule for the passed filter button"),
+                () -> assertTrue(
+                        extractCssRuleDeclarations(styles, "body.dark .filter-btn-skipped:not(.active)").isEmpty(),
+                        "HTML should not define a dark-mode tinted default-state rule for the skipped filter button"));
+    }
+
+    @Test
+    void testStatusFilterButtonHoverChangesOnlyTextAndBorder() throws IOException {
+        String content = generateHtml(createSampleTestRun());
+        String styles = extractStyleContent(content);
+        String failedHoverDeclarations = extractCssRuleDeclarations(styles, ".filter-btn-failed:not(.active):hover");
+        String passedHoverDeclarations = extractCssRuleDeclarations(styles, ".filter-btn-passed:not(.active):hover");
+        String skippedHoverDeclarations = extractCssRuleDeclarations(styles, ".filter-btn-skipped:not(.active):hover");
+
+        assertAll(
+                () -> assertTrue(!failedHoverDeclarations.isEmpty(),
+                        "HTML should define a hover rule for the inactive failed filter button"),
+                () -> assertTrue(failedHoverDeclarations.contains("background: var(--bg);"),
+                        "Failed filter hover should reset the background to the base surface"),
+                () -> assertTrue(failedHoverDeclarations.contains("color: var(--red);"),
+                        "Failed filter hover should recolor text with the red status variable"),
+                () -> assertTrue(failedHoverDeclarations.contains("border-color: var(--red);"),
+                        "Failed filter hover should recolor the border with the red status variable"),
+                () -> assertTrue(!passedHoverDeclarations.isEmpty(),
+                        "HTML should define a hover rule for the inactive passed filter button"),
+                () -> assertTrue(passedHoverDeclarations.contains("background: var(--bg);"),
+                        "Passed filter hover should reset the background to the base surface"),
+                () -> assertTrue(passedHoverDeclarations.contains("color: var(--green);"),
+                        "Passed filter hover should recolor text with the green status variable"),
+                () -> assertTrue(passedHoverDeclarations.contains("border-color: var(--green);"),
+                        "Passed filter hover should recolor the border with the green status variable"),
+                () -> assertTrue(!skippedHoverDeclarations.isEmpty(),
+                        "HTML should define a hover rule for the inactive skipped filter button"),
+                () -> assertTrue(skippedHoverDeclarations.contains("background: var(--bg);"),
+                        "Skipped filter hover should reset the background to the base surface"),
+                () -> assertTrue(skippedHoverDeclarations.contains("color: var(--amber);"),
+                        "Skipped filter hover should recolor text with the amber status variable"),
+                () -> assertTrue(skippedHoverDeclarations.contains("border-color: var(--amber);"),
+                        "Skipped filter hover should recolor the border with the amber status variable"));
+    }
+
+    @Test
+    void testStatusFilterButtonActiveTextIsAlwaysWhite() throws IOException {
+        String content = generateHtml(createSampleTestRun());
+        String styles = extractStyleContent(content);
+        String failedActiveDeclarations = extractCssRuleDeclarations(styles, ".filter-btn-failed.active");
+        String passedActiveDeclarations = extractCssRuleDeclarations(styles, ".filter-btn-passed.active");
+        String skippedActiveDeclarations = extractCssRuleDeclarations(styles, ".filter-btn-skipped.active");
+        String darkActiveDeclarations = extractCssRuleDeclarations(
+                styles,
+                "body.dark .filter-btn-failed.active",
+                "body.dark .filter-btn-passed.active",
+                "body.dark .filter-btn-skipped.active");
+
+        assertAll(
+                () -> assertTrue(failedActiveDeclarations.contains("color: #fff;"),
+                        "Active failed filter button should keep white text in light mode"),
+                () -> assertFalse(failedActiveDeclarations.contains("#212529"),
+                        "Active failed filter button should not use dark text"),
+                () -> assertTrue(passedActiveDeclarations.contains("color: #fff;"),
+                        "Active passed filter button should keep white text in light mode"),
+                () -> assertFalse(passedActiveDeclarations.contains("#212529"),
+                        "Active passed filter button should not use dark text"),
+                () -> assertTrue(skippedActiveDeclarations.contains("color: #fff;"),
+                        "Active skipped filter button should keep white text in light mode"),
+                () -> assertFalse(skippedActiveDeclarations.contains("#212529"),
+                        "Active skipped filter button should not use dark text"),
+                () -> assertTrue(!darkActiveDeclarations.isEmpty(),
+                        "HTML should define a combined dark-mode active rule for the status filter buttons"),
+                () -> assertTrue(darkActiveDeclarations.contains("color: #fff;"),
+                        "Active status filter buttons should keep white text in dark mode"),
+                () -> assertFalse(darkActiveDeclarations.contains("#212529"),
+                        "Active status filter buttons should not use dark text in dark mode"));
+    }
+
+    @Test
     void testHtmlUsesPulseReportProductNameAndBrandTitle() throws IOException {
         String content = generateHtml(createSampleTestRun());
 
@@ -1018,6 +1113,227 @@ class HtmlReportGeneratorTest {
         assertTrue(html.contains("/api/v1/endpoint1"), "Should contain first API path");
         assertTrue(html.contains("/api/v1/endpoint2"), "Should contain second API path");
         assertTrue(html.contains("/api/v1/endpoint3"), "Should contain third API path");
+    }
+
+    @Test
+    void renderedHtml_containsNoExamplesTableMarkup() throws IOException {
+        TestCase outlineCase = TestCase.builder()
+                .id("tc-outline-1")
+                .name("Login with alice")
+                .bddType("scenario_outline")
+                .startTime(Instant.parse("2026-03-10T10:00:00Z"))
+                .endTime(Instant.parse("2026-03-10T10:00:01Z"))
+                .duration(1000)
+                .status(TestStatus.PASSED)
+                .build();
+
+        TestSuite suite = TestSuite.builder()
+                .id("suite-outline-1")
+                .name("Login Feature")
+                .startTime(Instant.parse("2026-03-10T10:00:00Z"))
+                .endTime(Instant.parse("2026-03-10T10:00:01Z"))
+                .duration(1000)
+                .status(TestStatus.PASSED)
+                .testCases(Collections.singletonList(outlineCase))
+                .build();
+
+        String html = generateHtml(createTestRunWithSuite(suite));
+
+        assertAll(
+                () -> assertFalse(html.contains("examples-table-wrapper"),
+                        "Rendered HTML should not contain examples-table-wrapper markup"),
+                () -> assertFalse(html.contains("examples-table-caption"),
+                        "Rendered HTML should not contain examples-table-caption markup"),
+                () -> assertFalse(html.contains("examples-table-row"),
+                        "Rendered HTML should not contain examples-table-row markup"),
+                () -> assertFalse(html.contains("examples-table"),
+                        "Rendered HTML should not contain examples-table markup"),
+                () -> assertFalse(html.contains("data-outline"),
+                        "Rendered HTML should not contain data-outline attributes"),
+                () -> assertTrue(html.contains("Login with alice"),
+                        "The scenario outline test case card should still render with its substituted name"));
+    }
+
+    @Test
+    void renderedHtml_wrapsStepDataTablesInScrollContainer() throws IOException {
+        List<List<String>> wideTable = new ArrayList<>();
+        List<String> headerRow = new ArrayList<>();
+        List<String> dataRow = new ArrayList<>();
+        for (int i = 1; i <= 12; i++) {
+            headerRow.add("Header " + i);
+            dataRow.add("very-long-unbroken-cell-value-token-" + i);
+        }
+        wideTable.add(headerRow);
+        wideTable.add(dataRow);
+
+        TestStep backgroundStep = TestStep.builder()
+                .name("the system is initialized")
+                .keyword("Given")
+                .status(TestStatus.PASSED)
+                .dataTable(wideTable)
+                .build();
+
+        TestStep scenarioStep = TestStep.builder()
+                .name("a wide table is provided")
+                .keyword("When")
+                .status(TestStatus.PASSED)
+                .dataTable(wideTable)
+                .build();
+
+        TestCase testCase = TestCase.builder()
+                .id("tc-datatable-scroll")
+                .name("Wide datatable scenario")
+                .bddType("scenario")
+                .startTime(Instant.parse("2026-03-10T10:00:00Z"))
+                .endTime(Instant.parse("2026-03-10T10:00:01Z"))
+                .duration(1000)
+                .status(TestStatus.PASSED)
+                .backgroundSteps(Collections.singletonList(backgroundStep))
+                .steps(Collections.singletonList(scenarioStep))
+                .build();
+
+        String html = generateHtml(createTestRunWithTestCase(testCase));
+
+        Matcher wrapperMatcher = Pattern.compile(
+                "<div class=\"bdd-table-scroll\">\\s*<table class=\"bdd-step-datatable\">").matcher(html);
+        int wrapperCount = 0;
+        while (wrapperMatcher.find()) {
+            wrapperCount++;
+        }
+        int wrapped = wrapperCount;
+
+        int tableCount = html.split("<table class=\"bdd-step-datatable\">", -1).length - 1;
+
+        String styles = extractStyleContent(html);
+        String cellRule = extractCssRuleDeclarations(styles, ".bdd-step-datatable th", ".bdd-step-datatable td");
+
+        assertAll(
+                () -> assertTrue(wrapped >= 2,
+                        "Both background and scenario step datatables should be wrapped in a bdd-table-scroll container, found " + wrapped),
+                () -> assertTrue(tableCount >= 2,
+                        "Both background and scenario steps should still render bdd-step-datatable tables, found " + tableCount),
+                () -> assertTrue(Pattern.compile("\\.bdd-table-scroll\\s*\\{[^}]*overflow-x:\\s*auto").matcher(html).find(),
+                        "Emitted CSS should contain a .bdd-table-scroll rule with overflow-x: auto"),
+                () -> assertFalse(cellRule.isEmpty(),
+                        "Emitted CSS should contain a .bdd-step-datatable th, .bdd-step-datatable td rule"),
+                () -> assertFalse(cellRule.contains("word-break: break-word"),
+                        ".bdd-step-datatable cells must not use word-break: break-word (crushes wide tables into slivers)"),
+                () -> assertFalse(cellRule.contains("overflow-wrap: anywhere"),
+                        ".bdd-step-datatable cells must not use overflow-wrap: anywhere (crushes wide tables into slivers)"),
+                () -> assertTrue(cellRule.contains("overflow-wrap: break-word"),
+                        ".bdd-step-datatable cells should use overflow-wrap: break-word so only overflowing tokens wrap"),
+                () -> assertTrue(cellRule.contains("max-width: 320px"),
+                        ".bdd-step-datatable cells should cap at max-width: 320px so long tokens wrap within the cell"));
+    }
+
+    @Test
+    void renderedHtml_stepNameRuleAllowsWrapping() throws IOException {
+        String html = generateHtml(createSampleTestRun());
+        String styles = extractStyleContent(html);
+
+        String stepName = extractCssRuleDeclarations(styles, ".bdd-step-name");
+        String tableScroll = extractCssRuleDeclarations(styles, ".bdd-table-scroll");
+        String artifactsExpanded = extractCssRuleDeclarations(styles, ".bdd-step-artifacts-body.expanded");
+
+        assertAll(
+                () -> assertTrue(stepName.contains("min-width: 0"),
+                        ".bdd-step-name should use min-width: 0 so long unbroken step names can shrink within the flex row"),
+                () -> assertTrue(stepName.contains("word-break: break-word"),
+                        ".bdd-step-name should use word-break: break-word so long names wrap instead of overflowing"),
+                () -> assertFalse(tableScroll.isEmpty(),
+                        "Emitted CSS should contain a .bdd-table-scroll rule"),
+                () -> assertTrue(tableScroll.contains("overflow-x: auto"),
+                        ".bdd-table-scroll should use overflow-x: auto (Phase 3 regression guard)"),
+                () -> assertFalse(artifactsExpanded.isEmpty(),
+                        "Emitted CSS should contain a .bdd-step-artifacts-body.expanded rule"),
+                () -> assertFalse(artifactsExpanded.contains("overflow: visible"),
+                        ".bdd-step-artifacts-body.expanded should not use overflow: visible; wide expanded content must not escape the card"));
+    }
+
+    @Test
+    void renderedHtml_docStringRuleBreaksLongLines() throws IOException {
+        String html = generateHtml(createSampleTestRun());
+        String styles = extractStyleContent(html);
+
+        String docString = extractCssRuleDeclarations(styles, ".bdd-step-docstring");
+
+        assertAll(
+                () -> assertFalse(docString.isEmpty(),
+                        "Emitted CSS should contain a .bdd-step-docstring rule"),
+                () -> assertTrue(docString.contains("word-break: break-word"),
+                        ".bdd-step-docstring should use word-break: break-word so long unbroken tokens (URLs, JWTs) wrap"),
+                () -> assertTrue(docString.contains("overflow-wrap: anywhere"),
+                        ".bdd-step-docstring should use overflow-wrap: anywhere so long unbroken tokens (URLs, JWTs) wrap"));
+    }
+
+    @Test
+    void renderedHtml_tableScrollUsesNativeScrollbar() throws IOException {
+        String html = generateHtml(createSampleTestRun());
+        String styles = extractStyleContent(html);
+        String scripts = extractScriptContent(html);
+
+        String tableScroll = extractCssRuleDeclarations(styles, ".bdd-table-scroll");
+        String webkitScrollbar = extractCssRuleDeclarations(styles, ".bdd-table-scroll::-webkit-scrollbar");
+        String webkitThumb = extractCssRuleDeclarations(styles, ".bdd-table-scroll::-webkit-scrollbar-thumb");
+        String webkitTrack = extractCssRuleDeclarations(styles, ".bdd-table-scroll::-webkit-scrollbar-track");
+        String indicatorTrack = extractCssRuleDeclarations(styles, ".bdd-scroll-indicator");
+        String indicatorVisible = extractCssRuleDeclarations(styles, ".bdd-scroll-indicator.visible");
+        String indicatorThumb = extractCssRuleDeclarations(styles, ".bdd-scroll-indicator-thumb");
+
+        assertAll(
+                () -> assertFalse(tableScroll.isEmpty(),
+                        "Emitted CSS should contain a .bdd-table-scroll rule"),
+                () -> assertTrue(tableScroll.contains("overflow-x: auto"),
+                        ".bdd-table-scroll should use overflow-x: auto for native horizontal scrolling"),
+                () -> assertTrue(tableScroll.contains("max-width: 100%"),
+                        ".bdd-table-scroll should use max-width: 100% so the wrapper never exceeds its container"),
+                () -> assertFalse(tableScroll.contains("scrollbar-width"),
+                        ".bdd-table-scroll must not set scrollbar-width; the native scrollbar stays visible"),
+                () -> assertFalse(tableScroll.contains("scrollbar-color"),
+                        ".bdd-table-scroll must not set scrollbar-color; the native scrollbar stays unstyled"),
+                () -> assertTrue(webkitScrollbar.isEmpty(),
+                        "Emitted CSS must not contain a .bdd-table-scroll::-webkit-scrollbar rule"),
+                () -> assertTrue(webkitThumb.isEmpty(),
+                        "Emitted CSS must not contain a .bdd-table-scroll::-webkit-scrollbar-thumb rule"),
+                () -> assertTrue(webkitTrack.isEmpty(),
+                        "Emitted CSS must not contain a .bdd-table-scroll::-webkit-scrollbar-track rule"),
+                () -> assertTrue(indicatorTrack.isEmpty(),
+                        "Emitted CSS must not contain a .bdd-scroll-indicator rule (custom scrollbar removed)"),
+                () -> assertTrue(indicatorVisible.isEmpty(),
+                        "Emitted CSS must not contain a .bdd-scroll-indicator.visible rule (custom scrollbar removed)"),
+                () -> assertTrue(indicatorThumb.isEmpty(),
+                        "Emitted CSS must not contain a .bdd-scroll-indicator-thumb rule (custom scrollbar removed)"),
+                () -> assertFalse(styles.contains("bdd-scroll-indicator"),
+                        "Emitted CSS must not reference bdd-scroll-indicator at all (custom scrollbar removed)"),
+                () -> assertFalse(scripts.contains("initTableScrollIndicators"),
+                        "JS must not contain or call initTableScrollIndicators (custom scrollbar removed)"));
+
+        // Phase 5 regression guard: the wrapper markup stays; only the scrollbar chrome was removed
+        List<List<String>> table = new ArrayList<>();
+        table.add(Arrays.asList("Header 1", "Header 2"));
+        table.add(Arrays.asList("value-1", "value-2"));
+
+        TestStep step = TestStep.builder()
+                .name("a table is provided")
+                .keyword("When")
+                .status(TestStatus.PASSED)
+                .dataTable(table)
+                .build();
+
+        TestCase testCase = TestCase.builder()
+                .id("tc-datatable-native-scroll")
+                .name("Datatable scenario")
+                .bddType("scenario")
+                .startTime(Instant.parse("2026-03-10T10:00:00Z"))
+                .endTime(Instant.parse("2026-03-10T10:00:01Z"))
+                .duration(1000)
+                .status(TestStatus.PASSED)
+                .steps(Collections.singletonList(step))
+                .build();
+
+        String datatableHtml = generateHtml(createTestRunWithTestCase(testCase));
+        assertTrue(datatableHtml.contains("<div class=\"bdd-table-scroll\">"),
+                "Rendered output should still wrap step datatables in a bdd-table-scroll container (Phase 5 regression guard)");
     }
 
     @Test
