@@ -28,7 +28,7 @@ class ModelValidatorTest {
     }
 
     @Test
-    void testValidateValidTestRun() {
+    void validateValidTestRun() {
         TestCase testCase = TestCase.builder()
                 .id("test-001")
                 .name("Test 1")
@@ -58,7 +58,7 @@ class ModelValidatorTest {
     }
 
     @Test
-    void testValidateValidTestSuite() {
+    void validateValidTestSuite() {
         TestCase testCase = TestCase.builder()
                 .id("test-001")
                 .name("Test 1")
@@ -81,7 +81,7 @@ class ModelValidatorTest {
     }
 
     @Test
-    void testValidateValidTestCase() {
+    void validateValidTestCase() {
         TestCase testCase = TestCase.builder()
                 .id("test-001")
                 .name("Valid Test")
@@ -96,7 +96,7 @@ class ModelValidatorTest {
     }
 
     @Test
-    void testValidateValidTestStep() {
+    void validateValidTestStep() {
         TestStep step = TestStep.builder()
                 .name("Valid Step")
                 .status(TestStatus.PASSED)
@@ -110,7 +110,7 @@ class ModelValidatorTest {
     }
 
     @Test
-    void testValidateValidArtifact() {
+    void validateValidArtifact() {
         Artifact artifact = Artifact.builder()
                 .name("screenshot")
                 .type("screenshot")
@@ -123,7 +123,7 @@ class ModelValidatorTest {
     }
 
     @Test
-    void testValidateValidMetric() {
+    void validateValidMetric() {
         Metric metric = Metric.builder()
                 .name("response_time")
                 .value(100.0)
@@ -136,7 +136,7 @@ class ModelValidatorTest {
     }
 
     @Test
-    void testValidateNestedStructures() {
+    void validateNestedStructures() {
         TestStep step = TestStep.builder()
                 .name("Step 1")
                 .status(TestStatus.PASSED)
@@ -180,14 +180,14 @@ class ModelValidatorTest {
     }
 
     @Test
-    void testValidateNullObject() {
+    void validateNullObject() {
         List<String> errors = validator.validate(null);
         assertFalse(errors.isEmpty());
         assertTrue(errors.get(0).contains("null"));
     }
 
     @Test
-    void testValidateReturnsEmptyListForValidObjects() {
+    void validateReturnsEmptyListForValidObjects() {
         Metric metric = Metric.builder()
                 .name("cpu")
                 .value(50.0)
@@ -201,7 +201,7 @@ class ModelValidatorTest {
     }
 
     @Test
-    void testValidateTestRunWithNullId() throws Exception {
+    void validateTestRunWithNullId() throws Exception {
         String json = "{\"name\":\"Test Run\",\"status\":\"PASSED\",\"startTime\":\"2024-01-01T10:00:00Z\",\"suites\":[]}";
         TestRun run = objectMapper.readValue(json, TestRun.class);
         
@@ -212,7 +212,7 @@ class ModelValidatorTest {
     }
 
     @Test
-    void testValidateTestRunWithEmptyId() throws Exception {
+    void validateTestRunWithEmptyId() throws Exception {
         String json = "{\"id\":\"\",\"name\":\"Test Run\",\"status\":\"PASSED\",\"startTime\":\"2024-01-01T10:00:00Z\",\"suites\":[]}";
         TestRun run = objectMapper.readValue(json, TestRun.class);
         
@@ -223,7 +223,7 @@ class ModelValidatorTest {
     }
 
     @Test
-    void testValidateTestRunWithNullName() throws Exception {
+    void validateTestRunWithNullName() throws Exception {
         String json = "{\"id\":\"run-001\",\"status\":\"PASSED\",\"startTime\":\"2024-01-01T10:00:00Z\",\"suites\":[]}";
         TestRun run = objectMapper.readValue(json, TestRun.class);
         
@@ -234,7 +234,7 @@ class ModelValidatorTest {
     }
 
     @Test
-    void testValidateTestRunWithNullStatus() throws Exception {
+    void validateTestRunWithNullStatus() throws Exception {
         String json = "{\"id\":\"run-001\",\"name\":\"Test Run\",\"startTime\":\"2024-01-01T10:00:00Z\",\"suites\":[]}";
         TestRun run = objectMapper.readValue(json, TestRun.class);
         
@@ -245,7 +245,7 @@ class ModelValidatorTest {
     }
 
     @Test
-    void testValidateTestRunWithNullStartTime() throws Exception {
+    void validateTestRunWithNullStartTime() throws Exception {
         String json = "{\"id\":\"run-001\",\"name\":\"Test Run\",\"status\":\"PASSED\",\"suites\":[]}";
         TestRun run = objectMapper.readValue(json, TestRun.class);
         
@@ -256,7 +256,7 @@ class ModelValidatorTest {
     }
 
     @Test
-    void testValidateTestRunWithInvalidNestedSuite() throws Exception {
+    void validateTestRunWithInvalidNestedSuite() throws Exception {
         // Create a suite with missing required field via JSON
         String json = "{\"id\":\"run-001\",\"name\":\"Test Run\",\"status\":\"PASSED\"," +
                 "\"startTime\":\"2024-01-01T10:00:00Z\"," +
@@ -270,7 +270,7 @@ class ModelValidatorTest {
     }
 
     @Test
-    void testValidateTestRunWithEmptySuites() throws Exception {
+    void validateTestRunWithEmptySuites() throws Exception {
         String json = "{\"id\":\"run-001\",\"name\":\"Test Run\",\"status\":\"PASSED\"," +
                 "\"startTime\":\"2024-01-01T10:00:00Z\",\"suites\":[]}";
         TestRun run = objectMapper.readValue(json, TestRun.class);
@@ -282,7 +282,7 @@ class ModelValidatorTest {
     }
 
     @Test
-    void testValidateTestSuiteWithNullId() throws Exception {
+    void validateTestSuiteWithNullId() throws Exception {
         String json = "{\"name\":\"Suite 1\",\"status\":\"PASSED\",\"testCases\":[]}";
         TestSuite suite = objectMapper.readValue(json, TestSuite.class);
         
@@ -293,7 +293,7 @@ class ModelValidatorTest {
     }
 
     @Test
-    void testValidateTestSuiteWithEmptyName() throws Exception {
+    void validateTestSuiteWithEmptyName() throws Exception {
         String json = "{\"id\":\"suite-001\",\"name\":\"\",\"status\":\"PASSED\",\"testCases\":[]}";
         TestSuite suite = objectMapper.readValue(json, TestSuite.class);
         
@@ -304,7 +304,7 @@ class ModelValidatorTest {
     }
 
     @Test
-    void testValidateTestSuiteWithNullStatus() throws Exception {
+    void validateTestSuiteWithNullStatus() throws Exception {
         String json = "{\"id\":\"suite-001\",\"name\":\"Suite 1\",\"testCases\":[]}";
         TestSuite suite = objectMapper.readValue(json, TestSuite.class);
         
@@ -315,7 +315,7 @@ class ModelValidatorTest {
     }
 
     @Test
-    void testValidateTestSuiteWithInvalidNestedTestCase() throws Exception {
+    void validateTestSuiteWithInvalidNestedTestCase() throws Exception {
         String json = "{\"id\":\"suite-001\",\"name\":\"Suite 1\",\"status\":\"PASSED\"," +
                 "\"testCases\":[{\"name\":\"Test 1\",\"status\":\"PASSED\"}]}";
         TestSuite suite = objectMapper.readValue(json, TestSuite.class);
@@ -327,7 +327,7 @@ class ModelValidatorTest {
     }
 
     @Test
-    void testValidateTestSuiteWithEmptyTestCases() throws Exception {
+    void validateTestSuiteWithEmptyTestCases() throws Exception {
         String json = "{\"id\":\"suite-001\",\"name\":\"Suite 1\",\"status\":\"PASSED\",\"testCases\":[]}";
         TestSuite suite = objectMapper.readValue(json, TestSuite.class);
         
@@ -338,7 +338,7 @@ class ModelValidatorTest {
     }
 
     @Test
-    void testValidateTestCaseWithNullId() throws Exception {
+    void validateTestCaseWithNullId() throws Exception {
         String json = "{\"name\":\"Test 1\",\"status\":\"PASSED\"}";
         TestCase testCase = objectMapper.readValue(json, TestCase.class);
         
@@ -349,7 +349,7 @@ class ModelValidatorTest {
     }
 
     @Test
-    void testValidateTestCaseWithEmptyName() throws Exception {
+    void validateTestCaseWithEmptyName() throws Exception {
         String json = "{\"id\":\"test-001\",\"name\":\"\",\"status\":\"PASSED\"}";
         TestCase testCase = objectMapper.readValue(json, TestCase.class);
         
@@ -360,7 +360,7 @@ class ModelValidatorTest {
     }
 
     @Test
-    void testValidateTestCaseWithNullStatus() throws Exception {
+    void validateTestCaseWithNullStatus() throws Exception {
         String json = "{\"id\":\"test-001\",\"name\":\"Test 1\"}";
         TestCase testCase = objectMapper.readValue(json, TestCase.class);
         
@@ -371,7 +371,7 @@ class ModelValidatorTest {
     }
 
     @Test
-    void testValidateTestCaseWithInvalidNestedStep() throws Exception {
+    void validateTestCaseWithInvalidNestedStep() throws Exception {
         String json = "{\"id\":\"test-001\",\"name\":\"Test 1\",\"status\":\"PASSED\"," +
                 "\"steps\":[{\"status\":\"PASSED\"}]}";
         TestCase testCase = objectMapper.readValue(json, TestCase.class);
@@ -383,7 +383,7 @@ class ModelValidatorTest {
     }
 
     @Test
-    void testValidateTestCaseWithInvalidNestedArtifact() throws Exception {
+    void validateTestCaseWithInvalidNestedArtifact() throws Exception {
         String json = "{\"id\":\"test-001\",\"name\":\"Test 1\",\"status\":\"PASSED\"," +
                 "\"artifacts\":[{\"name\":\"screenshot\",\"type\":\"image\"}]}";
         TestCase testCase = objectMapper.readValue(json, TestCase.class);
@@ -395,7 +395,7 @@ class ModelValidatorTest {
     }
 
     @Test
-    void testValidateTestCaseWithInvalidNestedMetric() throws Exception {
+    void validateTestCaseWithInvalidNestedMetric() throws Exception {
         String json = "{\"id\":\"test-001\",\"name\":\"Test 1\",\"status\":\"PASSED\"," +
                 "\"metrics\":[{\"name\":\"cpu\",\"value\":50.0}]}";
         TestCase testCase = objectMapper.readValue(json, TestCase.class);
@@ -407,7 +407,7 @@ class ModelValidatorTest {
     }
 
     @Test
-    void testValidateTestStepWithNullName() throws Exception {
+    void validateTestStepWithNullName() throws Exception {
         String json = "{\"status\":\"PASSED\"}";
         TestStep step = objectMapper.readValue(json, TestStep.class);
         
@@ -418,7 +418,7 @@ class ModelValidatorTest {
     }
 
     @Test
-    void testValidateTestStepWithEmptyName() throws Exception {
+    void validateTestStepWithEmptyName() throws Exception {
         String json = "{\"name\":\"\",\"status\":\"PASSED\"}";
         TestStep step = objectMapper.readValue(json, TestStep.class);
         
@@ -429,7 +429,7 @@ class ModelValidatorTest {
     }
 
     @Test
-    void testValidateTestStepWithNullStatus() throws Exception {
+    void validateTestStepWithNullStatus() throws Exception {
         String json = "{\"name\":\"Step 1\"}";
         TestStep step = objectMapper.readValue(json, TestStep.class);
         
@@ -440,7 +440,7 @@ class ModelValidatorTest {
     }
 
     @Test
-    void testValidateArtifactWithNullName() throws Exception {
+    void validateArtifactWithNullName() throws Exception {
         String json = "{\"type\":\"screenshot\",\"path\":\"/path/to/file\",\"timestamp\":\"2024-01-01T10:00:00Z\"}";
         Artifact artifact = objectMapper.readValue(json, Artifact.class);
         
@@ -451,7 +451,7 @@ class ModelValidatorTest {
     }
 
     @Test
-    void testValidateArtifactWithEmptyType() throws Exception {
+    void validateArtifactWithEmptyType() throws Exception {
         String json = "{\"name\":\"screenshot\",\"type\":\"\",\"path\":\"/path/to/file\",\"timestamp\":\"2024-01-01T10:00:00Z\"}";
         Artifact artifact = objectMapper.readValue(json, Artifact.class);
         
@@ -462,7 +462,7 @@ class ModelValidatorTest {
     }
 
     @Test
-    void testValidateArtifactWithNullPath() throws Exception {
+    void validateArtifactWithNullPath() throws Exception {
         String json = "{\"name\":\"screenshot\",\"type\":\"image\",\"timestamp\":\"2024-01-01T10:00:00Z\"}";
         Artifact artifact = objectMapper.readValue(json, Artifact.class);
         
@@ -473,7 +473,7 @@ class ModelValidatorTest {
     }
 
     @Test
-    void testValidateArtifactWithNullTimestamp() throws Exception {
+    void validateArtifactWithNullTimestamp() throws Exception {
         String json = "{\"name\":\"screenshot\",\"type\":\"image\",\"path\":\"/path/to/file\"}";
         Artifact artifact = objectMapper.readValue(json, Artifact.class);
         
@@ -484,7 +484,7 @@ class ModelValidatorTest {
     }
 
     @Test
-    void testValidateMetricWithNullName() throws Exception {
+    void validateMetricWithNullName() throws Exception {
         String json = "{\"value\":100.0,\"unit\":\"ms\",\"timestamp\":\"2024-01-01T10:00:00Z\"}";
         Metric metric = objectMapper.readValue(json, Metric.class);
         
@@ -495,7 +495,7 @@ class ModelValidatorTest {
     }
 
     @Test
-    void testValidateMetricWithEmptyUnit() throws Exception {
+    void validateMetricWithEmptyUnit() throws Exception {
         String json = "{\"name\":\"cpu\",\"value\":50.0,\"unit\":\"\",\"timestamp\":\"2024-01-01T10:00:00Z\"}";
         Metric metric = objectMapper.readValue(json, Metric.class);
         
@@ -506,7 +506,7 @@ class ModelValidatorTest {
     }
 
     @Test
-    void testValidateMetricWithNullTimestamp() throws Exception {
+    void validateMetricWithNullTimestamp() throws Exception {
         String json = "{\"name\":\"cpu\",\"value\":50.0,\"unit\":\"ms\"}";
         Metric metric = objectMapper.readValue(json, Metric.class);
         
@@ -517,7 +517,7 @@ class ModelValidatorTest {
     }
 
     @Test
-    void testValidateComplexNestedStructureWithMultipleErrors() throws Exception {
+    void validateComplexNestedStructureWithMultipleErrors() throws Exception {
         // TestRun with invalid nested objects at multiple levels
         String json = "{\"id\":\"run-001\",\"name\":\"Test Run\",\"status\":\"PASSED\"," +
                 "\"startTime\":\"2024-01-01T10:00:00Z\"," +

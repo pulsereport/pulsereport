@@ -41,7 +41,7 @@ public class TempStorageManagerTest {
     }
 
     @Test
-    public void testWriteAndReadSingleBatch() throws IOException {
+    public void writeAndReadSingleBatch() throws IOException {
         List<TestCase> testCases = createTestCases(10);
         
         storageManager.writeBatch(testCases, 0);
@@ -54,7 +54,7 @@ public class TempStorageManagerTest {
     }
 
     @Test
-    public void testWriteAndReadMultipleBatches() throws IOException {
+    public void writeAndReadMultipleBatches() throws IOException {
         List<TestCase> batch1 = createTestCases(100);
         List<TestCase> batch2 = createTestCases(100);
         List<TestCase> batch3 = createTestCases(100);
@@ -69,7 +69,7 @@ public class TempStorageManagerTest {
     }
 
     @Test
-    public void testEmptyBatch() throws IOException {
+    public void emptyBatch() throws IOException {
         List<TestCase> emptyBatch = new ArrayList<>();
         
         storageManager.writeBatch(emptyBatch, 0);
@@ -80,7 +80,7 @@ public class TempStorageManagerTest {
     }
 
     @Test
-    public void testCleanup() throws IOException {
+    public void cleanup() throws IOException {
         List<TestCase> testCases = createTestCases(10);
         storageManager.writeBatch(testCases, 0);
         
@@ -92,7 +92,7 @@ public class TempStorageManagerTest {
     }
 
     @Test
-    public void testLargeBatch() throws IOException {
+    public void largeBatch() throws IOException {
         List<TestCase> largeBatch = createTestCases(1000);
         
         storageManager.writeBatch(largeBatch, 0);
@@ -103,7 +103,7 @@ public class TempStorageManagerTest {
     }
 
     @Test
-    public void testPreservesTestCaseData() throws IOException {
+    public void preservesTestCaseData() throws IOException {
         TestCase original = TestCase.builder()
                 .id("test-123")
                 .name("Sample Test")
@@ -133,19 +133,19 @@ public class TempStorageManagerTest {
     }
 
     @Test
-    public void testReadEmptyStorage() throws IOException {
+    public void readEmptyStorage() throws IOException {
         List<TestCase> readCases = storageManager.readAllBatches().collect(Collectors.toList());
         
         assertEquals(0, readCases.size());
     }
 
     @Test
-    public void testGetStorageDirectory() {
+    public void getStorageDirectory() {
         assertEquals(tempDir, storageManager.getStorageDir());
     }
 
     @Test
-    public void testNullBatchThrowsException() {
+    public void nullBatchThrowsException() {
         assertThrows(IllegalArgumentException.class, () -> {
             storageManager.writeBatch(null, 0);
         });

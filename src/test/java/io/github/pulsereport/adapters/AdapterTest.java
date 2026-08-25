@@ -88,7 +88,7 @@ public class AdapterTest {
     }
     
     @Test
-    public void testAdapterLifecycleMethods() {
+    public void adapterLifecycleMethods() {
         MockAdapter adapter = new MockAdapter();
         
         adapter.onSuiteStart("TestSuite");
@@ -105,7 +105,7 @@ public class AdapterTest {
     }
     
     @Test
-    public void testAdapterArtifactSupport() {
+    public void adapterArtifactSupport() {
         MockAdapter adapter = new MockAdapter();
         
         Artifact screenshot = Artifact.builder()
@@ -134,7 +134,7 @@ public class AdapterTest {
     }
     
     @Test
-    public void testAdapterMetricSupport() {
+    public void adapterMetricSupport() {
         MockAdapter adapter = new MockAdapter();
         
         Metric responseTime = Metric.builder()
@@ -159,7 +159,7 @@ public class AdapterTest {
     }
     
     @Test
-    public void testAdapterNullHandling() {
+    public void adapterNullHandling() {
         MockAdapter adapter = new MockAdapter();
         
         assertThrows(IllegalArgumentException.class, 

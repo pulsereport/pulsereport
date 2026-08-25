@@ -63,7 +63,7 @@ class HtmlReportGeneratorTest {
     }
 
     @Test
-    void testGenerateToFile() throws IOException {
+    void generateToFile() throws IOException {
         TestRun testRun = createSampleTestRun();
         File outputFile = new File(tempDir, "test-report.html");
 
@@ -78,7 +78,7 @@ class HtmlReportGeneratorTest {
     }
 
     @Test
-    void testGenerateToOutputStream() throws IOException {
+    void generateToOutputStream() throws IOException {
         TestRun testRun = createSampleTestRun();
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
 
@@ -90,31 +90,31 @@ class HtmlReportGeneratorTest {
     }
 
     @Test
-    void testGenerateWithNullTestRunToFile() {
+    void generateWithNullTestRunToFile() {
         File outputFile = new File(tempDir, "test-report.html");
         assertThrows(IllegalArgumentException.class, () -> generator.generate(null, outputFile));
     }
 
     @Test
-    void testGenerateWithNullFileToFile() {
+    void generateWithNullFileToFile() {
         TestRun testRun = createSampleTestRun();
         assertThrows(IllegalArgumentException.class, () -> generator.generate(testRun, (File) null));
     }
 
     @Test
-    void testGenerateWithNullTestRunToStream() {
+    void generateWithNullTestRunToStream() {
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
         assertThrows(IllegalArgumentException.class, () -> generator.generate(null, outputStream));
     }
 
     @Test
-    void testGenerateWithNullOutputStream() {
+    void generateWithNullOutputStream() {
         TestRun testRun = createSampleTestRun();
         assertThrows(IllegalArgumentException.class, () -> generator.generate(testRun, (java.io.OutputStream) null));
     }
 
     @Test
-    void testGenerateWithEmptyTestRun() throws IOException {
+    void generateWithEmptyTestRun() throws IOException {
         TestRun testRun = TestRun.builder()
                 .id("empty-run")
                 .name("Empty Test Run")
@@ -134,7 +134,7 @@ class HtmlReportGeneratorTest {
     }
 
     @Test
-    void testHtmlContainsSummary() throws IOException {
+    void htmlContainsSummary() throws IOException {
         TestRun testRun = createSampleTestRun();
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
 
@@ -145,7 +145,7 @@ class HtmlReportGeneratorTest {
     }
 
     @Test
-    void testHtmlContainsTestCaseDetails() throws IOException {
+    void htmlContainsTestCaseDetails() throws IOException {
         TestRun testRun = createSampleTestRun();
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
 
@@ -158,7 +158,7 @@ class HtmlReportGeneratorTest {
     }
 
     @Test
-    void testHtmlContainsErrorMessages() throws IOException {
+    void htmlContainsErrorMessages() throws IOException {
         TestRun testRun = createSampleTestRun();
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
 
@@ -169,7 +169,7 @@ class HtmlReportGeneratorTest {
     }
 
     @Test
-    void testHtmlIsOfflineCompatible() throws IOException {
+    void htmlIsOfflineCompatible() throws IOException {
         TestRun testRun = createSampleTestRun();
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
 
@@ -182,7 +182,7 @@ class HtmlReportGeneratorTest {
     }
 
     @Test
-    void testHtmlContainsEmbeddedStyles() throws IOException {
+    void htmlContainsEmbeddedStyles() throws IOException {
         TestRun testRun = createSampleTestRun();
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
 
@@ -193,7 +193,7 @@ class HtmlReportGeneratorTest {
     }
 
     @Test
-    void testHtmlContainsApprovedDarkThemeTokens() throws IOException {
+    void htmlContainsApprovedDarkThemeTokens() throws IOException {
         String content = generateHtml(createSampleTestRun());
 
         assertAll(
@@ -217,7 +217,7 @@ class HtmlReportGeneratorTest {
     }
 
     @Test
-    void testHtmlContainsApprovedLightThemeTokens() throws IOException {
+    void htmlContainsApprovedLightThemeTokens() throws IOException {
         String content = generateHtml(createSampleTestRun());
 
         assertAll(
@@ -242,7 +242,7 @@ class HtmlReportGeneratorTest {
     }
 
     @Test
-    void testHtmlUsesSharedLightThemeHoverTreatmentForFilterAndExpandButtons() throws IOException {
+    void htmlUsesSharedLightThemeHoverTreatmentForFilterAndExpandButtons() throws IOException {
         String content = generateHtml(createSampleTestRun());
         String styles = extractStyleContent(content);
         String sharedHoverDeclarations = extractCssRuleDeclarations(
@@ -267,7 +267,7 @@ class HtmlReportGeneratorTest {
     }
 
     @Test
-    void testStatusFilterButtonsHaveNoTintedDefaultState() throws IOException {
+    void statusFilterButtonsHaveNoTintedDefaultState() throws IOException {
         String content = generateHtml(createSampleTestRun());
         String styles = extractStyleContent(content);
 
@@ -293,7 +293,7 @@ class HtmlReportGeneratorTest {
     }
 
     @Test
-    void testStatusFilterButtonHoverChangesOnlyTextAndBorder() throws IOException {
+    void statusFilterButtonHoverChangesOnlyTextAndBorder() throws IOException {
         String content = generateHtml(createSampleTestRun());
         String styles = extractStyleContent(content);
         String failedHoverDeclarations = extractCssRuleDeclarations(styles, ".filter-btn-failed:not(.active):hover");
@@ -328,7 +328,7 @@ class HtmlReportGeneratorTest {
     }
 
     @Test
-    void testStatusFilterButtonActiveTextIsAlwaysWhite() throws IOException {
+    void statusFilterButtonActiveTextIsAlwaysWhite() throws IOException {
         String content = generateHtml(createSampleTestRun());
         String styles = extractStyleContent(content);
         String failedActiveDeclarations = extractCssRuleDeclarations(styles, ".filter-btn-failed.active");
@@ -362,7 +362,7 @@ class HtmlReportGeneratorTest {
     }
 
     @Test
-    void testHtmlUsesPulseReportProductNameAndBrandTitle() throws IOException {
+    void htmlUsesPulseReportProductNameAndBrandTitle() throws IOException {
         String content = generateHtml(createSampleTestRun());
 
         assertAll(
@@ -373,7 +373,7 @@ class HtmlReportGeneratorTest {
     }
 
     @Test
-    void testHtmlRendersUnifiedHeaderWithInlineMetadataAndNoLegacyInformationBlock() throws IOException {
+    void htmlRendersUnifiedHeaderWithInlineMetadataAndNoLegacyInformationBlock() throws IOException {
         TestRun testRun = createSeleniumHeaderTestRun(Instant.parse("2026-03-25T10:07:09Z"), true);
 
         String content = generateHtml(testRun);
@@ -411,7 +411,7 @@ class HtmlReportGeneratorTest {
     }
 
     @Test
-    void testHtmlShowsBrowserMetadataOnlyForWebRuns() throws IOException {
+    void htmlShowsBrowserMetadataOnlyForWebRuns() throws IOException {
         TestRun webRun = createSeleniumHeaderTestRun(Instant.parse("2026-03-25T10:07:09Z"), true);
         TestRun apiRun = createHeaderTestRun(createBrowserEnvironment(), Instant.parse("2026-03-25T10:07:09Z"), false);
 
@@ -430,7 +430,7 @@ class HtmlReportGeneratorTest {
     }
 
     @Test
-    void testHtmlShowsBrowserMetadataForScreenshotOnlySeleniumRuns() throws IOException {
+    void htmlShowsBrowserMetadataForScreenshotOnlySeleniumRuns() throws IOException {
         TestRun screenshotOnlyWebRun = createSeleniumHeaderTestRun(Instant.parse("2026-03-25T10:07:09Z"), true, false);
 
         String content = generateHtml(screenshotOnlyWebRun);
@@ -443,7 +443,7 @@ class HtmlReportGeneratorTest {
     }
 
     @Test
-    void testHtmlUnifiedHeaderOmitsEndTimeWhenRunHasNoEndTime() throws IOException {
+    void htmlUnifiedHeaderOmitsEndTimeWhenRunHasNoEndTime() throws IOException {
         TestRun inProgressRun = createSeleniumHeaderTestRun(null, true);
 
         String content = generateHtml(inProgressRun);
@@ -466,7 +466,7 @@ class HtmlReportGeneratorTest {
     }
 
     @Test
-    void testHtmlMapsHeroStatusPillClassFromRunStatus() throws IOException {
+    void htmlMapsHeroStatusPillClassFromRunStatus() throws IOException {
         String passedContent = generateHtml(createHeroStatusTestRun(TestStatus.PASSED));
         String failedContent = generateHtml(createHeroStatusTestRun(TestStatus.FAILED));
         String skippedContent = generateHtml(createHeroStatusTestRun(TestStatus.SKIPPED));
@@ -487,7 +487,7 @@ class HtmlReportGeneratorTest {
     }
 
     @Test
-    void testHtmlUsesCurrentPulseReportLogoMarkInsteadOfLegacyWave() throws IOException {
+    void htmlUsesCurrentPulseReportLogoMarkInsteadOfLegacyWave() throws IOException {
         String content = generateHtml(createSampleTestRun());
 
         assertAll(
@@ -508,7 +508,7 @@ class HtmlReportGeneratorTest {
     }
 
     @Test
-    void testHtmlContainsPersistedThemePreferenceHooks() throws IOException {
+    void htmlContainsPersistedThemePreferenceHooks() throws IOException {
         String content = generateHtml(createSampleTestRun());
         String scriptContent = extractScriptContent(content);
         int storedThemeReadIndex = indexOfScriptStatementWithMarkers(
@@ -549,7 +549,7 @@ class HtmlReportGeneratorTest {
     }
 
     @Test
-    void testHtmlRetainsThemeToggleButtonMarkup() throws IOException {
+    void htmlRetainsThemeToggleButtonMarkup() throws IOException {
         String content = generateHtml(createSampleTestRun());
 
         assertAll(
@@ -564,7 +564,7 @@ class HtmlReportGeneratorTest {
     }
 
     @Test
-    void testHtmlContainsArtifactsSection() throws IOException {
+    void htmlContainsArtifactsSection() throws IOException {
         Artifact httpRequest = Artifact.builder()
                 .name("HTTP Request")
                 .type("http-request")
@@ -618,7 +618,7 @@ class HtmlReportGeneratorTest {
     }
 
     @Test
-    void testHtmlRendersHttpRequest() throws IOException {
+    void htmlRendersHttpRequest() throws IOException {
         Artifact httpRequest = Artifact.builder()
                 .name("GET Request")
                 .type("http-request")
@@ -650,7 +650,7 @@ class HtmlReportGeneratorTest {
     }
 
     @Test
-    void testHtmlRendersHttpResponse() throws IOException {
+    void htmlRendersHttpResponse() throws IOException {
         Artifact httpResponse = Artifact.builder()
                 .name("API Response")
                 .type("http-response")
@@ -682,7 +682,7 @@ class HtmlReportGeneratorTest {
     }
 
     @Test
-    void testHtmlPrettyPrintsJson() throws IOException {
+    void htmlPrettyPrintsJson() throws IOException {
         String jsonContent = "{\"user\":{\"id\":1,\"name\":\"John\",\"active\":true}}";
         Artifact jsonArtifact = Artifact.builder()
                 .name("JSON Data")
@@ -715,7 +715,7 @@ class HtmlReportGeneratorTest {
     }
 
     @Test
-    void testHtmlPrettyPrintsXml() throws IOException {
+    void htmlPrettyPrintsXml() throws IOException {
         String xmlContent = "<user><id>1</id><name>John</name><active>true</active></user>";
         Artifact xmlArtifact = Artifact.builder()
                 .name("XML Data")
@@ -747,7 +747,7 @@ class HtmlReportGeneratorTest {
     }
 
     @Test
-    void testHtmlShowsBinaryAsDownloadLink() throws IOException {
+    void htmlShowsBinaryAsDownloadLink() throws IOException {
         Artifact binaryArtifact = Artifact.builder()
                 .name("screenshot.png")
                 .type("screenshot")
@@ -778,7 +778,7 @@ class HtmlReportGeneratorTest {
     }
 
     @Test
-    void testHtmlHandlesNoArtifacts() throws IOException {
+    void htmlHandlesNoArtifacts() throws IOException {
         TestCase testCase = TestCase.builder()
                 .id("tc-1")
                 .name("Test No Artifacts")
@@ -800,7 +800,7 @@ class HtmlReportGeneratorTest {
     }
 
     @Test
-    void testHtmlDoesNotRenderExpandHookForPassedNonBddTestWithoutDetails() throws IOException {
+    void htmlDoesNotRenderExpandHookForPassedNonBddTestWithoutDetails() throws IOException {
         TestCase testCase = TestCase.builder()
                 .id("tc-no-details")
                 .name("Passed Test Without Details")
@@ -826,7 +826,7 @@ class HtmlReportGeneratorTest {
     }
 
     @Test
-    void testHtmlDoesNotRenderExpandHookForPassedExpectedExceptionResult() throws IOException {
+    void htmlDoesNotRenderExpandHookForPassedExpectedExceptionResult() throws IOException {
         TestResultAggregator aggregator = new TestResultAggregator();
         ITestResult result = mock(ITestResult.class);
         ITestNGMethod method = mock(ITestNGMethod.class);
@@ -861,7 +861,7 @@ class HtmlReportGeneratorTest {
     }
 
     @Test
-    void testHtmlUsesSuiteSecondaryTextInSuiteHeaderWhenPresent() throws IOException {
+    void htmlUsesSuiteSecondaryTextInSuiteHeaderWhenPresent() throws IOException {
         TestCase testCase = TestCase.builder()
                 .id("tc-bdd-1")
                 .name("Successful login")
@@ -895,7 +895,7 @@ class HtmlReportGeneratorTest {
     }
 
     @Test
-    void testHtmlFallsBackToFirstNonBddClassPathForGenericSuiteNames() throws IOException {
+    void htmlFallsBackToFirstNonBddClassPathForGenericSuiteNames() throws IOException {
         TestCase firstTestCase = TestCase.builder()
                 .id("tc-1")
                 .name("Fallback test")
@@ -929,7 +929,7 @@ class HtmlReportGeneratorTest {
     }
 
     @Test
-    void testHtmlPrefersSuiteSecondaryTextOverDerivedClassPathForGenericSuiteNames() throws IOException {
+    void htmlPrefersSuiteSecondaryTextOverDerivedClassPathForGenericSuiteNames() throws IOException {
         TestCase firstTestCase = TestCase.builder()
                 .id("tc-1")
                 .name("Fallback test")
@@ -964,7 +964,7 @@ class HtmlReportGeneratorTest {
     }
 
     @Test
-    void testCssApiCallBodyExpandedUsesNoMaxHeightCap() throws IOException {
+    void cssApiCallBodyExpandedUsesNoMaxHeightCap() throws IOException {
         String html = generateHtml(createSampleTestRun());
         String styles = extractStyleContent(html);
 
@@ -978,7 +978,7 @@ class HtmlReportGeneratorTest {
     }
 
     @Test
-    void testCssArtifactContentExpandedUsesNoMaxHeightCap() throws IOException {
+    void cssArtifactContentExpandedUsesNoMaxHeightCap() throws IOException {
         String html = generateHtml(createSampleTestRun());
         String styles = extractStyleContent(html);
 
@@ -992,7 +992,7 @@ class HtmlReportGeneratorTest {
     }
 
     @Test
-    void testCssBddStepArtifactsBodyExpandedUsesNoMaxHeightCap() throws IOException {
+    void cssBddStepArtifactsBodyExpandedUsesNoMaxHeightCap() throws IOException {
         String html = generateHtml(createSampleTestRun());
         String styles = extractStyleContent(html);
 
@@ -1004,7 +1004,7 @@ class HtmlReportGeneratorTest {
     }
 
     @Test
-    void testJsContainsSmoothExpandCollapseHelpers() throws IOException {
+    void jsContainsSmoothExpandCollapseHelpers() throws IOException {
         String html = generateHtml(createSampleTestRun());
         String scripts = extractScriptContent(html);
 
@@ -1017,7 +1017,7 @@ class HtmlReportGeneratorTest {
     }
 
     @Test
-    void testJsToggleFunctionsUseSmoothHelpers() throws IOException {
+    void jsToggleFunctionsUseSmoothHelpers() throws IOException {
         String html = generateHtml(createSampleTestRun());
         String scripts = extractScriptContent(html);
 
@@ -1028,7 +1028,7 @@ class HtmlReportGeneratorTest {
     }
 
     @Test
-    void testCssApiCallTitleHasEllipsisOverflow() throws IOException {
+    void cssApiCallTitleHasEllipsisOverflow() throws IOException {
         String html = generateHtml(createSampleTestRun());
         String styles = extractStyleContent(html);
 
@@ -1044,7 +1044,7 @@ class HtmlReportGeneratorTest {
     }
 
     @Test
-    void testCssArtifactCodeHasOverflowWrapAnywhere() throws IOException {
+    void cssArtifactCodeHasOverflowWrapAnywhere() throws IOException {
         String html = generateHtml(createSampleTestRun());
         String styles = extractStyleContent(html);
 
@@ -1056,7 +1056,7 @@ class HtmlReportGeneratorTest {
     }
 
     @Test
-    void testMultipleApiCallsPerStepRendersApiCallCards() throws IOException {
+    void multipleApiCallsPerStepRendersApiCallCards() throws IOException {
         List<Artifact> artifacts = new ArrayList<>();
         for (int i = 1; i <= 3; i++) {
             artifacts.add(Artifact.builder()
@@ -1337,7 +1337,7 @@ class HtmlReportGeneratorTest {
     }
 
     @Test
-    void testXssEscapingInTestName() throws IOException {
+    void xssEscapingInTestName() throws IOException {
         TestCase xssCase = TestCase.builder()
                 .id("tc-xss-name")
                 .name("<script>alert('xss')</script>")
@@ -1358,7 +1358,7 @@ class HtmlReportGeneratorTest {
     }
 
     @Test
-    void testXssEscapingInErrorMessage() throws IOException {
+    void xssEscapingInErrorMessage() throws IOException {
         TestCase xssCase = TestCase.builder()
                 .id("tc-xss-error")
                 .name("failingTest")
@@ -1380,7 +1380,7 @@ class HtmlReportGeneratorTest {
     }
 
     @Test
-    void testXssEscapingInSuiteName() throws IOException {
+    void xssEscapingInSuiteName() throws IOException {
         TestSuite suite = TestSuite.builder()
                 .id("suite-xss")
                 .name("\"><script>alert(1)</script><div class=\"")

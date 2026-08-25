@@ -57,7 +57,7 @@ public class LoadTest {
      * memory usage.
      */
     @Test
-    public void testSmallDataset_1000Tests() {
+    public void smallDataset_1000Tests() {
         long startTime = System.currentTimeMillis();
         long startMemory = getUsedMemoryMB();
 
@@ -89,7 +89,7 @@ public class LoadTest {
      * usage.
      */
     @Test
-    public void testMediumDataset_10000Tests() {
+    public void mediumDataset_10000Tests() {
         long startTime = System.currentTimeMillis();
         long startMemory = getUsedMemoryMB();
 
@@ -122,7 +122,7 @@ public class LoadTest {
      * limits, motivating the need for streaming.
      */
     @Test
-    public void testLargeDataset_100000Tests_InMemory() {
+    public void largeDataset_100000Tests_inMemory() {
         long startTime = System.currentTimeMillis();
         long startMemory = getUsedMemoryMB();
 
@@ -154,7 +154,7 @@ public class LoadTest {
      * Tests all test cases can be retrieved without memory issues.
      */
     @Test
-    public void testGetAllTestCases_LargeDataset() {
+    public void getAllTestCases_largeDataset() {
         List<ITestResult> results = generateMockResults(SMALL_DATASET);
 
         for (ITestResult result : results) {

@@ -47,7 +47,7 @@ class SlackNotifierTest {
 
     @SuppressWarnings("unchecked")
     @Test
-    void testNotify_Success() throws Exception {
+    void notify_success() throws Exception {
         TestRun testRun = TestRun.builder()
                 .id("test-run-1")
                 .name("Test Run")
@@ -74,7 +74,7 @@ class SlackNotifierTest {
 
     @SuppressWarnings("unchecked")
     @Test
-    void testNotify_WithReportUrl() throws Exception {
+    void notify_withReportUrl() throws Exception {
         TestRun testRun = TestRun.builder()
                 .id("test-run-1")
                 .name("Test Run")
@@ -107,7 +107,7 @@ class SlackNotifierTest {
 
     @SuppressWarnings("unchecked")
     @Test
-    void testNotify_WithMentions() throws Exception {
+    void notify_withMentions() throws Exception {
         TestRun testRun = TestRun.builder()
                 .id("test-run-1")
                 .name("Test Run")
@@ -140,7 +140,7 @@ class SlackNotifierTest {
 
     @SuppressWarnings("unchecked")
     @Test
-    void testNotify_RetryOnFailure() throws Exception {
+    void notify_retryOnFailure() throws Exception {
         TestRun testRun = TestRun.builder()
                 .id("test-run-1")
                 .name("Test Run")
@@ -174,7 +174,7 @@ class SlackNotifierTest {
 
     @SuppressWarnings("unchecked")
     @Test
-    void testNotify_FailAfterRetries() throws Exception {
+    void notify_failAfterRetries() throws Exception {
         TestRun testRun = TestRun.builder()
                 .id("test-run-1")
                 .name("Test Run")
@@ -201,7 +201,7 @@ class SlackNotifierTest {
     }
 
     @Test
-    void testSlackConfig() {
+    void slackConfig() {
         SlackConfig config = SlackConfig.builder()
                 .webhookUrl("https://hooks.slack.com/test")
                 .channel("#alerts")

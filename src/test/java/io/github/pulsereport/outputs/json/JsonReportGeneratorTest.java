@@ -40,7 +40,7 @@ class JsonReportGeneratorTest {
     }
 
     @Test
-    void testGenerateToFile() throws IOException {
+    void generateToFile() throws IOException {
         TestRun testRun = createSampleTestRun();
         File outputFile = new File(tempDir, "test-report.json");
 
@@ -57,7 +57,7 @@ class JsonReportGeneratorTest {
     }
 
     @Test
-    void testGenerateToOutputStream() throws IOException {
+    void generateToOutputStream() throws IOException {
         TestRun testRun = createSampleTestRun();
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
 
@@ -72,31 +72,31 @@ class JsonReportGeneratorTest {
     }
 
     @Test
-    void testGenerateWithNullTestRunToFile() {
+    void generateWithNullTestRunToFile() {
         File outputFile = new File(tempDir, "test-report.json");
         assertThrows(IllegalArgumentException.class, () -> generator.generate(null, outputFile));
     }
 
     @Test
-    void testGenerateWithNullFileToFile() {
+    void generateWithNullFileToFile() {
         TestRun testRun = createSampleTestRun();
         assertThrows(IllegalArgumentException.class, () -> generator.generate(testRun, (File) null));
     }
 
     @Test
-    void testGenerateWithNullTestRunToStream() {
+    void generateWithNullTestRunToStream() {
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
         assertThrows(IllegalArgumentException.class, () -> generator.generate(null, outputStream));
     }
 
     @Test
-    void testGenerateWithNullOutputStream() {
+    void generateWithNullOutputStream() {
         TestRun testRun = createSampleTestRun();
         assertThrows(IllegalArgumentException.class, () -> generator.generate(testRun, (java.io.OutputStream) null));
     }
 
     @Test
-    void testGenerateWithEmptyTestRun() throws IOException {
+    void generateWithEmptyTestRun() throws IOException {
         TestRun testRun = TestRun.builder()
                 .id("empty-run")
                 .name("Empty Test Run")
@@ -116,7 +116,7 @@ class JsonReportGeneratorTest {
     }
 
     @Test
-    void testJsonIsPrettyPrinted() throws IOException {
+    void jsonIsPrettyPrinted() throws IOException {
         TestRun testRun = createSampleTestRun();
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
 

@@ -87,7 +87,7 @@ public class RestAssuredBodyMaskingTest {
     }
 
     @Test
-    public void testCapturedRequestBodyIsMasked() {
+    public void capturedRequestBodyIsMasked() {
         RestAssuredAdapter.setCurrentTestName("maskReqTest");
 
         when(requestSpec.getMethod()).thenReturn("POST");
@@ -117,7 +117,7 @@ public class RestAssuredBodyMaskingTest {
     }
 
     @Test
-    public void testCapturedResponseBodyIsMasked() {
+    public void capturedResponseBodyIsMasked() {
         RestAssuredAdapter.setCurrentTestName("maskRespTest");
 
         when(requestSpec.getMethod()).thenReturn("GET");
@@ -145,7 +145,7 @@ public class RestAssuredBodyMaskingTest {
     }
 
     @Test
-    public void testManualCaptureMasksHeadersAndBody() {
+    public void manualCaptureMasksHeadersAndBody() {
         RestAssuredAdapter.setCurrentTestName("manualMaskTest");
 
         Map<String, String> reqHeaders = new HashMap<>();
@@ -184,7 +184,7 @@ public class RestAssuredBodyMaskingTest {
     }
 
     @Test
-    public void testManualCaptureRespectsMaskingDisabled() {
+    public void manualCaptureRespectsMaskingDisabled() {
         ReporterConfig noMaskConfig = ReporterConfig.builder()
                 .outputFormats(Arrays.asList("json"))
                 .outputDirectory(new File("target/custom-reports"))
@@ -225,7 +225,7 @@ public class RestAssuredBodyMaskingTest {
     }
 
     @Test
-    public void testMaskBodyDisabledMasksHeadersOnly() {
+    public void maskBodyDisabledMasksHeadersOnly() {
         ReporterConfig headersOnlyConfig = ReporterConfig.builder()
                 .outputFormats(Arrays.asList("json"))
                 .outputDirectory(new File("target/custom-reports"))
@@ -258,7 +258,7 @@ public class RestAssuredBodyMaskingTest {
     }
 
     @Test
-    public void testCaptureJsonPayloadAttachesContent() {
+    public void captureJsonPayloadAttachesContent() {
         RestAssuredAdapter.setCurrentTestName("jsonPayloadTest");
 
         String jsonPayload = "{\"user\":\"bob\",\"password\":\"hunter2\"}";
@@ -289,7 +289,7 @@ public class RestAssuredBodyMaskingTest {
     }
 
     @Test
-    public void testCaptureXmlPayloadAttachesContent() {
+    public void captureXmlPayloadAttachesContent() {
         RestAssuredAdapter.setCurrentTestName("xmlPayloadTest");
 
         String xmlPayload = "<?xml version=\"1.0\"?><data><id>1</id><name>Test</name></data>";

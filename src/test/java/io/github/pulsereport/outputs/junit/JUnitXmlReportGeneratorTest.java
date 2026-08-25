@@ -34,7 +34,7 @@ class JUnitXmlReportGeneratorTest {
     }
 
     @Test
-    void testGenerateToFile() throws IOException {
+    void generateToFile() throws IOException {
         TestRun testRun = createSampleTestRun();
         File outputFile = new File(tempDir, "TEST-junit-report.xml");
 
@@ -53,7 +53,7 @@ class JUnitXmlReportGeneratorTest {
     }
 
     @Test
-    void testGenerateToOutputStream() throws IOException {
+    void generateToOutputStream() throws IOException {
         TestRun testRun = createSampleTestRun();
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
 
@@ -65,31 +65,31 @@ class JUnitXmlReportGeneratorTest {
     }
 
     @Test
-    void testGenerateWithNullTestRunToFile() {
+    void generateWithNullTestRunToFile() {
         File outputFile = new File(tempDir, "test.xml");
         assertThrows(IllegalArgumentException.class, () -> generator.generate(null, outputFile));
     }
 
     @Test
-    void testGenerateWithNullFileToFile() {
+    void generateWithNullFileToFile() {
         TestRun testRun = createSampleTestRun();
         assertThrows(IllegalArgumentException.class, () -> generator.generate(testRun, (File) null));
     }
 
     @Test
-    void testGenerateWithNullTestRunToStream() {
+    void generateWithNullTestRunToStream() {
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
         assertThrows(IllegalArgumentException.class, () -> generator.generate(null, outputStream));
     }
 
     @Test
-    void testGenerateWithNullOutputStream() {
+    void generateWithNullOutputStream() {
         TestRun testRun = createSampleTestRun();
         assertThrows(IllegalArgumentException.class, () -> generator.generate(testRun, (java.io.OutputStream) null));
     }
 
     @Test
-    void testGenerateWithFailedTest() throws IOException {
+    void generateWithFailedTest() throws IOException {
         TestRun testRun = createSampleTestRun();
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
 
@@ -101,7 +101,7 @@ class JUnitXmlReportGeneratorTest {
     }
 
     @Test
-    void testGenerateWithSkippedTest() throws IOException {
+    void generateWithSkippedTest() throws IOException {
         TestCase skippedTest = TestCase.builder()
                 .id("tc-3")
                 .name("Skipped Test")
@@ -142,7 +142,7 @@ class JUnitXmlReportGeneratorTest {
     }
 
     @Test
-    void testGenerateWithEmptyTestRun() throws IOException {
+    void generateWithEmptyTestRun() throws IOException {
         TestRun testRun = TestRun.builder()
                 .id("empty-run")
                 .name("Empty Test Run")
@@ -162,7 +162,7 @@ class JUnitXmlReportGeneratorTest {
     }
 
     @Test
-    void testTestSuiteCountsAreCorrect() throws IOException {
+    void testSuiteCountsAreCorrect() throws IOException {
         TestRun testRun = createSampleTestRun();
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
 

@@ -24,7 +24,7 @@ import io.restassured.http.Headers;
 public class SensitiveDataMaskerTest {
 
     @Test
-    public void testMaskerMasksSensitiveHeaders() {
+    public void maskerMasksSensitiveHeaders() {
         Headers originalHeaders = new Headers(
             new Header("Content-Type", "application/json"),
             new Header("Authorization", "Bearer secret-token-123"),
@@ -43,7 +43,7 @@ public class SensitiveDataMaskerTest {
     }
 
     @Test
-    public void testMaskerPreservesNonSensitiveHeaders() {
+    public void maskerPreservesNonSensitiveHeaders() {
         Headers originalHeaders = new Headers(
             new Header("Content-Type", "application/json"),
             new Header("Accept", "application/json"),
@@ -60,7 +60,7 @@ public class SensitiveDataMaskerTest {
     }
 
     @Test
-    public void testMaskerHandlesNullHeaders() {
+    public void maskerHandlesNullHeaders() {
         List<String> sensitiveHeaders = Arrays.asList("Authorization");
         
         Headers maskedHeaders = SensitiveDataMasker.maskHeaders(null, sensitiveHeaders);
@@ -70,7 +70,7 @@ public class SensitiveDataMaskerTest {
     }
 
     @Test
-    public void testMaskerHandlesEmptyHeaders() {
+    public void maskerHandlesEmptyHeaders() {
         Headers originalHeaders = new Headers();
         List<String> sensitiveHeaders = Arrays.asList("Authorization");
         
@@ -81,7 +81,7 @@ public class SensitiveDataMaskerTest {
     }
 
     @Test
-    public void testMaskerHandlesNullSensitiveList() {
+    public void maskerHandlesNullSensitiveList() {
         Headers originalHeaders = new Headers(
             new Header("Authorization", "Bearer secret"),
             new Header("Content-Type", "application/json")
@@ -94,7 +94,7 @@ public class SensitiveDataMaskerTest {
     }
 
     @Test
-    public void testMaskerHandlesEmptySensitiveList() {
+    public void maskerHandlesEmptySensitiveList() {
         Headers originalHeaders = new Headers(
             new Header("Authorization", "Bearer secret"),
             new Header("Content-Type", "application/json")
@@ -107,7 +107,7 @@ public class SensitiveDataMaskerTest {
     }
 
     @Test
-    public void testMaskerIsCaseInsensitive() {
+    public void maskerIsCaseInsensitive() {
         Headers originalHeaders = new Headers(
             new Header("authorization", "Bearer secret"),
             new Header("X-Api-Key", "secret-key"),
@@ -124,7 +124,7 @@ public class SensitiveDataMaskerTest {
     }
 
     @Test
-    public void testMaskerWithCookieAndSetCookie() {
+    public void maskerWithCookieAndSetCookie() {
         Headers originalHeaders = new Headers(
             new Header("Cookie", "session=xyz; user=admin"),
             new Header("Set-Cookie", "token=abc123; Path=/; HttpOnly"),

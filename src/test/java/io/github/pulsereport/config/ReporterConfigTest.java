@@ -47,7 +47,7 @@ class ReporterConfigTest {
     }
 
     @Test
-    void testBuilderPattern() {
+    void builderPattern() {
         ReporterConfig config = ReporterConfig.builder()
                 .outputFormats(Arrays.asList("html", "json"))
                 .outputDirectory(new File("target/reports"))
@@ -61,7 +61,7 @@ class ReporterConfigTest {
     }
 
     @Test
-    void testLoadFromFile() throws Exception {
+    void loadFromFile() throws Exception {
         ReporterConfig config = ReporterConfig.loadFromFile(configFile);
 
         assertNotNull(config);
@@ -75,7 +75,7 @@ class ReporterConfigTest {
     }
 
     @Test
-    void testLoadFromProperties() {
+    void loadFromProperties() {
         Properties props = new Properties();
         props.setProperty("reporter.output.formats", "junit");
         props.setProperty("reporter.output.directory", "target/test-reports");
@@ -88,7 +88,7 @@ class ReporterConfigTest {
     }
 
     @Test
-    void testValidation_ValidConfig() {
+    void validate_validConfig() {
         ReporterConfig config = ReporterConfig.builder()
                 .outputFormats(Arrays.asList("html"))
                 .outputDirectory(tempDir.toFile())
@@ -98,7 +98,7 @@ class ReporterConfigTest {
     }
 
     @Test
-    void testValidation_MissingOutputFormats() {
+    void validate_missingOutputFormats() {
         ReporterConfig config = ReporterConfig.builder()
                 .outputDirectory(tempDir.toFile())
                 .build();
@@ -108,7 +108,7 @@ class ReporterConfigTest {
     }
 
     @Test
-    void testValidation_NullOutputDirectory() {
+    void validate_nullOutputDirectory() {
         ReporterConfig config = ReporterConfig.builder()
                 .outputFormats(Arrays.asList("html"))
                 .build();
@@ -118,7 +118,7 @@ class ReporterConfigTest {
     }
 
     @Test
-    void testValidation_InvalidOutputFormat() {
+    void validate_invalidOutputFormat() {
         ReporterConfig config = ReporterConfig.builder()
                 .outputFormats(Arrays.asList("invalid-format"))
                 .outputDirectory(tempDir.toFile())
@@ -129,7 +129,7 @@ class ReporterConfigTest {
     }
 
     @Test
-    void testS3ConfigValidation() throws Exception {
+    void s3ConfigValidation() throws Exception {
         Properties props = new Properties();
         props.setProperty("reporter.output.formats", "html");
         props.setProperty("reporter.output.directory", tempDir.toString());
@@ -143,7 +143,7 @@ class ReporterConfigTest {
     }
 
     @Test
-    void testHttpConfigValidation() {
+    void httpConfigValidation() {
         Properties props = new Properties();
         props.setProperty("reporter.output.formats", "html");
         props.setProperty("reporter.output.directory", tempDir.toString());
@@ -157,7 +157,7 @@ class ReporterConfigTest {
     }
 
     @Test
-    void testSlackConfigValidation() {
+    void slackConfigValidation() {
         Properties props = new Properties();
         props.setProperty("reporter.output.formats", "html");
         props.setProperty("reporter.output.directory", tempDir.toString());
@@ -171,7 +171,7 @@ class ReporterConfigTest {
     }
 
     @Test
-    void testEnvironmentVariableInterpolation() {
+    void environmentVariableInterpolation() {
         System.setProperty("TEST_BUCKET", "my-test-bucket");
         Properties props = new Properties();
         props.setProperty("reporter.output.formats", "html");
@@ -188,7 +188,7 @@ class ReporterConfigTest {
     }
 
     @Test
-    void testDefaultValues() {
+    void defaultValues() {
         ReporterConfig config = ReporterConfig.builder()
                 .outputFormats(Arrays.asList("html"))
                 .outputDirectory(tempDir.toFile())
@@ -203,7 +203,7 @@ class ReporterConfigTest {
     }
 
     @Test
-    void testToString() {
+    void toString_containsKeyFields() {
         ReporterConfig config = ReporterConfig.builder()
                 .outputFormats(Arrays.asList("html", "json"))
                 .outputDirectory(new File("target/reports"))
@@ -218,7 +218,7 @@ class ReporterConfigTest {
     }
 
     @Test
-    void testConfigLoadsContentSizeLimit() {
+    void configLoadsContentSizeLimit() {
         Properties props = new Properties();
         props.setProperty("reporter.output.formats", "html");
         props.setProperty("reporter.output.directory", tempDir.toString());
@@ -230,7 +230,7 @@ class ReporterConfigTest {
     }
 
     @Test
-    void testConfigLoadsDefaultContentSizeLimit() {
+    void configLoadsDefaultContentSizeLimit() {
         Properties props = new Properties();
         props.setProperty("reporter.output.formats", "html");
         props.setProperty("reporter.output.directory", tempDir.toString());
@@ -241,7 +241,7 @@ class ReporterConfigTest {
     }
 
     @Test
-    void testConfigLoadsSensitiveDataSettings() {
+    void configLoadsSensitiveDataSettings() {
         Properties props = new Properties();
         props.setProperty("reporter.output.formats", "html");
         props.setProperty("reporter.output.directory", tempDir.toString());
@@ -255,7 +255,7 @@ class ReporterConfigTest {
     }
 
     @Test
-    void testConfigLoadsDefaultSensitiveDataSettings() {
+    void configLoadsDefaultSensitiveDataSettings() {
         Properties props = new Properties();
         props.setProperty("reporter.output.formats", "html");
         props.setProperty("reporter.output.directory", tempDir.toString());
@@ -268,7 +268,7 @@ class ReporterConfigTest {
     }
 
     @Test
-    void testBuilderWithContentSizeSettings() {
+    void builderWithContentSizeSettings() {
         ReporterConfig config = ReporterConfig.builder()
                 .outputFormats(Arrays.asList("html"))
                 .outputDirectory(tempDir.toFile())
@@ -283,7 +283,7 @@ class ReporterConfigTest {
     }
 
     @Test
-    void testMaskBodyDefaults() {
+    void maskBodyDefaults() {
         ReporterConfig config = ReporterConfig.builder()
                 .outputFormats(Arrays.asList("html"))
                 .outputDirectory(tempDir.toFile())
@@ -298,7 +298,7 @@ class ReporterConfigTest {
     }
 
     @Test
-    void testConfigLoadsMaskBodySettings() {
+    void configLoadsMaskBodySettings() {
         Properties props = new Properties();
         props.setProperty("reporter.output.formats", "html");
         props.setProperty("reporter.output.directory", tempDir.toString());
@@ -314,7 +314,7 @@ class ReporterConfigTest {
     }
 
     @Test
-    void testConfigLoadsDefaultMaskBodySettings() {
+    void configLoadsDefaultMaskBodySettings() {
         Properties props = new Properties();
         props.setProperty("reporter.output.formats", "html");
         props.setProperty("reporter.output.directory", tempDir.toString());
@@ -330,7 +330,7 @@ class ReporterConfigTest {
     }
 
     @Test
-    void testBuilderWithMaskBodySettings() {
+    void builderWithMaskBodySettings() {
         ReporterConfig config = ReporterConfig.builder()
                 .outputFormats(Arrays.asList("html"))
                 .outputDirectory(tempDir.toFile())

@@ -27,7 +27,7 @@ class TestRunTest {
     }
 
     @Test
-    void testBuilderCreatesMinimalTestRun() {
+    void builderCreatesMinimalTestRun() {
         Instant start = Instant.ofEpochMilli(1000);
         Instant end = start.plusMillis(60000);
         
@@ -56,7 +56,7 @@ class TestRunTest {
     }
 
     @Test
-    void testBuilderWithAllFields() {
+    void builderWithAllFields() {
         Instant start = Instant.ofEpochMilli(2000);
         Instant end = start.plusMillis(120000);
         
@@ -113,7 +113,7 @@ class TestRunTest {
     }
 
     @Test
-    void testBuilderRequiresId() {
+    void builderRequiresId() {
         assertThrows(IllegalArgumentException.class, () ->
                 TestRun.builder()
                         .name("Run")
@@ -127,7 +127,7 @@ class TestRunTest {
     }
 
     @Test
-    void testBuilderRequiresName() {
+    void builderRequiresName() {
         assertThrows(IllegalArgumentException.class, () ->
                 TestRun.builder()
                         .id("run-001")
@@ -141,7 +141,7 @@ class TestRunTest {
     }
 
     @Test
-    void testBuilderRequiresStatus() {
+    void builderRequiresStatus() {
         assertThrows(IllegalArgumentException.class, () ->
                 TestRun.builder()
                         .id("run-001")
@@ -155,7 +155,7 @@ class TestRunTest {
     }
 
     @Test
-    void testBuilderRequiresStartTime() {
+    void builderRequiresStartTime() {
         assertThrows(IllegalArgumentException.class, () ->
                 TestRun.builder()
                         .id("run-001")
@@ -169,7 +169,7 @@ class TestRunTest {
     }
 
     @Test
-    void testBuilderRequiresSuites() {
+    void builderRequiresSuites() {
         assertThrows(IllegalArgumentException.class, () ->
                 TestRun.builder()
                         .id("run-001")
@@ -183,7 +183,7 @@ class TestRunTest {
     }
 
     @Test
-    void testEndTimeIsOptional() {
+    void endTimeIsOptional() {
         Instant start = Instant.ofEpochMilli(3000);
         
         TestRun run = TestRun.builder()
@@ -199,7 +199,7 @@ class TestRunTest {
     }
 
     @Test
-    void testImmutabilityOfCollections() {
+    void immutabilityOfCollections() {
         TestSuite suite = TestSuite.builder()
                 .id("suite-001")
                 .name("Suite")
@@ -235,7 +235,7 @@ class TestRunTest {
     }
 
     @Test
-    void testImmutabilityOfEnvironmentMap() {
+    void immutabilityOfEnvironmentMap() {
         Map<String, String> env = new HashMap<>();
         env.put("key", "value");
 
@@ -257,7 +257,7 @@ class TestRunTest {
     }
 
     @Test
-    void testJsonSerialization() throws Exception {
+    void jsonSerialization() throws Exception {
         Instant start = Instant.parse("2026-02-16T10:00:00Z");
         Instant end = Instant.parse("2026-02-16T11:00:00Z");
         
@@ -288,7 +288,7 @@ class TestRunTest {
     }
 
     @Test
-    void testJsonDeserialization() throws Exception {
+    void jsonDeserialization() throws Exception {
         String json = "{\"id\":\"run-005\",\"name\":\"Nightly Run\",\"status\":\"PASSED\",\"startTime\":\"2026-02-16T10:00:00Z\",\"endTime\":\"2026-02-16T12:00:00Z\",\"duration\":7200000,\"suites\":[],\"totalTests\":50,\"passedTests\":50,\"failedTests\":0,\"skippedTests\":0}";
         TestRun run = objectMapper.readValue(json, TestRun.class);
 
@@ -300,7 +300,7 @@ class TestRunTest {
     }
 
     @Test
-    void testCountersDefaultToZero() {
+    void countersDefaultToZero() {
         TestRun run = TestRun.builder()
                 .id("run-006")
                 .name("Empty Run")
@@ -318,7 +318,7 @@ class TestRunTest {
     }
 
     @Test
-    void testEqualsAndHashCode() {
+    void equalsAndHashCode() {
         Instant start = Instant.ofEpochMilli(11000);
         Instant end = start.plusMillis(1000);
         
@@ -347,7 +347,7 @@ class TestRunTest {
     }
 
     @Test
-    void testToString() {
+    void toString_containsKeyFields() {
         TestRun run = TestRun.builder()
                 .id("run-008")
                 .name("Test Run")

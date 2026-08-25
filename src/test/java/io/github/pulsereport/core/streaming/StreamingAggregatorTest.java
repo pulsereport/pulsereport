@@ -67,7 +67,7 @@ public class StreamingAggregatorTest {
     }
 
     @Test
-    public void testRecordAndBuildTestRun() throws IOException {
+    public void recordAndBuildTestRun() throws IOException {
         List<ITestResult> results = generateMockResults(50);
 
         for (ITestResult result : results) {
@@ -83,7 +83,7 @@ public class StreamingAggregatorTest {
     }
 
     @Test
-    public void testAutomaticFlushWhenBatchSizeReached() throws IOException {
+    public void automaticFlushWhenBatchSizeReached() throws IOException {
         PerformanceConfig smallBatchConfig = PerformanceConfig.builder()
                 .streamingMode(true)
                 .batchSize(10)
@@ -109,7 +109,7 @@ public class StreamingAggregatorTest {
     }
 
     @Test
-    public void testManualFlush() throws IOException {
+    public void manualFlush() throws IOException {
         List<ITestResult> results = generateMockResults(5);
 
         for (ITestResult result : results) {
@@ -125,7 +125,7 @@ public class StreamingAggregatorTest {
     }
 
     @Test
-    public void testLargeDataset() throws IOException {
+    public void largeDataset() throws IOException {
         List<ITestResult> results = generateMockResults(1000);
 
         for (ITestResult result : results) {
@@ -140,7 +140,7 @@ public class StreamingAggregatorTest {
     }
 
     @Test
-    public void testHandlesRetries() throws IOException {
+    public void handlesRetries() throws IOException {
         ITestResult failedAttempt = createMockResult("test1", ITestResult.FAILURE);
         ITestResult passedAttempt = createMockResult("test1", ITestResult.SUCCESS);
 
@@ -155,7 +155,7 @@ public class StreamingAggregatorTest {
     }
 
     @Test
-    public void testPassedExpectedExceptionDoesNotExposeThrowableDetails() throws IOException {
+    public void passedExpectedExceptionDoesNotExposeThrowableDetails() throws IOException {
         ITestResult passedExpectedException = createMockResult(
                 "testDivisionByZero",
                 ITestResult.SUCCESS,
@@ -177,7 +177,7 @@ public class StreamingAggregatorTest {
     }
 
     @Test
-    public void testFailedResultRetainsThrowableDetails() throws IOException {
+    public void failedResultRetainsThrowableDetails() throws IOException {
         ITestResult failedResult = createMockResult(
                 "testFailure",
                 ITestResult.FAILURE,
@@ -197,7 +197,7 @@ public class StreamingAggregatorTest {
     }
 
     @Test
-    public void testAutoCleanup() throws IOException {
+    public void autoCleanup() throws IOException {
         PerformanceConfig autoCleanupConfig = PerformanceConfig.builder()
                 .streamingMode(true)
                 .batchSize(10)
@@ -222,7 +222,7 @@ public class StreamingAggregatorTest {
     }
 
     @Test
-    public void testNoAutoCleanup() throws IOException {
+    public void noAutoCleanup() throws IOException {
         PerformanceConfig noCleanupConfig = PerformanceConfig.builder()
                 .streamingMode(true)
                 .batchSize(10)
@@ -247,7 +247,7 @@ public class StreamingAggregatorTest {
     }
 
     @Test
-    public void testEmptyTestRun() throws IOException {
+    public void emptyTestRun() throws IOException {
         ISuite suite = createMockSuite("EmptySuite", Collections.emptyList());
         TestRun testRun = streamingAggregator.buildTestRun(suite);
 
@@ -256,7 +256,7 @@ public class StreamingAggregatorTest {
     }
 
     @Test
-    public void testNullResultIgnored() throws IOException {
+    public void nullResultIgnored() throws IOException {
         streamingAggregator.recordTestResult(null);
 
         ISuite suite = createMockSuite("TestSuite", Collections.emptyList());
@@ -266,7 +266,7 @@ public class StreamingAggregatorTest {
     }
 
     @Test
-    public void testCalculatesStatisticsCorrectly() throws IOException {
+    public void calculatesStatisticsCorrectly() throws IOException {
         List<ITestResult> results = new ArrayList<>();
 
         for (int i = 0; i < 70; i++) {

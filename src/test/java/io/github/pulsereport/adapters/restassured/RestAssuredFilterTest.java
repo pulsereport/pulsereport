@@ -70,7 +70,7 @@ public class RestAssuredFilterTest {
     }
 
     @Test
-    public void testFilterCapturesRequest() throws Exception {
+    public void filterCapturesRequest() throws Exception {
         RestAssuredAdapter.setCurrentTestName("testApiCall");
 
         when(requestSpec.getMethod()).thenReturn("POST");
@@ -96,7 +96,7 @@ public class RestAssuredFilterTest {
     }
 
     @Test
-    public void testFilterCapturesResponse() throws Exception {
+    public void filterCapturesResponse() throws Exception {
         RestAssuredAdapter.setCurrentTestName("testApiCall");
 
         when(requestSpec.getMethod()).thenReturn("GET");
@@ -120,7 +120,7 @@ public class RestAssuredFilterTest {
     }
 
     @Test
-    public void testFilterStoresContentInArtifacts() throws Exception {
+    public void filterStoresContentInArtifacts() throws Exception {
         RestAssuredAdapter.setCurrentTestName("testApiCall");
 
         String requestBody = "{\"username\":\"admin\",\"password\":\"secret123\"}";
@@ -167,7 +167,7 @@ public class RestAssuredFilterTest {
     }
 
     @Test
-    public void testFilterTruncatesLargePayloads() throws Exception {
+    public void filterTruncatesLargePayloads() throws Exception {
         RestAssuredAdapter.setCurrentTestName("testApiCall");
 
         StringBuilder largeBody = new StringBuilder();
@@ -200,7 +200,7 @@ public class RestAssuredFilterTest {
     }
 
     @Test
-    public void testFilterMasksSensitiveHeaders() throws Exception {
+    public void filterMasksSensitiveHeaders() throws Exception {
         RestAssuredAdapter.setCurrentTestName("testApiCall");
 
         when(requestSpec.getMethod()).thenReturn("GET");
@@ -245,7 +245,7 @@ public class RestAssuredFilterTest {
     }
 
     @Test
-    public void testFilterHandlesBinaryContent() throws Exception {
+    public void filterHandlesBinaryContent() throws Exception {
         RestAssuredAdapter.setCurrentTestName("testApiCall");
 
         when(requestSpec.getMethod()).thenReturn("POST");
@@ -274,7 +274,7 @@ public class RestAssuredFilterTest {
     }
 
     @Test
-    public void testFilterWithMaskingDisabled() throws Exception {
+    public void filterWithMaskingDisabled() throws Exception {
         ReporterConfig configNoMask = ReporterConfig.builder()
                 .outputFormats(Arrays.asList("json"))
                 .outputDirectory(new File("target/custom-reports"))
@@ -314,7 +314,7 @@ public class RestAssuredFilterTest {
     }
 
     @Test
-    public void testFilterHandlesNullRequestBody() throws Exception {
+    public void filterHandlesNullRequestBody() throws Exception {
         RestAssuredAdapter.setCurrentTestName("testApiCall");
 
         when(requestSpec.getMethod()).thenReturn("GET");
@@ -336,7 +336,7 @@ public class RestAssuredFilterTest {
     }
 
     @Test
-    public void testFilterHandlesEmptyResponseBody() throws Exception {
+    public void filterHandlesEmptyResponseBody() throws Exception {
         RestAssuredAdapter.setCurrentTestName("testApiCall");
 
         when(requestSpec.getMethod()).thenReturn("DELETE");
