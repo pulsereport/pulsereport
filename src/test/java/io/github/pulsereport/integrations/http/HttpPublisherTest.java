@@ -51,7 +51,7 @@ class HttpPublisherTest {
 
     @SuppressWarnings("unchecked")
     @Test
-    void testPublishFile_Success() throws Exception {
+    void publishFile_success() throws Exception {
         File reportFile = new File(tempDir, "report.json");
         Files.writeString(reportFile.toPath(), "{\"test\": \"data\"}");
 
@@ -67,7 +67,7 @@ class HttpPublisherTest {
 
     @SuppressWarnings("unchecked")
     @Test
-    void testPublishBytes_Success() throws Exception {
+    void publishBytes_success() throws Exception {
         byte[] reportData = "{\"test\": \"data\"}".getBytes();
         String fileName = "report.json";
 
@@ -83,7 +83,7 @@ class HttpPublisherTest {
 
     @SuppressWarnings("unchecked")
     @Test
-    void testPublish_WithHeaders() throws Exception {
+    void publish_withHeaders() throws Exception {
         byte[] reportData = "{\"test\": \"data\"}".getBytes();
         String fileName = "report.json";
 
@@ -109,7 +109,7 @@ class HttpPublisherTest {
 
     @SuppressWarnings("unchecked")
     @Test
-    void testPublish_WithBearerAuth() throws Exception {
+    void publish_withBearerAuth() throws Exception {
         byte[] reportData = "{\"test\": \"data\"}".getBytes();
         String fileName = "report.json";
 
@@ -131,7 +131,7 @@ class HttpPublisherTest {
 
     @SuppressWarnings("unchecked")
     @Test
-    void testPublish_WithBasicAuth() throws Exception {
+    void publish_withBasicAuth() throws Exception {
         byte[] reportData = "{\"test\": \"data\"}".getBytes();
         String fileName = "report.json";
 
@@ -154,7 +154,7 @@ class HttpPublisherTest {
 
     @SuppressWarnings("unchecked")
     @Test
-    void testPublish_RetryOn5xx() throws Exception {
+    void publish_retryOn5xx() throws Exception {
         byte[] reportData = "{\"test\": \"data\"}".getBytes();
         String fileName = "report.json";
 
@@ -177,7 +177,7 @@ class HttpPublisherTest {
 
     @SuppressWarnings("unchecked")
     @Test
-    void testPublish_FailOn4xx() throws Exception {
+    void publish_failOn4xx() throws Exception {
         byte[] reportData = "{\"test\": \"data\"}".getBytes();
         String fileName = "report.json";
 
@@ -195,7 +195,7 @@ class HttpPublisherTest {
 
     @SuppressWarnings("unchecked")
     @Test
-    void testPublish_FailAfterRetries() throws Exception {
+    void publish_failAfterRetries() throws Exception {
         byte[] reportData = "{\"test\": \"data\"}".getBytes();
         String fileName = "report.json";
 
@@ -211,7 +211,7 @@ class HttpPublisherTest {
     }
 
     @Test
-    void testHttpPublishConfig() {
+    void httpPublishConfig() {
         HttpPublishConfig config = HttpPublishConfig.builder()
                 .endpoint("https://example.com")
                 .method("PUT")

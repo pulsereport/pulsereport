@@ -6,7 +6,7 @@ PulseReport can emit human-readable and machine-readable outputs from the same r
 
 | Format | Use Case | Features |
 | -------- | ---------- | ---------- |
-| **HTML** | Human-readable reports | Interactive, charts, screenshots |
+| **HTML** | Human-readable reports | Interactive, screenshots, search/filter |
 | **JSON** | Machine processing, CI/CD | Complete data, queryable |
 | **JUnit XML** | CI/CD integration | Jenkins, TeamCity, Bamboo |
 
@@ -17,28 +17,14 @@ PulseReport can emit human-readable and machine-readable outputs from the same r
 In the PulseReport configuration file (`reporter.properties`):
 
 ```properties
-# Enable multiple formats (comma-separated)
+# Formats to generate (comma-separated: html, json, junit)
 reporter.output.formats=html,json,junit
 
 # Output directory
 reporter.output.directory=target/pulsereport
-
-# Reporter metadata
-reporter.name=PulseReport
-reporter.version=1.0.0
 ```
 
-### Format-Specific Configuration
-
-```properties
-# JSON settings
-reporter.json.pretty=true
-reporter.json.includeStackTraces=true
-
-# JUnit XML settings
-reporter.junit.includeSystemOut=true
-reporter.junit.includeSystemErr=true
-```
+> **Note:** `reporter.output.formats` is honored **only by the PulseReport CLI**. The TestNG and Cucumber adapters always generate both `test-report.html` and `test-report.json`, regardless of this setting.
 
 ---
 
@@ -155,48 +141,66 @@ Machine-readable JSON format for integration and processing.
 
 ### Structure
 
+The `TestRun` object is serialized **directly at the document root** — there is no wrapper element. Output is always indented. The example below mirrors a real generated report (from the Appium example):
+
 ```json
 {
-  "testRun": {
-    "id": "550e8400-e29b-41d4-a716-446655440000",
-    "name": "My Test Suite",
-    "startTime": "2026-02-16T10:30:00Z",
-    "endTime": "2026-02-16T10:32:45Z",
-    "duration": 165000,
-    "status": "COMPLETED",
-    "suites": [
-      {
-        "id": "suite-1",
-        "name": "Calculator Tests",
-        "startTime": "2026-02-16T10:30:00Z",
-        "endTime": "2026-02-16T10:31:30Z",
-        "duration": 90000,
-        "testCases": [
-          {
-            "id": "test-1",
-            "name": "testAddition",
-            "description": "Verify addition of two numbers",
-            "status": "PASSED",
-            "startTime": "2026-02-16T10:30:00Z",
-            "endTime": "2026-02-16T10:30:05Z",
-            "duration": 5000,
-            "steps": [],
-            "artifacts": [],
-            "metrics": [],
-            "errorMessage": null,
-            "stackTrace": null
-          }
-        ]
-      }
-    ],
-    "summary": {
-      "totalTests": 150,
-      "passedTests": 142,
-      "failedTests": 6,
-      "skippedTests": 2,
-      "successRate": 94.7
-    }
-  }
+  "id" : "e27c1458-b0e6-4271-bc8e-c173ae4c5f89",
+  "name" : "Surefire suite",
+  "startTime" : "2026-06-05T13:59:24.844Z",
+  "endTime" : "2026-06-05T14:00:58.912Z",
+  "duration" : 94068,
+  "status" : "FAILED",
+  "suites" : [ {
+    "id" : "66c6463f-4995-4051-9fd8-6d47ab1c9390",
+    "name" : "Surefire test",
+    "startTime" : "2026-06-05T13:59:24.844Z",
+    "endTime" : "2026-06-05T14:00:58.912Z",
+    "duration" : 94068,
+    "status" : "FAILED",
+    "testCases" : [ {
+      "id" : "Surefire suite.Surefire test.io.github.pulsereport.examples.appium.IOSAppTest.testAppLaunch_testAppLaunch",
+      "name" : "Verify iOS app launches and product catalog is displayed",
+      "className" : "io.github.pulsereport.examples.appium.IOSAppTest",
+      "methodName" : "testAppLaunch",
+      "startTime" : "2026-06-05T14:00:09.334Z",
+      "endTime" : "2026-06-05T14:00:29.989Z",
+      "duration" : 20655,
+      "status" : "FAILED",
+      "errorMessage" : "Expected condition failed: waiting for visibility of element ...",
+      "stackTrace" : "org.openqa.selenium.TimeoutException: Expected condition failed: ...",
+      "steps" : [ ],
+      "artifacts" : [ {
+        "name" : "testAppLaunch-failed.png",
+        "type" : "screenshot",
+        "path" : "/var/folders/.../screenshot2624571246221067343.png",
+        "mimeType" : "image/png",
+        "size" : 772358,
+        "timestamp" : "2026-06-05T14:00:30.224599Z"
+      } ],
+      "metrics" : [ ],
+      "retryCount" : 0,
+      "backgroundSteps" : [ ],
+      "tags" : [ ]
+    } ],
+    "totalTests" : 3,
+    "passedTests" : 0,
+    "failedTests" : 3,
+    "skippedTests" : 0,
+    "tags" : [ ]
+  } ],
+  "environment" : {
+    "automationName" : "XCuiTest",
+    "platformName" : "iOS",
+    "udid" : "C6E13B79-9B0E-4DBC-AFA0-C64C11AE9C9E",
+    "device" : "iPhone 17 Pro",
+    "appName" : "My Demo App.app",
+    "platformVersion" : "26.0"
+  },
+  "totalTests" : 3,
+  "passedTests" : 0,
+  "failedTests" : 3,
+  "skippedTests" : 0
 }
 ```
 
@@ -209,58 +213,29 @@ target/pulsereport/
 
 ### Schema
 
-The JSON output structure mirrors the `TestRun` model and its nested objects (`TestSuite`, `TestCase`, `TestStep`, `Artifact`, `Metric`).
+The JSON output is the `TestRun` model serialized directly at the root, with nested `TestSuite`, `TestCase`, `TestStep`, `Artifact`, and `Metric` objects.
 
-### Pretty Printing
+Key facts:
 
-```properties
-# Enable pretty printing (default: false)
-reporter.json.pretty=true
-```
-
-Pretty printed output:
-
-```json
-{
-  "testRun": {
-    "id": "550e8400-e29b-41d4-a716-446655440000",
-    "name": "My Test Suite"
-  }
-}
-```
-
-Compact output:
-
-```json
-{"testRun":{"id":"550e8400-e29b-41d4-a716-446655440000","name":"My Test Suite"}}
-```
-
-### Include/Exclude Data
-
-```properties
-# Include full stack traces (can be large)
-reporter.json.includeStackTraces=true
-
-# Include artifact content (base64 encoded)
-reporter.json.includeArtifacts=true
-
-# Include metric details
-reporter.json.includeMetrics=true
-```
+- **Root object** is the test run itself — there is no `testRun` wrapper and no `summary` object. The counters `totalTests`, `passedTests`, `failedTests`, and `skippedTests` are flat fields on both the run and each suite.
+- **Status values** are `PASSED`, `FAILED`, `SKIPPED`, or `FLAKY` only.
+- **`environment`** is a map of adapter-supplied key/value pairs; its contents vary by adapter.
+- **Indentation is always enabled** — there is no configuration to produce compact output.
+- Error messages, stack traces, artifact metadata, metrics, steps, tags, and retry counts are included whenever present.
 
 ### Processing JSON Reports
 
 #### JQ (Command Line)
 
 ```bash
-# Get test summary
-jq '.testRun.summary' test-report.json
+# Get run-level counts
+jq '.totalTests, .passedTests, .failedTests, .skippedTests' test-report.json
 
 # Get failed tests
-jq '.testRun.suites[].testCases[] | select(.status == "FAILED")' test-report.json
+jq '.suites[].testCases[] | select(.status == "FAILED")' test-report.json
 
-# Get test count
-jq '.testRun.summary.totalTests' test-report.json
+# Get overall run status
+jq '.status' test-report.json
 ```
 
 #### Python
@@ -271,11 +246,10 @@ import json
 with open('test-report.json', 'r') as f:
     report = json.load(f)
 
-summary = report['testRun']['summary']
-print(f"Total: {summary['totalTests']}")
-print(f"Passed: {summary['passedTests']}")
-print(f"Failed: {summary['failedTests']}")
-print(f"Success Rate: {summary['successRate']}%")
+print(f"Total: {report['totalTests']}")
+print(f"Passed: {report['passedTests']}")
+print(f"Failed: {report['failedTests']}")
+print(f"Skipped: {report['skippedTests']}")
 ```
 
 #### JavaScript/Node.js
@@ -284,12 +258,11 @@ print(f"Success Rate: {summary['successRate']}%")
 const fs = require('fs');
 
 const report = JSON.parse(fs.readFileSync('test-report.json', 'utf8'));
-const summary = report.testRun.summary;
 
-console.log(`Total: ${summary.totalTests}`);
-console.log(`Passed: ${summary.passedTests}`);
-console.log(`Failed: ${summary.failedTests}`);
-console.log(`Success Rate: ${summary.successRate}%`);
+console.log(`Total: ${report.totalTests}`);
+console.log(`Passed: ${report.passedTests}`);
+console.log(`Failed: ${report.failedTests}`);
+console.log(`Skipped: ${report.skippedTests}`);
 ```
 
 ---
@@ -298,46 +271,46 @@ console.log(`Success Rate: ${summary.successRate}%`);
 
 Standard JUnit XML format for CI/CD integration.
 
+> **CLI only:** JUnit XML is generated only by the PulseReport CLI. The TestNG and Cucumber adapters generate only `test-report.html` and `test-report.json` — they never produce JUnit XML. Generate it from an existing JSON report:
+>
+> ```bash
+> pulsereport generate -i target/pulsereport/test-report.json -f junit
+> ```
+
 ### Structure
+
+The generator emits only `testsuites`, `testsuite`, and `testcase` elements:
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuites name="My Test Suite" time="165.0" tests="150" failures="6" skipped="2">
-    <testsuite name="Calculator Tests" time="90.0" tests="50" failures="2" skipped="1">
-        <properties>
-            <property name="java.version" value="17.0.2"/>
-            <property name="os.name" value="Mac OS X"/>
-        </properties>
-        
-        <testcase name="testAddition" classname="com.example.CalculatorTest" time="5.0">
-            <!-- Passed test - no additional elements -->
-        </testcase>
-        
-        <testcase name="testDivision" classname="com.example.CalculatorTest" time="3.2">
-            <failure message="Division by zero" type="java.lang.ArithmeticException">
-                <![CDATA[
-java.lang.ArithmeticException: Division by zero
+<testsuites tests="50" failures="2" errors="0" skipped="1" time="90.000">
+  <testsuite name="Calculator Tests" tests="50" failures="2" errors="0" skipped="1" time="90.000">
+    <testcase name="testAddition" classname="com.example.CalculatorTest" time="5.000" />
+    <testcase name="testDivision" classname="com.example.CalculatorTest" time="3.200">
+      <failure message="Division by zero">java.lang.ArithmeticException: Division by zero
     at com.example.Calculator.divide(Calculator.java:25)
-    at com.example.CalculatorTest.testDivision(CalculatorTest.java:42)
-                ]]>
-            </failure>
-        </testcase>
-        
-        <testcase name="testSkipped" classname="com.example.CalculatorTest" time="0.0">
-            <skipped message="Test disabled"/>
-        </testcase>
-        
-        <system-out><![CDATA[Test execution output]]></system-out>
-        <system-err><![CDATA[Error output]]></system-err>
-    </testsuite>
+    at com.example.CalculatorTest.testDivision(CalculatorTest.java:42)</failure>
+    </testcase>
+    <testcase name="testSkipped" classname="com.example.CalculatorTest" time="0.000">
+      <skipped />
+    </testcase>
+  </testsuite>
 </testsuites>
 ```
+
+Notes on the emitted XML:
+
+- `time` attributes are in seconds (converted from the model's millisecond durations).
+- Passed and flaky tests are self-closing `<testcase ... />` elements.
+- Skipped tests contain an empty `<skipped />` element (no `message` attribute).
+- Failed tests contain a `<failure message="...">` element whose text is the XML-escaped stack trace.
+- No `<properties>`, `<system-out>`, or `<system-err>` elements are emitted.
 
 ### Generated Files
 
 ```
 target/pulsereport/
-└── TEST-junit.xml
+└── test-report.xml          # Generated by the CLI only
 ```
 
 ### CI/CD Integration
@@ -351,9 +324,15 @@ stage('Test') {
     }
 }
 
+stage('Reports') {
+    steps {
+        sh 'pulsereport generate -i target/pulsereport/test-report.json -f junit'
+    }
+}
+
 stage('Publish Results') {
     steps {
-        junit 'target/pulsereport/TEST-junit.xml'
+        junit 'target/pulsereport/test-report.xml'
     }
 }
 ```
@@ -364,9 +343,10 @@ stage('Publish Results') {
 test:
   script:
     - mvn test
+    - pulsereport generate -i target/pulsereport/test-report.json -f junit
   artifacts:
     reports:
-      junit: target/pulsereport/TEST-junit.xml
+      junit: target/pulsereport/test-report.xml
 ```
 
 #### GitHub Actions
@@ -375,11 +355,15 @@ test:
 - name: Run Tests
   run: mvn test
 
+- name: Generate JUnit XML
+  if: always()
+  run: pulsereport generate -i target/pulsereport/test-report.json -f junit
+
 - name: Publish Test Results
   uses: EnricoMi/publish-unit-test-result-action@v2
   if: always()
   with:
-    files: target/pulsereport/TEST-junit.xml
+    files: target/pulsereport/test-report.xml
 ```
 
 #### Azure Pipelines
@@ -389,24 +373,13 @@ test:
   inputs:
     goals: 'test'
 
+- script: pulsereport generate -i target/pulsereport/test-report.json -f junit
+  displayName: 'Generate JUnit XML'
+
 - task: PublishTestResults@2
   inputs:
     testResultsFormat: 'JUnit'
-    testResultsFiles: '**/TEST-*.xml'
-```
-
-### Configuration
-
-```properties
-# Include system output
-reporter.junit.includeSystemOut=true
-reporter.junit.includeSystemErr=true
-
-# Include properties
-reporter.junit.includeProperties=true
-
-# Flatten suite hierarchy
-reporter.junit.flattenSuites=false
+    testResultsFiles: '**/test-report.xml'
 ```
 
 ---
@@ -415,41 +388,51 @@ reporter.junit.flattenSuites=false
 
 ### Creating a Custom Output Plugin
 
-Implement the `OutputGenerator` interface:
+Implement the `OutputGenerator` interface. It defines two methods — one writing to a single output **file**, and one writing to an `OutputStream`:
 
 ```java
 package com.example;
 
-import io.github.pulsereport.outputs.OutputGenerator;
 import io.github.pulsereport.core.model.TestRun;
+import io.github.pulsereport.outputs.OutputGenerator;
+
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.io.PrintWriter;
 
 public class CustomOutputGenerator implements OutputGenerator {
-    
+
     @Override
-    public String getName() {
-        return "custom";
-    }
-    
-    @Override
-    public void generate(TestRun testRun, File outputDirectory) {
-        // Custom report generation logic
-        File reportFile = new File(outputDirectory, "custom-report.txt");
-        
-        try (PrintWriter writer = new PrintWriter(reportFile)) {
-            writer.println("Custom Report");
-            writer.println("=============");
-            writer.println("Total Tests: " + testRun.getSummary().getTotalTests());
-            // ... more custom formatting
+    public void generate(TestRun testRun, File outputFile) throws IOException {
+        if (outputFile.getParentFile() != null) {
+            outputFile.getParentFile().mkdirs();
         }
+        try (OutputStream out = new FileOutputStream(outputFile)) {
+            generate(testRun, out);
+        }
+    }
+
+    @Override
+    public void generate(TestRun testRun, OutputStream outputStream) throws IOException {
+        PrintWriter writer = new PrintWriter(outputStream);
+        writer.println("Custom Report");
+        writer.println("=============");
+        writer.println("Total Tests: " + testRun.getTotalTests());
+        writer.println("Passed:      " + testRun.getPassedTests());
+        writer.println("Failed:      " + testRun.getFailedTests());
+        writer.println("Skipped:     " + testRun.getSkippedTests());
+        writer.flush();
     }
 }
 ```
 
-Register the generator in the PulseReport configuration file (`reporter.properties`):
+There is no configuration-based registration mechanism — the CLI's supported formats (`html`, `json`, `junit`) are hardcoded. Use a custom generator programmatically instead:
 
-```properties
-reporter.output.formats=html,json,custom
-# Note: custom output generator registration is reserved for future use.
+```java
+TestRun testRun = ...; // e.g. deserialize test-report.json with Jackson
+new CustomOutputGenerator().generate(testRun, new File("target/pulsereport/custom-report.txt"));
 ```
 
 ---
@@ -460,8 +443,7 @@ reporter.output.formats=html,json,custom
 | --------- | ------ | ------ | ----------- |
 | Human Readable | ✅ Excellent | ❌ No | ⚠️ Limited |
 | Machine Readable | ❌ No | ✅ Excellent | ✅ Good |
-| Screenshots | ✅ Embedded | ✅ Base64 | ❌ No |
-| Charts | ✅ Yes | ❌ No | ❌ No |
+| Screenshots | ✅ Embedded | ✅ Metadata | ❌ No |
 | CI/CD Integration | ⚠️ Manual | ✅ API | ✅ Native |
 | File Size | 🔴 Large | 🟡 Medium | 🟢 Small |
 | Search/Filter | ✅ Yes | 🔧 JQ/Script | ❌ No |
@@ -472,22 +454,15 @@ reporter.output.formats=html,json,custom
 
 ### 1. Use Multiple Formats
 
-Generate both HTML (for humans) and JUnit XML (for CI/CD):
+The TestNG and Cucumber adapters always generate both HTML (for humans) and JSON (for automation). Add JUnit XML (for CI/CD) by regenerating with the CLI:
 
-```properties
-reporter.output.formats=html,junit
+```bash
+pulsereport generate -i target/pulsereport/test-report.json -f html,json,junit
 ```
 
 ### 2. Optimize Artifact Size
 
-Large screenshots increase report size:
-
-```properties
-# Compress screenshots
-reporter.html.screenshots.compress=true
-reporter.html.screenshots.maxWidth=1920
-reporter.html.screenshots.maxHeight=1080
-```
+Large screenshots and log attachments increase report size. Capture screenshots at a reasonable resolution in your tests, and attach large logs only when they are needed for debugging.
 
 ### 3. Archive Reports
 
@@ -503,11 +478,11 @@ mv target/pulsereport target/pulsereport-$(date +%Y%m%d-%H%M%S)
 Mask sensitive information in reports:
 
 ```properties
-# Mask credentials in REST API tests
-reporter.restassured.mask.credentials=true
-
-# Exclude environment variables
-reporter.json.excludeEnvVars=PASSWORD,API_KEY,SECRET
+# Masking is enabled by default; these are the master switch and
+# per-category controls for REST API tests
+reporter.maskSensitiveData=true
+reporter.maskHeaders.fields=Authorization,X-API-Key,Cookie,Set-Cookie
+reporter.maskBody.fields=password,secret,token
 ```
 
 ---
@@ -520,34 +495,23 @@ reporter.json.excludeEnvVars=PASSWORD,API_KEY,SECRET
 
 **Solution**:
 
-- Compress screenshots
-- Limit artifact content
-- Use pagination
-
-```properties
-reporter.html.pagination.enabled=true
-reporter.html.pagination.pageSize=50
-```
+- Reduce the size and number of attached artifacts (screenshots, logs, videos).
+- Split very large test runs into smaller suites.
 
 ### Missing Screenshots in HTML
 
 **Problem**: Screenshots not appearing in HTML report.
 
-**Solution**: Ensure screenshots are embedded:
-
-```properties
-reporter.html.screenshots.embed=true
-# Options: embed, link, none
-```
+**Solution**: Screenshots appear only when tests attach them as artifacts (for example, by capturing a screenshot in a failure handler or via the Selenium/Appium adapter helpers). Verify the artifacts are present in `test-report.json` under each test case's `artifacts` array.
 
 ### Invalid JUnit XML
 
 **Problem**: CI/CD system rejects JUnit XML.
 
-**Solution**: Validate against schema:
+**Solution**: Validate the CLI-generated file:
 
 ```bash
-xmllint --schema junit-schema.xsd target/pulsereport/TEST-junit.xml
+xmllint --noout target/pulsereport/test-report.xml
 ```
 
 ---

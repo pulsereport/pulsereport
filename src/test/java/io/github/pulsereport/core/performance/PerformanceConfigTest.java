@@ -15,7 +15,7 @@ import static org.junit.jupiter.api.Assertions.*;
 public class PerformanceConfigTest {
 
     @Test
-    public void testDefaults() {
+    public void defaults() {
         PerformanceConfig config = PerformanceConfig.defaults();
         
         assertFalse(config.isStreamingMode());
@@ -26,7 +26,7 @@ public class PerformanceConfigTest {
     }
 
     @Test
-    public void testForLargeDatasets() {
+    public void forLargeDatasets() {
         PerformanceConfig config = PerformanceConfig.forLargeDatasets();
         
         assertTrue(config.isStreamingMode());
@@ -35,7 +35,7 @@ public class PerformanceConfigTest {
     }
 
     @Test
-    public void testBuilder() {
+    public void builder() {
         Path customPath = Path.of("/tmp/custom");
         
         PerformanceConfig config = PerformanceConfig.builder()
@@ -54,7 +54,7 @@ public class PerformanceConfigTest {
     }
 
     @Test
-    public void testBuilderInvalidBatchSize() {
+    public void builderInvalidBatchSize() {
         assertThrows(IllegalArgumentException.class, () -> {
             PerformanceConfig.builder()
                     .batchSize(0)
@@ -69,7 +69,7 @@ public class PerformanceConfigTest {
     }
 
     @Test
-    public void testBuilderInvalidMaxMemory() {
+    public void builderInvalidMaxMemory() {
         assertThrows(IllegalArgumentException.class, () -> {
             PerformanceConfig.builder()
                     .maxMemoryMB(0)
@@ -84,7 +84,7 @@ public class PerformanceConfigTest {
     }
 
     @Test
-    public void testBuilderNullTempDir() {
+    public void builderNullTempDir() {
         assertThrows(IllegalArgumentException.class, () -> {
             PerformanceConfig.builder()
                     .tempStorageDir(null)
@@ -93,7 +93,7 @@ public class PerformanceConfigTest {
     }
 
     @Test
-    public void testToString() {
+    public void toString_containsKeyFields() {
         PerformanceConfig config = PerformanceConfig.builder()
                 .streamingMode(true)
                 .batchSize(100)
@@ -107,7 +107,7 @@ public class PerformanceConfigTest {
     }
 
     @Test
-    public void testBuilderChaining() {
+    public void builderChaining() {
         PerformanceConfig config = PerformanceConfig.builder()
                 .streamingMode(true)
                 .batchSize(200)
@@ -122,7 +122,7 @@ public class PerformanceConfigTest {
     }
 
     @Test
-    public void testDefaultBatchSize() {
+    public void defaultBatchSize() {
         PerformanceConfig config = PerformanceConfig.builder()
                 .streamingMode(true)
                 .build();
@@ -131,7 +131,7 @@ public class PerformanceConfigTest {
     }
 
     @Test
-    public void testDefaultMaxMemory() {
+    public void defaultMaxMemory() {
         PerformanceConfig config = PerformanceConfig.builder()
                 .streamingMode(true)
                 .build();

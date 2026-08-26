@@ -70,7 +70,7 @@ public class TestResultAggregatorTest {
      * PASSED status
      */
     @Test
-    public void testConvertSuccessfulTestResultToTestCase() {
+    public void convertSuccessfulTestResultToTestCase() {
         ITestResult mockResult = createMockTestResult(
                 "testMethod",
                 "com.example.TestClass",
@@ -100,7 +100,7 @@ public class TestResultAggregatorTest {
      * errorMessage and stackTrace
      */
     @Test
-    public void testConvertFailedTestResultToTestCase() {
+    public void convertFailedTestResultToTestCase() {
         Throwable throwable = new AssertionError("Expected <true> but was <false>");
         ITestResult mockResult = createMockTestResult(
                 "testFailingMethod",
@@ -127,7 +127,7 @@ public class TestResultAggregatorTest {
      * status
      */
     @Test
-    public void testConvertSkippedTestResultToTestCase() {
+    public void convertSkippedTestResultToTestCase() {
         ITestResult mockResult = createMockTestResult(
                 "testSkippedMethod",
                 "com.example.SkipTest",
@@ -151,7 +151,7 @@ public class TestResultAggregatorTest {
      * with FLAKY status
      */
     @Test
-    public void testDetectFlakyTestAfterRetry() {
+    public void detectFlakyTestAfterRetry() {
         ITestResult failedResult = createMockTestResult(
                 "testFlakyMethod",
                 "com.example.FlakyTest",
@@ -188,7 +188,7 @@ public class TestResultAggregatorTest {
      * retry count
      */
     @Test
-    public void testMultipleFailedAttempts() {
+    public void multipleFailedAttempts() {
         ITestResult firstFailure = createMockTestResult(
                 "testAlwaysFails",
                 "com.Test",
@@ -223,7 +223,7 @@ public class TestResultAggregatorTest {
      * Test 6: Multiple tests in suite → TestSuite with multiple TestCases
      */
     @Test
-    public void testConvertMultipleTestsToSuite() {
+    public void convertMultipleTestsToSuite() {
         ITestContext mockContext = createMockTestContext("TestSuite1");
 
         ITestResult result1 = createMockTestResult("test1", "com.Test", ITestResult.SUCCESS, 100L, 200L, null);
@@ -249,7 +249,7 @@ public class TestResultAggregatorTest {
      * Test 7: Nested suites → TestRun with multiple TestSuites
      */
     @Test
-    public void testConvertNestedSuitesToTestRun() {
+    public void convertNestedSuitesToTestRun() {
         ISuite mockSuite = createMockSuite("MasterSuite");
 
         ITestContext context1 = createMockTestContext("Suite1");
@@ -305,7 +305,7 @@ public class TestResultAggregatorTest {
      * Test 8: Parallel execution → deterministic TestRun (thread-safe)
      */
     @Test
-    public void testParallelExecutionIsDeterministic() throws InterruptedException {
+    public void parallelExecutionIsDeterministic() throws InterruptedException {
         int threadCount = 10;
         int testsPerThread = 10;
         ExecutorService executor = Executors.newFixedThreadPool(threadCount);
@@ -354,7 +354,7 @@ public class TestResultAggregatorTest {
      * endTime, duration
      */
     @Test
-    public void testTimingExtractionFromTestResult() {
+    public void timingExtractionFromTestResult() {
         long startTimeMs = 1609459200000L; // 2021-01-01 00:00:00 UTC
         long endTimeMs = 1609459201500L;   // 2021-01-01 00:00:01.5 UTC
         long expectedDuration = 1500L;
@@ -381,7 +381,7 @@ public class TestResultAggregatorTest {
      * Test 10: Null safety - handle null throwable gracefully
      */
     @Test
-    public void testNullThrowableHandling() {
+    public void nullThrowableHandling() {
         ITestResult mockResult = createMockTestResult(
                 "testMethod",
                 "com.Test",
@@ -399,7 +399,7 @@ public class TestResultAggregatorTest {
     }
 
     @Test
-    public void testPassedExpectedExceptionDoesNotExposeThrowableDetails() {
+    public void passedExpectedExceptionDoesNotExposeThrowableDetails() {
         ITestResult mockResult = createMockTestResult(
                 "testDivisionByZero",
                 "com.example.TestClass",
@@ -420,7 +420,7 @@ public class TestResultAggregatorTest {
      * Test 11: Empty suite handling
      */
     @Test
-    public void testEmptySuiteConversion() {
+    public void emptySuiteConversion() {
         ITestContext mockContext = createMockTestContext("EmptySuite");
         List<ITestResult> emptyResults = new ArrayList<>();
 
@@ -437,7 +437,7 @@ public class TestResultAggregatorTest {
      * Test 12: Suite status calculation - all passed → PASSED
      */
     @Test
-    public void testSuiteStatusAllPassed() {
+    public void suiteStatusAllPassed() {
         ITestContext mockContext = createMockTestContext("AllPassedSuite");
         ITestResult result1 = createMockTestResult("test1", "com.Test", ITestResult.SUCCESS, 100L, 200L, null);
         ITestResult result2 = createMockTestResult("test2", "com.Test", ITestResult.SUCCESS, 100L, 200L, null);
@@ -453,7 +453,7 @@ public class TestResultAggregatorTest {
      * Test 13: Suite status calculation - any failed → FAILED
      */
     @Test
-    public void testSuiteStatusWithFailures() {
+    public void suiteStatusWithFailures() {
         ITestContext mockContext = createMockTestContext("FailedSuite");
         ITestResult result1 = createMockTestResult("test1", "com.Test", ITestResult.SUCCESS, 100L, 200L, null);
         ITestResult result2 = createMockTestResult("test2", "com.Test", ITestResult.FAILURE, 100L, 200L, new AssertionError());
@@ -469,7 +469,7 @@ public class TestResultAggregatorTest {
      * Test 14: Suite status calculation - has flaky → FLAKY (if no failures)
      */
     @Test
-    public void testSuiteStatusWithFlakyTests() {
+    public void suiteStatusWithFlakyTests() {
         ITestContext mockContext = createMockTestContext("FlakySuite");
 
         ITestResult failResult = createMockTestResult("flakyTest", "com.Test", ITestResult.FAILURE, 100L, 200L, new AssertionError());
@@ -495,7 +495,7 @@ public class TestResultAggregatorTest {
      * NOT leaked into the TestCase.
      */
     @Test
-    public void testMergesArtifactsFromFullKeyAndMethodName() {
+    public void mergesArtifactsFromFullKeyAndMethodName() {
         ITestResult result = createMockTestResult(
                 "customerLoginTest", "com.Test", ITestResult.FAILURE, 100L, 200L, new AssertionError("boom"));
         ISuite suite = wiredSuiteWithResult("Suite", "Automation suite", result);

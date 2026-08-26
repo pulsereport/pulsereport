@@ -74,7 +74,7 @@ class ReporterCLITest {
     }
 
     @Test
-    void testMainMethod() {
+    void mainMethod() {
         assertDoesNotThrow(() -> {
             Class<?> cliClass = Class.forName("io.github.pulsereport.cli.ReporterCLI");
             assertNotNull(cliClass.getMethod("main", String[].class));
@@ -82,7 +82,7 @@ class ReporterCLITest {
     }
 
     @Test
-    void testHelpCommand() {
+    void helpCommand() {
         String[] args = {"--help"};
 
         int exitCode = ReporterCLI.execute(args);
@@ -95,7 +95,7 @@ class ReporterCLITest {
     }
 
     @Test
-    void testVersionCommand() {
+    void versionCommand() {
         String[] args = {"--version"};
 
         int exitCode = ReporterCLI.execute(args);
@@ -107,7 +107,7 @@ class ReporterCLITest {
     }
 
     @Test
-    void testGenerateCommand_WithValidArgs() {
+    void generateCommand_withValidArgs() {
         String[] args = {
             "generate",
             "--input", inputFile.getAbsolutePath(),
@@ -121,7 +121,7 @@ class ReporterCLITest {
     }
 
     @Test
-    void testGenerateCommand_MissingInputFile() {
+    void generateCommand_missingInputFile() {
         String[] args = {
             "generate",
             "--output", tempDir.toString(),
@@ -134,7 +134,7 @@ class ReporterCLITest {
     }
 
     @Test
-    void testGenerateCommand_InvalidFormat() {
+    void generateCommand_invalidFormat() {
         String[] args = {
             "generate",
             "--input", inputFile.getAbsolutePath(),
@@ -150,7 +150,7 @@ class ReporterCLITest {
     }
 
     @Test
-    void testPublishCommand_WithValidArgs() {
+    void publishCommand_withValidArgs() {
         File reportFile = tempDir.resolve("report.html").toFile();
         try {
             reportFile.createNewFile();
@@ -173,7 +173,7 @@ class ReporterCLITest {
     }
 
     @Test
-    void testPublishCommand_MissingConfig() {
+    void publishCommand_missingConfig() {
         String[] args = {
             "publish",
             "--input", inputFile.getAbsolutePath(),
@@ -187,7 +187,7 @@ class ReporterCLITest {
     }
 
     @Test
-    void testValidateCommand_WithValidConfig() {
+    void validateCommand_withValidConfig() {
         String[] args = {
             "validate",
             "--config", configFile.getAbsolutePath()
@@ -201,7 +201,7 @@ class ReporterCLITest {
     }
 
     @Test
-    void testValidateCommand_WithInvalidConfig() throws IOException {
+    void validateCommand_withInvalidConfig() throws IOException {
         File invalidConfigFile = tempDir.resolve("invalid.properties").toFile();
         Properties props = new Properties();
         props.setProperty("reporter.output.formats", ""); // Invalid: empty formats
@@ -225,7 +225,7 @@ class ReporterCLITest {
     }
 
     @Test
-    void testVerboseMode() {
+    void verboseMode() {
         String[] args = {
             "validate",
             "--config", configFile.getAbsolutePath(),
@@ -240,7 +240,7 @@ class ReporterCLITest {
     }
 
     @Test
-    void testDryRunMode() {
+    void dryRunMode() {
         String[] args = {
             "generate",
             "--input", inputFile.getAbsolutePath(),
@@ -257,7 +257,7 @@ class ReporterCLITest {
     }
 
     @Test
-    void testInvalidCommand() {
+    void invalidCommand() {
         String[] args = {"invalid-command"};
 
         int exitCode = ReporterCLI.execute(args);
@@ -266,7 +266,7 @@ class ReporterCLITest {
     }
 
     @Test
-    void testNoArguments() {
+    void noArguments() {
         String[] args = {};
 
         int exitCode = ReporterCLI.execute(args);
@@ -277,7 +277,7 @@ class ReporterCLITest {
     }
 
     @Test
-    void testGenerateWithConfigFile() {
+    void generateWithConfigFile() {
         String[] args = {
             "generate",
             "--input", inputFile.getAbsolutePath(),
@@ -290,7 +290,7 @@ class ReporterCLITest {
     }
 
     @Test
-    void testMultipleFormats() {
+    void multipleFormats() {
         String[] args = {
             "generate",
             "--input", inputFile.getAbsolutePath(),
@@ -304,7 +304,7 @@ class ReporterCLITest {
     }
 
     @Test
-    void testGenerateCommand_MalformedJsonInput() throws IOException {
+    void generateCommand_malformedJsonInput() throws IOException {
         File badJsonFile = tempDir.resolve("bad-input.json").toFile();
         try (FileWriter fw = new FileWriter(badJsonFile)) {
             fw.write("{ this is not valid json at all }}}");
@@ -322,7 +322,7 @@ class ReporterCLITest {
     }
 
     @Test
-    void testGenerateCommand_EmptyJsonInput() throws IOException {
+    void generateCommand_emptyJsonInput() throws IOException {
         File emptyFile = tempDir.resolve("empty.json").toFile();
         try (FileWriter fw = new FileWriter(emptyFile)) {
             fw.write("");
@@ -340,7 +340,7 @@ class ReporterCLITest {
     }
 
     @Test
-    void testGenerateCommand_IncompleteJsonInput() throws IOException {
+    void generateCommand_incompleteJsonInput() throws IOException {
         File incompleteFile = tempDir.resolve("incomplete.json").toFile();
         try (FileWriter fw = new FileWriter(incompleteFile)) {
             fw.write("{\"id\":\"test\",\"name\":\"Incomplete\"");

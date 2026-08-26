@@ -47,7 +47,7 @@ public class RestAssuredFilterTest {
                 .outputDirectory(new File("target/custom-reports"))
                 .maxArtifactContentSize(1024) // 1KB limit for testing
                 .maskSensitiveData(true)
-                .sensitiveHeaders("Authorization,X-API-Key,Cookie,Set-Cookie")
+                .maskHeaderFields("Authorization,X-API-Key,Cookie,Set-Cookie")
                 .build();
 
         adapter = new RestAssuredAdapter(config);
@@ -70,7 +70,7 @@ public class RestAssuredFilterTest {
     }
 
     @Test
-    public void testFilterCapturesRequest() throws Exception {
+    public void filterCapturesRequest() throws Exception {
         RestAssuredAdapter.setCurrentTestName("testApiCall");
 
         when(requestSpec.getMethod()).thenReturn("POST");
@@ -96,7 +96,7 @@ public class RestAssuredFilterTest {
     }
 
     @Test
-    public void testFilterCapturesResponse() throws Exception {
+    public void filterCapturesResponse() throws Exception {
         RestAssuredAdapter.setCurrentTestName("testApiCall");
 
         when(requestSpec.getMethod()).thenReturn("GET");
@@ -120,7 +120,7 @@ public class RestAssuredFilterTest {
     }
 
     @Test
-    public void testFilterStoresContentInArtifacts() throws Exception {
+    public void filterStoresContentInArtifacts() throws Exception {
         RestAssuredAdapter.setCurrentTestName("testApiCall");
 
         String requestBody = "{\"username\":\"admin\",\"password\":\"secret123\"}";
@@ -148,7 +148,10 @@ public class RestAssuredFilterTest {
         assertNotNull(reqArtifact.getContent());
         assertTrue(reqArtifact.getContent().contains("POST"));
         assertTrue(reqArtifact.getContent().contains("/login"));
-        assertTrue(reqArtifact.getContent().contains(requestBody));
+        // Body masking is enabled by default; sensitive fields are redacted.
+        assertTrue(reqArtifact.getContent().contains("admin"));
+        assertFalse(reqArtifact.getContent().contains("secret123"));
+        assertTrue(reqArtifact.getContent().contains("***REDACTED***"));
 
         Artifact respArtifact = artifacts.stream()
                 .filter(a -> a.getType().equals("http-response"))
@@ -156,13 +159,15 @@ public class RestAssuredFilterTest {
         assertNotNull(respArtifact);
         assertNotNull(respArtifact.getContent());
         assertTrue(respArtifact.getContent().contains("200"));
-        assertTrue(respArtifact.getContent().contains(respBody));
+        // Response token is masked by default body masking.
+        assertFalse(respArtifact.getContent().contains("jwt-token-here"));
+        assertTrue(respArtifact.getContent().contains("***REDACTED***"));
 
         RestAssuredAdapter.clearCurrentTestName();
     }
 
     @Test
-    public void testFilterTruncatesLargePayloads() throws Exception {
+    public void filterTruncatesLargePayloads() throws Exception {
         RestAssuredAdapter.setCurrentTestName("testApiCall");
 
         StringBuilder largeBody = new StringBuilder();
@@ -195,7 +200,7 @@ public class RestAssuredFilterTest {
     }
 
     @Test
-    public void testFilterMasksSensitiveHeaders() throws Exception {
+    public void filterMasksSensitiveHeaders() throws Exception {
         RestAssuredAdapter.setCurrentTestName("testApiCall");
 
         when(requestSpec.getMethod()).thenReturn("GET");
@@ -240,7 +245,7 @@ public class RestAssuredFilterTest {
     }
 
     @Test
-    public void testFilterHandlesBinaryContent() throws Exception {
+    public void filterHandlesBinaryContent() throws Exception {
         RestAssuredAdapter.setCurrentTestName("testApiCall");
 
         when(requestSpec.getMethod()).thenReturn("POST");
@@ -269,13 +274,13 @@ public class RestAssuredFilterTest {
     }
 
     @Test
-    public void testFilterWithMaskingDisabled() throws Exception {
+    public void filterWithMaskingDisabled() throws Exception {
         ReporterConfig configNoMask = ReporterConfig.builder()
                 .outputFormats(Arrays.asList("json"))
                 .outputDirectory(new File("target/custom-reports"))
                 .maxArtifactContentSize(10240)
                 .maskSensitiveData(false)
-                .sensitiveHeaders("Authorization,X-API-Key")
+                .maskHeaderFields("Authorization,X-API-Key")
                 .build();
 
         RestAssuredAdapter adapterNoMask = new RestAssuredAdapter(configNoMask);
@@ -309,7 +314,7 @@ public class RestAssuredFilterTest {
     }
 
     @Test
-    public void testFilterHandlesNullRequestBody() throws Exception {
+    public void filterHandlesNullRequestBody() throws Exception {
         RestAssuredAdapter.setCurrentTestName("testApiCall");
 
         when(requestSpec.getMethod()).thenReturn("GET");
@@ -331,7 +336,7 @@ public class RestAssuredFilterTest {
     }
 
     @Test
-    public void testFilterHandlesEmptyResponseBody() throws Exception {
+    public void filterHandlesEmptyResponseBody() throws Exception {
         RestAssuredAdapter.setCurrentTestName("testApiCall");
 
         when(requestSpec.getMethod()).thenReturn("DELETE");

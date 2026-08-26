@@ -29,7 +29,7 @@ class TestSuiteTest {
     }
 
     @Test
-    void testBuilderCreatesMinimalTestSuite() {
+    void builderCreatesMinimalTestSuite() {
         Instant start = Instant.ofEpochMilli(1000);
         Instant end = start.plusMillis(5000);
 
@@ -57,7 +57,7 @@ class TestSuiteTest {
     }
 
     @Test
-    void testBuilderWithTestCases() {
+    void builderWithTestCases() {
         Instant start = Instant.ofEpochMilli(2000);
         Instant end = start.plusMillis(10000);
 
@@ -101,7 +101,7 @@ class TestSuiteTest {
     }
 
     @Test
-    void testBuilderSupportsOptionalSecondaryText() {
+    void builderSupportsOptionalSecondaryText() {
         TestSuite suite = TestSuite.builder()
                 .id("suite-secondary")
                 .name("Feature Suite")
@@ -117,7 +117,7 @@ class TestSuiteTest {
     }
 
     @Test
-    void testBuilderRequiresId() {
+    void builderRequiresId() {
         assertThrows(IllegalArgumentException.class, ()
                 -> TestSuite.builder()
                         .name("Suite")
@@ -131,7 +131,7 @@ class TestSuiteTest {
     }
 
     @Test
-    void testBuilderRequiresName() {
+    void builderRequiresName() {
         assertThrows(IllegalArgumentException.class, ()
                 -> TestSuite.builder()
                         .id("suite-001")
@@ -145,7 +145,7 @@ class TestSuiteTest {
     }
 
     @Test
-    void testBuilderRequiresStatus() {
+    void builderRequiresStatus() {
         assertThrows(IllegalArgumentException.class, ()
                 -> TestSuite.builder()
                         .id("suite-001")
@@ -159,7 +159,7 @@ class TestSuiteTest {
     }
 
     @Test
-    void testBuilderRequiresTestCases() {
+    void builderRequiresTestCases() {
         assertThrows(IllegalArgumentException.class, ()
                 -> TestSuite.builder()
                         .id("suite-001")
@@ -173,7 +173,7 @@ class TestSuiteTest {
     }
 
     @Test
-    void testImmutabilityOfCollections() {
+    void immutabilityOfCollections() {
         TestCase test = TestCase.builder()
                 .id("test-001")
                 .name("Test")
@@ -207,7 +207,7 @@ class TestSuiteTest {
     }
 
     @Test
-    void testJsonSerialization() throws Exception {
+    void jsonSerialization() throws Exception {
         Instant start = Instant.parse("2026-02-16T10:00:00Z");
         Instant end = Instant.parse("2026-02-16T10:10:00Z");
 
@@ -234,7 +234,7 @@ class TestSuiteTest {
     }
 
     @Test
-    void testJsonSerializationIncludesSecondaryTextWhenPresent() throws Exception {
+    void jsonSerializationIncludesSecondaryTextWhenPresent() throws Exception {
         TestSuite suite = TestSuite.builder()
                 .id("suite-secondary-json")
                 .name("Readable Suite")
@@ -252,7 +252,7 @@ class TestSuiteTest {
     }
 
     @Test
-    void testJsonDeserialization() throws Exception {
+    void jsonDeserialization() throws Exception {
         String json = "{\"id\":\"suite-004\",\"name\":\"REST Suite\",\"status\":\"PASSED\",\"startTime\":\"2026-02-16T10:00:00Z\",\"endTime\":\"2026-02-16T10:05:00Z\",\"duration\":300000,\"testCases\":[],\"totalTests\":5,\"passedTests\":5,\"failedTests\":0,\"skippedTests\":0}";
         TestSuite suite = objectMapper.readValue(json, TestSuite.class);
 
@@ -265,7 +265,7 @@ class TestSuiteTest {
     }
 
     @Test
-    void testJsonDeserializationReadsSecondaryTextWhenPresent() throws Exception {
+    void jsonDeserializationReadsSecondaryTextWhenPresent() throws Exception {
         String json = "{\"id\":\"suite-004b\",\"name\":\"REST Suite\",\"secondaryText\":\"features/rest.feature\",\"status\":\"PASSED\",\"startTime\":\"2026-02-16T10:00:00Z\",\"endTime\":\"2026-02-16T10:05:00Z\",\"duration\":300000,\"testCases\":[],\"totalTests\":5,\"passedTests\":5,\"failedTests\":0,\"skippedTests\":0}";
 
         TestSuite suite = objectMapper.readValue(json, TestSuite.class);
@@ -274,7 +274,7 @@ class TestSuiteTest {
     }
 
     @Test
-    void testCountersDefaultToZero() {
+    void countersDefaultToZero() {
         TestSuite suite = TestSuite.builder()
                 .id("suite-005")
                 .name("Empty Suite")
@@ -292,7 +292,7 @@ class TestSuiteTest {
     }
 
     @Test
-    void testEqualsAndHashCode() {
+    void equalsAndHashCode() {
         Instant start = Instant.ofEpochMilli(7000);
         Instant end = start.plusMillis(1000);
 
@@ -321,7 +321,7 @@ class TestSuiteTest {
     }
 
     @Test
-    void testToString() {
+    void toString_containsKeyFields() {
         TestSuite suite = TestSuite.builder()
                 .id("suite-007")
                 .name("Test Suite")

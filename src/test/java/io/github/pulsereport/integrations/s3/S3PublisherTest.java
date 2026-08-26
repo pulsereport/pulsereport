@@ -54,7 +54,7 @@ class S3PublisherTest {
     }
 
     @Test
-    void testPublishFile_Success() throws Exception {
+    void publishFile_success() throws Exception {
         File reportFile = new File(tempDir, "report.json");
         Files.writeString(reportFile.toPath(), "{\"test\": \"data\"}");
 
@@ -67,7 +67,7 @@ class S3PublisherTest {
     }
 
     @Test
-    void testPublishBytes_Success() throws Exception {
+    void publishBytes_success() throws Exception {
         byte[] reportData = "{\"test\": \"data\"}".getBytes();
         String fileName = "report.json";
 
@@ -80,7 +80,7 @@ class S3PublisherTest {
     }
 
     @Test
-    void testPublish_WithMetadata() throws Exception {
+    void publish_withMetadata() throws Exception {
         byte[] reportData = "{\"test\": \"data\"}".getBytes();
         String fileName = "report.json";
 
@@ -110,7 +110,7 @@ class S3PublisherTest {
     }
 
     @Test
-    void testPublish_RetryOnFailure() throws Exception {
+    void publish_retryOnFailure() throws Exception {
         byte[] reportData = "{\"test\": \"data\"}".getBytes();
         String fileName = "report.json";
 
@@ -126,7 +126,7 @@ class S3PublisherTest {
     }
 
     @Test
-    void testPublish_FailAfterRetries() {
+    void publish_failAfterRetries() {
         byte[] reportData = "{\"test\": \"data\"}".getBytes();
         String fileName = "report.json";
 
@@ -141,7 +141,7 @@ class S3PublisherTest {
     }
 
     @Test
-    void testPublish_FileNotFound() {
+    void publish_fileNotFound() {
         File nonExistentFile = new File(tempDir, "nonexistent.json");
 
         PublishException ex = assertThrows(PublishException.class, () -> publisher.publish(nonExistentFile, s3Config));
@@ -149,7 +149,7 @@ class S3PublisherTest {
     }
 
     @Test
-    void testS3PublishConfig() {
+    void s3PublishConfig() {
         S3PublishConfig config = S3PublishConfig.builder()
                 .bucketName("my-bucket")
                 .keyPrefix("prefix/")

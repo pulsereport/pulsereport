@@ -53,12 +53,12 @@ public class TestNGAdapterTest {
     }
 
     @Test
-    public void testAdapterImplementsInterface() {
+    public void adapterImplementsInterface() {
         assertTrue(adapter instanceof Adapter, "TestNGAdapter should implement Adapter interface");
     }
 
     @Test
-    public void testSuiteLifecycle() {
+    public void suiteLifecycle() {
         ISuite mockSuite = mock(ISuite.class);
         when(mockSuite.getName()).thenReturn("TestSuite");
 
@@ -67,7 +67,7 @@ public class TestNGAdapterTest {
     }
 
     @Test
-    public void testTestLifecycle() {
+    public void testLifecycle() {
         ITestResult mockResult = createMockTestResult("testMethod", ITestResult.SUCCESS);
 
         assertDoesNotThrow(() -> adapter.onTestStart(mockResult));
@@ -75,7 +75,7 @@ public class TestNGAdapterTest {
     }
 
     @Test
-    public void testTestSuccess() {
+    public void testSuccess() {
         ITestResult mockResult = createMockTestResult("successTest", ITestResult.SUCCESS);
 
         adapter.onTestStart(mockResult);
@@ -85,7 +85,7 @@ public class TestNGAdapterTest {
     }
 
     @Test
-    public void testTestFailure() {
+    public void testFailure() {
         ITestResult mockResult = createMockTestResult("failureTest", ITestResult.FAILURE);
         Throwable throwable = new AssertionError("Test failed");
         when(mockResult.getThrowable()).thenReturn(throwable);
@@ -97,7 +97,7 @@ public class TestNGAdapterTest {
     }
 
     @Test
-    public void testTestSkip() {
+    public void testSkip() {
         ITestResult mockResult = createMockTestResult("skippedTest", ITestResult.SKIP);
 
         adapter.onTestStart(mockResult);
@@ -107,7 +107,7 @@ public class TestNGAdapterTest {
     }
 
     @Test
-    public void testAddArtifact() {
+    public void addArtifact() {
         ITestResult mockResult = createMockTestResult("testWithArtifact", ITestResult.SUCCESS);
 
         adapter.onTestStart(mockResult);
@@ -125,7 +125,7 @@ public class TestNGAdapterTest {
     }
 
     @Test
-    public void testAddMetric() {
+    public void addMetric() {
         ITestResult mockResult = createMockTestResult("testWithMetric", ITestResult.SUCCESS);
 
         adapter.onTestStart(mockResult);
@@ -141,13 +141,13 @@ public class TestNGAdapterTest {
     }
 
     @Test
-    public void testGetTestRunBeforeFinish() {
+    public void getTestRunBeforeFinish() {
         TestRun testRun = adapter.getTestRun();
         assertNull(testRun, "TestRun should be null before suite finishes");
     }
 
     @Test
-    public void testGetTestRunAfterFinish() {
+    public void getTestRunAfterFinish() {
         ISuite mockSuite = mock(ISuite.class);
         when(mockSuite.getName()).thenReturn("TestSuite");
 
@@ -184,7 +184,7 @@ public class TestNGAdapterTest {
     }
 
     @Test
-    public void testGenerateReportsUsesPulseReportDefaultOutputDirectory() throws Exception {
+    public void generateReportsUsesPulseReportDefaultOutputDirectory() throws Exception {
         String previousUserDir = System.getProperty("user.dir");
         String previousOutputDir = System.getProperty("reporter.output.directory");
 
@@ -243,7 +243,7 @@ public class TestNGAdapterTest {
     }
 
     @Test
-    public void testParallelExecution() throws InterruptedException {
+    public void parallelExecution() throws InterruptedException {
         Runnable test1 = () -> {
             ITestResult result = createMockTestResult("parallel_test1", ITestResult.SUCCESS);
             adapter.onTestStart(result);
@@ -269,7 +269,7 @@ public class TestNGAdapterTest {
     }
 
     @Test
-    public void testArtifactsAttachedToTestCase() {
+    public void artifactsAttachedToTestCase() {
         ISuite mockSuite = mock(ISuite.class);
         when(mockSuite.getName()).thenReturn("TestSuite");
 
@@ -302,7 +302,7 @@ public class TestNGAdapterTest {
     }
 
     @Test
-    public void testMetricsAttachedToTestCase() {
+    public void metricsAttachedToTestCase() {
         ISuite mockSuite = mock(ISuite.class);
         when(mockSuite.getName()).thenReturn("TestSuite");
 
@@ -338,7 +338,7 @@ public class TestNGAdapterTest {
     }
 
     @Test
-    public void testNullArtifactHandling() {
+    public void nullArtifactHandling() {
         ITestResult mockResult = createMockTestResult("test", ITestResult.SUCCESS);
         adapter.onTestStart(mockResult);
 
@@ -348,7 +348,7 @@ public class TestNGAdapterTest {
     }
 
     @Test
-    public void testNullMetricHandling() {
+    public void nullMetricHandling() {
         ITestResult mockResult = createMockTestResult("test", ITestResult.SUCCESS);
         adapter.onTestStart(mockResult);
 
@@ -358,7 +358,7 @@ public class TestNGAdapterTest {
     }
 
     @Test
-    public void testParameterizedTestsNoCollision() {
+    public void parameterizedTestsNoCollision() {
 
         ITestResult result1 = createParameterizedMockTestResult("paramTest", "param1", ITestResult.SUCCESS);
         ITestResult result2 = createParameterizedMockTestResult("paramTest", "param2", ITestResult.SUCCESS);
@@ -392,7 +392,7 @@ public class TestNGAdapterTest {
     }
 
     @Test
-    public void testLateCaptureRescopedToSingleInvocation() {
+    public void lateCaptureRescopedToSingleInvocation() {
         // Single invocation of a method: after onTestSuccess clears the thread-local,
         // a late capture (e.g. video in @AfterMethod) must resolve back to that
         // invocation's full key via the method-name registry, not an ambiguous
@@ -411,7 +411,7 @@ public class TestNGAdapterTest {
     }
 
     @Test
-    public void testAddArtifactWithoutTestStart() {
+    public void addArtifactWithoutTestStart() {
         Artifact artifact = Artifact.builder()
                 .name("test.png")
                 .type("screenshot")
@@ -427,7 +427,7 @@ public class TestNGAdapterTest {
     }
 
     @Test
-    public void testAddMetricWithoutTestStart() {
+    public void addMetricWithoutTestStart() {
         Metric metric = Metric.builder()
                 .name("test.metric")
                 .value(100.0)
@@ -441,7 +441,7 @@ public class TestNGAdapterTest {
     }
 
     @Test
-    public void testParameterizedTestsWithUniqueArtifacts() {
+    public void parameterizedTestsWithUniqueArtifacts() {
 
         ISuite mockSuite = mock(ISuite.class);
         ITestContext mockContext = mock(ITestContext.class);
@@ -568,7 +568,7 @@ public class TestNGAdapterTest {
     }
 
     @Test
-    public void testStandaloneAdapterApiUsage() {
+    public void standaloneAdapterApiUsage() {
         Artifact artifact = Artifact.builder()
                 .name("standalone.png")
                 .type("screenshot")

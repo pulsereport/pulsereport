@@ -26,7 +26,7 @@ class ArtifactTest {
     }
 
     @Test
-    void testBuilderCreatesArtifact() {
+    void builderCreatesArtifact() {
         Instant now = Instant.ofEpochMilli(1000);
         Artifact artifact = Artifact.builder()
                 .name("screenshot1")
@@ -44,7 +44,7 @@ class ArtifactTest {
     }
 
     @Test
-    void testBuilderWithAllFields() {
+    void builderWithAllFields() {
         Instant now = Instant.ofEpochMilli(2000);
         Artifact artifact = Artifact.builder()
                 .name("video1")
@@ -64,7 +64,7 @@ class ArtifactTest {
     }
 
     @Test
-    void testBuilderRequiresName() {
+    void builderRequiresName() {
         assertThrows(IllegalArgumentException.class, () ->
                 Artifact.builder()
                         .type("log")
@@ -75,7 +75,7 @@ class ArtifactTest {
     }
 
     @Test
-    void testBuilderRequiresType() {
+    void builderRequiresType() {
         assertThrows(IllegalArgumentException.class, () ->
                 Artifact.builder()
                         .name("artifact")
@@ -86,7 +86,7 @@ class ArtifactTest {
     }
 
     @Test
-    void testBuilderRequiresPath() {
+    void builderRequiresPath() {
         assertThrows(IllegalArgumentException.class, () ->
                 Artifact.builder()
                         .name("artifact")
@@ -97,7 +97,7 @@ class ArtifactTest {
     }
 
     @Test
-    void testBuilderRequiresTimestamp() {
+    void builderRequiresTimestamp() {
         assertThrows(IllegalArgumentException.class, () ->
                 Artifact.builder()
                         .name("artifact")
@@ -108,7 +108,7 @@ class ArtifactTest {
     }
 
     @Test
-    void testJsonSerialization() throws Exception {
+    void jsonSerialization() throws Exception {
         Instant now = Instant.parse("2026-02-16T10:00:00Z");
         Artifact artifact = Artifact.builder()
                 .name("log1")
@@ -128,7 +128,7 @@ class ArtifactTest {
     }
 
     @Test
-    void testJsonDeserialization() throws Exception {
+    void jsonDeserialization() throws Exception {
         String json = "{\"name\":\"screenshot\",\"type\":\"screenshot\",\"path\":\"/img.png\",\"mimeType\":\"image/png\",\"size\":4096,\"timestamp\":\"2026-02-16T10:00:00Z\"}";
         Artifact artifact = objectMapper.readValue(json, Artifact.class);
 
@@ -141,7 +141,7 @@ class ArtifactTest {
     }
 
     @Test
-    void testEqualsAndHashCode() {
+    void equalsAndHashCode() {
         Instant now = Instant.ofEpochMilli(3000);
         Artifact artifact1 = Artifact.builder()
                 .name("file")
@@ -162,7 +162,7 @@ class ArtifactTest {
     }
 
     @Test
-    void testToString() {
+    void toString_containsKeyFields() {
         Artifact artifact = Artifact.builder()
                 .name("test")
                 .type("http-request")
@@ -177,7 +177,7 @@ class ArtifactTest {
     }
 
     @Test
-    void testArtifactWithContent() {
+    void artifactWithContent() {
         Instant now = Instant.ofEpochMilli(5000);
         String content = "{\"request\":\"data\"}";
 
@@ -197,7 +197,7 @@ class ArtifactTest {
     }
 
     @Test
-    void testArtifactWithoutContent() {
+    void artifactWithoutContent() {
         Instant now = Instant.ofEpochMilli(6000);
 
         Artifact artifact = Artifact.builder()
@@ -215,7 +215,7 @@ class ArtifactTest {
     }
 
     @Test
-    void testArtifactContentSerialization() throws Exception {
+    void artifactContentSerialization() throws Exception {
         Instant now = Instant.parse("2026-02-17T10:00:00Z");
         String content = "{\"status\":200,\"body\":\"response\"}";
         Artifact artifact = Artifact.builder()

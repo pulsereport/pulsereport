@@ -16,6 +16,7 @@ import org.testng.ITestResult;
 
 import io.github.pulsereport.adapters.Adapter;
 import io.github.pulsereport.adapters.restassured.RestAssuredAdapter;
+import io.github.pulsereport.config.ReporterConfig;
 import io.github.pulsereport.core.aggregator.TestResultAggregator;
 import io.github.pulsereport.core.model.Artifact;
 import io.github.pulsereport.core.model.Metric;
@@ -567,7 +568,8 @@ public class TestNGAdapter implements Adapter, ITestListener, ISuiteListener {
         }
 
         try {
-            String outputDir = System.getProperty("reporter.output.directory", "target/pulsereport");
+            String outputDir = ReporterConfig.resolveOutputDirectory("reporter.output.directory",
+                    "target/pulsereport");
             File reportDir = resolveOutputDirectory(outputDir);
             reportDir.mkdirs();
 

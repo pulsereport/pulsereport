@@ -28,3 +28,7 @@ dependency-reduced-pom.xml
 
 # Examples
 examples/
+
+# AI
+plans/
+agents/

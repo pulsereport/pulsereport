@@ -46,12 +46,12 @@ public class RestAssuredAdapterTest {
     }
 
     @Test
-    public void testAdapterImplementsFilter() {
+    public void adapterImplementsFilter() {
         assertTrue(adapter instanceof Filter, "RestAssuredAdapter should implement Filter interface");
     }
 
     @Test
-    public void testCaptureHttpRequest() {
+    public void captureHttpRequest() {
         RestAssuredAdapter.setCurrentTestName("testApi");
 
         String requestBody = "{\"username\":\"user\",\"password\":\"pass\"}";
@@ -68,7 +68,7 @@ public class RestAssuredAdapterTest {
     }
 
     @Test
-    public void testCaptureHttpResponse() {
+    public void captureHttpResponse() {
         RestAssuredAdapter.setCurrentTestName("testApi");
 
         String responseBody = "{\"success\":true,\"token\":\"abc123\"}";
@@ -84,7 +84,7 @@ public class RestAssuredAdapterTest {
     }
 
     @Test
-    public void testCaptureJsonPayload() {
+    public void captureJsonPayload() {
         RestAssuredAdapter.setCurrentTestName("testApi");
 
         String jsonPayload = "{\"data\":{\"id\":1,\"name\":\"Test\"}}";
@@ -97,7 +97,7 @@ public class RestAssuredAdapterTest {
     }
 
     @Test
-    public void testCaptureXmlPayload() {
+    public void captureXmlPayload() {
         RestAssuredAdapter.setCurrentTestName("testApi");
 
         String xmlPayload = "<?xml version=\"1.0\"?><data><id>1</id></data>";
@@ -110,7 +110,7 @@ public class RestAssuredAdapterTest {
     }
 
     @Test
-    public void testRecordResponseTime() {
+    public void recordResponseTime() {
         RestAssuredAdapter.setCurrentTestName("testApi");
 
         assertDoesNotThrow(() -> adapter.recordResponseTime("testApi", 350.5));
@@ -122,7 +122,7 @@ public class RestAssuredAdapterTest {
     }
 
     @Test
-    public void testRecordRequestSize() {
+    public void recordRequestSize() {
         RestAssuredAdapter.setCurrentTestName("testApi");
 
         assertDoesNotThrow(() -> adapter.recordRequestSize("testApi", 1024L));
@@ -134,7 +134,7 @@ public class RestAssuredAdapterTest {
     }
 
     @Test
-    public void testRecordResponseSize() {
+    public void recordResponseSize() {
         RestAssuredAdapter.setCurrentTestName("testApi");
 
         assertDoesNotThrow(() -> adapter.recordResponseSize("testApi", 2048L));
@@ -146,7 +146,7 @@ public class RestAssuredAdapterTest {
     }
 
     @Test
-    public void testMultipleApiArtifacts() {
+    public void multipleApiArtifacts() {
         RestAssuredAdapter.setCurrentTestName("testWithMultipleArtifacts");
 
         Map<String, String> headers = new HashMap<>();
@@ -164,7 +164,7 @@ public class RestAssuredAdapterTest {
     }
 
     @Test
-    public void testMultipleApiMetrics() {
+    public void multipleApiMetrics() {
         RestAssuredAdapter.setCurrentTestName("testWithMultipleMetrics");
 
         adapter.recordResponseTime("testWithMultipleMetrics", 350.5);
@@ -178,7 +178,7 @@ public class RestAssuredAdapterTest {
     }
 
     @Test
-    public void testThreadSafetyForParallelApiTests() throws InterruptedException {
+    public void threadSafetyForParallelApiTests() throws InterruptedException {
         Runnable test1 = () -> {
             RestAssuredAdapter.setCurrentTestName("api_test1");
             adapter.captureJsonPayload("api_test1", "test1.json", "{\"test\":1}");
@@ -208,7 +208,7 @@ public class RestAssuredAdapterTest {
     }
 
     @Test
-    public void testNullParameterHandling() {
+    public void nullParameterHandling() {
         RestAssuredAdapter.setCurrentTestName("test");
 
         Map<String, String> headers = new HashMap<>();
@@ -244,7 +244,7 @@ public class RestAssuredAdapterTest {
     }
 
     @Test
-    public void testSetAndClearCurrentTestName() {
+    public void setAndClearCurrentTestName() {
         RestAssuredAdapter.setCurrentTestName("myTest");
         adapter.captureJsonPayload("myTest", "test.json", "{\"test\":true}");
 
@@ -255,7 +255,7 @@ public class RestAssuredAdapterTest {
     }
 
     @Test
-    public void testClearTestData() {
+    public void clearTestData() {
         RestAssuredAdapter.setCurrentTestName("testApi");
         adapter.captureJsonPayload("testApi", "test.json", "{\"test\":true}");
         adapter.recordResponseTime("testApi", 100.0);

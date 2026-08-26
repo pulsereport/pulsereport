@@ -10,7 +10,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class TestStatusTest {
 
     @Test
-    void testEnumValues() {
+    void enumValues() {
         assertEquals(4, TestStatus.values().length);
         assertNotNull(TestStatus.valueOf("PASSED"));
         assertNotNull(TestStatus.valueOf("FAILED"));
@@ -19,25 +19,25 @@ class TestStatusTest {
     }
 
     @Test
-    void testPassedStatus() {
+    void passedStatus() {
         TestStatus status = TestStatus.PASSED;
         assertEquals("PASSED", status.name());
     }
 
     @Test
-    void testFailedStatus() {
+    void failedStatus() {
         TestStatus status = TestStatus.FAILED;
         assertEquals("FAILED", status.name());
     }
 
     @Test
-    void testSkippedStatus() {
+    void skippedStatus() {
         TestStatus status = TestStatus.SKIPPED;
         assertEquals("SKIPPED", status.name());
     }
 
     @Test
-    void testFlakyStatus() {
+    void flakyStatus() {
         TestStatus status = TestStatus.FLAKY;
         assertEquals("FLAKY", status.name());
     }

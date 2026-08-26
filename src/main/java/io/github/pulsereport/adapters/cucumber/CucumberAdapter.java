@@ -41,6 +41,7 @@ import io.github.pulsereport.core.model.TestRun;
 import io.github.pulsereport.core.model.TestStatus;
 import io.github.pulsereport.core.model.TestStep;
 import io.github.pulsereport.core.model.TestSuite;
+import io.github.pulsereport.config.ReporterConfig;
 import io.github.pulsereport.outputs.html.HtmlReportGenerator;
 import io.github.pulsereport.outputs.json.JsonReportGenerator;
 
@@ -469,7 +470,8 @@ public class CucumberAdapter implements EventListener {
 
     private void generateReports(TestRun testRun) {
         try {
-            String outputDir = System.getProperty("reporter.output.directory", "target/pulsereport");
+            String outputDir = ReporterConfig.resolveOutputDirectory("reporter.output.directory",
+                    "target/pulsereport");
             File reportDir = resolveOutputDirectory(outputDir);
             reportDir.mkdirs();
 

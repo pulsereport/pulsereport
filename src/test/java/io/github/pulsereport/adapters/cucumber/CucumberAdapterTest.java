@@ -148,7 +148,7 @@ class CucumberAdapterTest {
     }
 
     @Test
-    void testAdapterRegistersAllEventHandlers() {
+    void adapterRegistersAllEventHandlers() {
         CucumberAdapter adapter = new CucumberAdapter();
         AtomicInteger handlerCount = new AtomicInteger(0);
 

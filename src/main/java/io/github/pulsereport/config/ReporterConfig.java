@@ -26,7 +26,13 @@ public class ReporterConfig {
     private SlackConfig slackConfig;
     private int maxArtifactContentSize;
     private boolean maskSensitiveData;
-    private String sensitiveHeaders;
+    private String maskHeaderFields;
+    private boolean maskHeadersEnabled;
+    private boolean maskBodyEnabled;
+    private String sensitiveBodyFields;
+    private boolean maskXmlEnabled;
+    private String xmlFields;
+    private boolean maskTokens;
     private String videoStorage;
 
     /**
@@ -38,7 +44,15 @@ public class ReporterConfig {
         this.slackConfig = new SlackConfig();
         this.maxArtifactContentSize = 51200; // 50KB default
         this.maskSensitiveData = true;
-        this.sensitiveHeaders = "Authorization,X-API-Key,Cookie,Set-Cookie";
+        this.maskHeaderFields = "Authorization,X-API-Key,Cookie,Set-Cookie";
+        this.maskHeadersEnabled = true;
+        this.maskBodyEnabled = true;
+        this.sensitiveBodyFields = "password,secret,token,access_token,refresh_token,"
+                + "id_token,client_secret,api_key,apiKey,authorization";
+        this.maskXmlEnabled = true;
+        this.xmlFields = "password,secret,token,access_token,refresh_token,"
+                + "id_token,client_secret,api_key,apiKey,authorization";
+        this.maskTokens = true;
         this.videoStorage = "path"; // path | embed | url
     }
 
@@ -100,6 +114,42 @@ public class ReporterConfig {
     }
 
     /**
+     * Resolves the report output directory using the following precedence
+     * (highest first):
+     * <ol>
+     * <li>The {@code System.getProperty(systemPropertyName)} value, if non-null
+     * and non-blank</li>
+     * <li>The {@code reporter.output.directory} value from an auto-detected
+     * {@code reporter.properties} file (see {@link #autoDetect()}), if
+     * present</li>
+     * <li>The supplied {@code defaultDirectory}</li>
+     * </ol>
+     * This method never throws; any failure during auto-detection falls through
+     * to the default.
+     *
+     * @param systemPropertyName name of the system property that overrides the
+     * output directory (e.g. {@code "reporter.output.directory"})
+     * @param defaultDirectory fallback directory used when neither the system
+     * property nor an auto-detected properties file provides a value
+     * @return the resolved output directory path
+     */
+    public static String resolveOutputDirectory(String systemPropertyName, String defaultDirectory) {
+        String sysProp = System.getProperty(systemPropertyName);
+        if (sysProp != null && !sysProp.isBlank()) {
+            return sysProp;
+        }
+        try {
+            ReporterConfig config = autoDetect();
+            if (config != null && config.getOutputDirectory() != null) {
+                return config.getOutputDirectory().getPath();
+            }
+        } catch (RuntimeException e) {
+            // fall through to default
+        }
+        return defaultDirectory;
+    }
+
+    /**
      * Loads configuration from Properties object.
      *
      * @param props the properties object
@@ -140,7 +190,17 @@ public class ReporterConfig {
 
         config.maxArtifactContentSize = Integer.parseInt(props.getProperty("reporter.maxArtifactContentSize", "51200"));
         config.maskSensitiveData = Boolean.parseBoolean(props.getProperty("reporter.maskSensitiveData", "true"));
-        config.sensitiveHeaders = interpolate(props.getProperty("reporter.sensitiveHeaders", "Authorization,X-API-Key,Cookie,Set-Cookie"));
+        config.maskHeadersEnabled = Boolean.parseBoolean(props.getProperty("reporter.maskHeaders.enabled", "true"));
+        config.maskHeaderFields = interpolate(props.getProperty("reporter.maskHeaders.fields", "Authorization,X-API-Key,Cookie,Set-Cookie"));
+        config.maskBodyEnabled = Boolean.parseBoolean(props.getProperty("reporter.maskBody.enabled", "true"));
+        config.sensitiveBodyFields = interpolate(props.getProperty("reporter.maskBody.fields",
+                "password,secret,token,access_token,refresh_token,id_token,client_secret,api_key,apiKey,authorization"));
+        config.maskXmlEnabled = Boolean.parseBoolean(props.getProperty("reporter.maskXml.enabled", "true"));
+        String xmlFieldsValue = interpolate(props.getProperty("reporter.maskXml.fields"));
+        config.xmlFields = (xmlFieldsValue == null || xmlFieldsValue.isEmpty())
+                ? config.sensitiveBodyFields
+                : xmlFieldsValue;
+        config.maskTokens = Boolean.parseBoolean(props.getProperty("reporter.maskBody.maskTokens", "true"));
         String videoStorageValue = interpolate(props.getProperty("reporter.video.storage", "path"));
         config.videoStorage = videoStorageValue == null ? "path" : videoStorageValue.trim().toLowerCase();
 
@@ -251,8 +311,71 @@ public class ReporterConfig {
         return maskSensitiveData;
     }
 
-    public String getSensitiveHeaders() {
-        return sensitiveHeaders;
+    /**
+     * Gets the comma-separated list of header names to mask.
+     *
+     * @return the mask header fields
+     */
+    public String getMaskHeaderFields() {
+        return maskHeaderFields;
+    }
+
+    /**
+     * Whether request/response header masking is enabled. Defaults to true.
+     *
+     * @return true if header masking is enabled
+     */
+    public boolean isMaskHeadersEnabled() {
+        return maskHeadersEnabled;
+    }
+
+    /**
+     * Whether request/response body masking is enabled. Defaults to true.
+     *
+     * @return true if body masking is enabled
+     */
+    public boolean isMaskBodyEnabled() {
+        return maskBodyEnabled;
+    }
+
+    /**
+     * Gets the comma-separated list of body field names (JSON keys or
+     * form-urlencoded keys) to mask. The list is authoritative: it fully
+     * replaces the built-in defaults when set.
+     *
+     * @return the sensitive body fields
+     */
+    public String getSensitiveBodyFields() {
+        return sensitiveBodyFields;
+    }
+
+    /**
+     * Whether XML body element masking is enabled. Defaults to true.
+     *
+     * @return true if XML masking is enabled
+     */
+    public boolean isMaskXmlEnabled() {
+        return maskXmlEnabled;
+    }
+
+    /**
+     * Gets the comma-separated list of XML element names to mask. When not
+     * explicitly configured, this inherits the sensitive body fields list.
+     *
+     * @return the XML fields to mask
+     */
+    public String getXmlFields() {
+        return xmlFields;
+    }
+
+    /**
+     * Whether Bearer/JWT token regex masking passes are applied to bodies.
+     * Defaults to true.
+     *
+     * @return true if token masking is enabled
+     */
+    public boolean isMaskTokens() {
+        return maskTokens;
     }
 
     /**
@@ -275,7 +398,13 @@ public class ReporterConfig {
                 + ", slackConfig=" + slackConfig
                 + ", maxArtifactContentSize=" + maxArtifactContentSize
                 + ", maskSensitiveData=" + maskSensitiveData
-                + ", sensitiveHeaders='" + sensitiveHeaders + '\''
+                + ", maskHeadersEnabled=" + maskHeadersEnabled
+                + ", maskHeaderFields='" + maskHeaderFields + '\''
+                + ", maskBodyEnabled=" + maskBodyEnabled
+                + ", sensitiveBodyFields='" + sensitiveBodyFields + '\''
+                + ", maskXmlEnabled=" + maskXmlEnabled
+                + ", xmlFields='" + xmlFields + '\''
+                + ", maskTokens=" + maskTokens
                 + ", videoStorage='" + videoStorage + '\''
                 + '}';
     }
@@ -326,8 +455,38 @@ public class ReporterConfig {
             return this;
         }
 
-        public Builder sensitiveHeaders(String sensitiveHeaders) {
-            config.sensitiveHeaders = sensitiveHeaders;
+        public Builder maskHeaderFields(String maskHeaderFields) {
+            config.maskHeaderFields = maskHeaderFields;
+            return this;
+        }
+
+        public Builder maskHeadersEnabled(boolean maskHeadersEnabled) {
+            config.maskHeadersEnabled = maskHeadersEnabled;
+            return this;
+        }
+
+        public Builder maskBodyEnabled(boolean maskBodyEnabled) {
+            config.maskBodyEnabled = maskBodyEnabled;
+            return this;
+        }
+
+        public Builder sensitiveBodyFields(String sensitiveBodyFields) {
+            config.sensitiveBodyFields = sensitiveBodyFields;
+            return this;
+        }
+
+        public Builder maskXmlEnabled(boolean maskXmlEnabled) {
+            config.maskXmlEnabled = maskXmlEnabled;
+            return this;
+        }
+
+        public Builder maskXmlFields(String xmlFields) {
+            config.xmlFields = xmlFields;
+            return this;
+        }
+
+        public Builder maskTokens(boolean maskTokens) {
+            config.maskTokens = maskTokens;
             return this;
         }
 

@@ -27,7 +27,7 @@ public class AdapterContractComplianceTest {
     }
 
     @Test
-    public void testDocumentedApiExample_DirectCall() {
+    public void documentedApiExample_directCall() {
         // adapter.addArtifact("myTest", screenshot);
         
         Artifact screenshot = Artifact.builder()
@@ -43,7 +43,7 @@ public class AdapterContractComplianceTest {
     }
 
     @Test
-    public void testDocumentedApiExample_WithMetric() {
+    public void documentedApiExample_withMetric() {
         // adapter.addMetric("myTest", responseTime);
         
         Metric responseTime = Metric.builder()
@@ -57,7 +57,7 @@ public class AdapterContractComplianceTest {
     }
 
     @Test
-    public void testDocumentedApiExample_FullLifecycle() {
+    public void documentedApiExample_fullLifecycle() {
         Artifact screenshot = Artifact.builder()
                 .name("test-screenshot.png")
                 .type("screenshot")
@@ -83,7 +83,7 @@ public class AdapterContractComplianceTest {
     }
 
     @Test
-    public void testStandaloneUsageWithProperSetup() {
+    public void standaloneUsageWithProperSetup() {
         
         Artifact artifact = Artifact.builder()
                 .name("proper-setup.png")
@@ -99,7 +99,7 @@ public class AdapterContractComplianceTest {
     }
 
     @Test
-    public void testFallbackBehaviorWithoutSetup() {
+    public void fallbackBehaviorWithoutSetup() {
         
         Metric metric = Metric.builder()
                 .name("fallback.metric")

@@ -43,17 +43,17 @@ public class SeleniumAdapterTest {
     }
 
     @Test
-    public void testAdapterImplementsInterface() {
+    public void adapterImplementsInterface() {
         assertTrue(adapter instanceof Adapter, "SeleniumAdapter should implement Adapter interface");
     }
 
     @Test
-    public void testExtendsTestNGAdapter() {
+    public void extendsTestNGAdapter() {
         assertTrue(adapter instanceof TestNGAdapter, "SeleniumAdapter should extend TestNGAdapter");
     }
 
     @Test
-    public void testCaptureBrowserScreenshot() {
+    public void captureBrowserScreenshot() {
         ITestResult mockResult = createMockTestResult("testWebApp", ITestResult.SUCCESS);
         adapter.onTestStart(mockResult);
 
@@ -63,7 +63,7 @@ public class SeleniumAdapterTest {
     }
 
     @Test
-    public void testCaptureBrowserLogs() {
+    public void captureBrowserLogs() {
         ITestResult mockResult = createMockTestResult("testWebApp", ITestResult.SUCCESS);
         adapter.onTestStart(mockResult);
 
@@ -74,7 +74,7 @@ public class SeleniumAdapterTest {
     }
 
     @Test
-    public void testCaptureConsoleLogs() {
+    public void captureConsoleLogs() {
         ITestResult mockResult = createMockTestResult("testWebApp", ITestResult.SUCCESS);
         adapter.onTestStart(mockResult);
 
@@ -85,7 +85,7 @@ public class SeleniumAdapterTest {
     }
 
     @Test
-    public void testCaptureHarFile() {
+    public void captureHarFile() {
         ITestResult mockResult = createMockTestResult("testWebApp", ITestResult.SUCCESS);
         adapter.onTestStart(mockResult);
 
@@ -96,7 +96,7 @@ public class SeleniumAdapterTest {
     }
 
     @Test
-    public void testRecordPageLoadTime() {
+    public void recordPageLoadTime() {
         ITestResult mockResult = createMockTestResult("testPageLoad", ITestResult.SUCCESS);
         adapter.onTestStart(mockResult);
 
@@ -106,7 +106,7 @@ public class SeleniumAdapterTest {
     }
 
     @Test
-    public void testRecordDomReadyTime() {
+    public void recordDomReadyTime() {
         ITestResult mockResult = createMockTestResult("testDomReady", ITestResult.SUCCESS);
         adapter.onTestStart(mockResult);
 
@@ -116,7 +116,7 @@ public class SeleniumAdapterTest {
     }
 
     @Test
-    public void testRecordNetworkTiming() {
+    public void recordNetworkTiming() {
         ITestResult mockResult = createMockTestResult("testNetwork", ITestResult.SUCCESS);
         adapter.onTestStart(mockResult);
 
@@ -127,7 +127,7 @@ public class SeleniumAdapterTest {
     }
 
     @Test
-    public void testMultipleWebArtifacts() {
+    public void multipleWebArtifacts() {
         ISuite mockSuite = mock(ISuite.class);
         when(mockSuite.getName()).thenReturn("WebTestSuite");
 
@@ -153,7 +153,7 @@ public class SeleniumAdapterTest {
     }
 
     @Test
-    public void testMultipleWebMetrics() {
+    public void multipleWebMetrics() {
         ISuite mockSuite = mock(ISuite.class);
         when(mockSuite.getName()).thenReturn("WebTestSuite");
 
@@ -179,7 +179,7 @@ public class SeleniumAdapterTest {
     }
 
     @Test
-    public void testBuildsTestRunWithRecordedBrowserMetadataInEnvironment() {
+    public void buildsTestRunWithRecordedBrowserMetadataInEnvironment() {
         ISuite mockSuite = mock(ISuite.class);
         when(mockSuite.getName()).thenReturn("WebTestSuite");
 
@@ -206,7 +206,7 @@ public class SeleniumAdapterTest {
     }
 
     @Test
-    public void testThreadSafetyForParallelWebTests() throws InterruptedException {
+    public void threadSafetyForParallelWebTests() throws InterruptedException {
         Runnable test1 = () -> {
             ITestResult result = createMockTestResult("web_test1", ITestResult.SUCCESS);
             adapter.onTestStart(result);
@@ -236,7 +236,7 @@ public class SeleniumAdapterTest {
     }
 
     @Test
-    public void testNullParameterHandling() {
+    public void nullParameterHandling() {
         ITestResult mockResult = createMockTestResult("test", ITestResult.SUCCESS);
         adapter.onTestStart(mockResult);
 

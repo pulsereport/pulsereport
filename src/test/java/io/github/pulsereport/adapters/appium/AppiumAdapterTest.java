@@ -33,17 +33,17 @@ public class AppiumAdapterTest {
     }
 
     @Test
-    public void testAdapterImplementsInterface() {
+    public void adapterImplementsInterface() {
         assertTrue(adapter instanceof Adapter, "AppiumAdapter should implement Adapter interface");
     }
 
     @Test
-    public void testExtendsTestNGAdapter() {
+    public void extendsTestNGAdapter() {
         assertTrue(adapter instanceof TestNGAdapter, "AppiumAdapter should extend TestNGAdapter");
     }
 
     @Test
-    public void testCaptureScreenshot() {
+    public void captureScreenshot() {
         ITestResult mockResult = createMockTestResult("testMobileApp", ITestResult.SUCCESS);
         adapter.onTestStart(mockResult);
 
@@ -53,7 +53,7 @@ public class AppiumAdapterTest {
     }
 
     @Test
-    public void testCaptureAppLogs() {
+    public void captureAppLogs() {
         ITestResult mockResult = createMockTestResult("testMobileApp", ITestResult.SUCCESS);
         adapter.onTestStart(mockResult);
 
@@ -64,7 +64,7 @@ public class AppiumAdapterTest {
     }
 
     @Test
-    public void testCaptureDeviceInfo() {
+    public void captureDeviceInfo() {
         ITestResult mockResult = createMockTestResult("testMobileApp", ITestResult.SUCCESS);
         adapter.onTestStart(mockResult);
 
@@ -75,7 +75,7 @@ public class AppiumAdapterTest {
     }
 
     @Test
-    public void testRecordAppLaunchTime() {
+    public void recordAppLaunchTime() {
         ITestResult mockResult = createMockTestResult("testAppLaunch", ITestResult.SUCCESS);
         adapter.onTestStart(mockResult);
 
@@ -85,7 +85,7 @@ public class AppiumAdapterTest {
     }
 
     @Test
-    public void testRecordScreenTransitionTime() {
+    public void recordScreenTransitionTime() {
         ITestResult mockResult = createMockTestResult("testNavigation", ITestResult.SUCCESS);
         adapter.onTestStart(mockResult);
 
@@ -95,7 +95,7 @@ public class AppiumAdapterTest {
     }
 
     @Test
-    public void testMultipleMobileArtifacts() {
+    public void multipleMobileArtifacts() {
         ISuite mockSuite = mock(ISuite.class);
         when(mockSuite.getName()).thenReturn("MobileTestSuite");
 
@@ -121,7 +121,7 @@ public class AppiumAdapterTest {
     }
 
     @Test
-    public void testMultipleMobileMetrics() {
+    public void multipleMobileMetrics() {
         ISuite mockSuite = mock(ISuite.class);
         when(mockSuite.getName()).thenReturn("MobileTestSuite");
 
@@ -145,7 +145,7 @@ public class AppiumAdapterTest {
     }
 
     @Test
-    public void testThreadSafetyForParallelMobileTests() throws InterruptedException {
+    public void threadSafetyForParallelMobileTests() throws InterruptedException {
         Runnable test1 = () -> {
             ITestResult result = createMockTestResult("mobile_test1", ITestResult.SUCCESS);
             adapter.onTestStart(result);
@@ -175,7 +175,7 @@ public class AppiumAdapterTest {
     }
 
     @Test
-    public void testNullParameterHandling() {
+    public void nullParameterHandling() {
         ITestResult mockResult = createMockTestResult("test", ITestResult.SUCCESS);
         adapter.onTestStart(mockResult);
 
@@ -205,7 +205,7 @@ public class AppiumAdapterTest {
     // ---------------------------------------------------------------
 
     @Test
-    public void testRecordStepIsCapturedInTestRun() {
+    public void recordStepIsCapturedInTestRun() {
         ITestResult mockResult = createMockTestResult("testWithSteps", ITestResult.SUCCESS);
         ISuite mockSuite = createWiredSuite("MobileStepsSuite", "MobileSteps", mockResult);
         ITestContext mockContext = mockResult.getTestContext();
@@ -236,7 +236,7 @@ public class AppiumAdapterTest {
     }
 
     @Test
-    public void testRecordStepNullValidation() {
+    public void recordStepNullValidation() {
         ITestResult mockResult = createMockTestResult("stepTest", ITestResult.SUCCESS);
         adapter.onTestStart(mockResult);
         assertThrows(IllegalArgumentException.class, () -> adapter.recordStep(null, "step", 1));
@@ -244,7 +244,7 @@ public class AppiumAdapterTest {
     }
 
     @Test
-    public void testCaptureVideo() {
+    public void captureVideo() {
         ITestResult mockResult = createMockTestResult("testVideo", ITestResult.SUCCESS);
         adapter.onTestStart(mockResult);
         assertDoesNotThrow(() -> adapter.captureVideo("testVideo", "recording.mp4", "/tmp/recording.mp4"));
@@ -252,7 +252,7 @@ public class AppiumAdapterTest {
     }
 
     @Test
-    public void testCaptureCrashReport() {
+    public void captureCrashReport() {
         ITestResult mockResult = createMockTestResult("testCrash", ITestResult.SUCCESS);
         adapter.onTestStart(mockResult);
         assertDoesNotThrow(() ->
@@ -261,7 +261,7 @@ public class AppiumAdapterTest {
     }
 
     @Test
-    public void testCapturePageSource() {
+    public void capturePageSource() {
         ITestResult mockResult = createMockTestResult("testPageSource", ITestResult.SUCCESS);
         adapter.onTestStart(mockResult);
         assertDoesNotThrow(() ->
@@ -270,7 +270,7 @@ public class AppiumAdapterTest {
     }
 
     @Test
-    public void testRecordDeviceHealth() {
+    public void recordDeviceHealth() {
         ITestResult mockResult = createMockTestResult("testHealth", ITestResult.SUCCESS);
         adapter.onTestStart(mockResult);
         assertDoesNotThrow(() -> adapter.recordDeviceHealth("testHealth", 85, 512.0));
@@ -278,7 +278,7 @@ public class AppiumAdapterTest {
     }
 
     @Test
-    public void testRecordSessionMetadataSurfacesInEnvironment() {
+    public void recordSessionMetadataSurfacesInEnvironment() {
         ITestResult mockResult = createMockTestResult("testMeta", ITestResult.SUCCESS);
         ISuite mockSuite = createWiredSuite("MetadataSuite", "Metadata", mockResult);
         ITestContext mockContext = mockResult.getTestContext();
@@ -307,7 +307,7 @@ public class AppiumAdapterTest {
     }
 
     @Test
-    public void testAutomaticFailureCaptureUsesRegisteredDriver() {
+    public void automaticFailureCaptureUsesRegisteredDriver() {
         ITestResult mockResult = createMockTestResult("testAutoFail", ITestResult.FAILURE);
         ISuite mockSuite = createWiredSuite("FailureSuite", "Failure", mockResult);
         ITestContext mockContext = mockResult.getTestContext();
@@ -345,7 +345,7 @@ public class AppiumAdapterTest {
     }
 
     @Test
-    public void testFailureWithoutDriverDoesNotBreak() {
+    public void failureWithoutDriverDoesNotBreak() {
         ITestResult mockResult = createMockTestResult("testFailNoDriver", ITestResult.FAILURE);
         adapter.onTestStart(mockResult);
         MobileDriverHolder.remove(); // ensure no driver

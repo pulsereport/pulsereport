@@ -23,7 +23,7 @@ class TestStepTest {
     }
 
     @Test
-    void testBuilderCreatesTestStep() {
+    void builderCreatesTestStep() {
         Instant start = Instant.ofEpochMilli(1000);
         Instant end = start.plusMillis(100);
         
@@ -44,7 +44,7 @@ class TestStepTest {
     }
 
     @Test
-    void testBuilderWithDescription() {
+    void builderWithDescription() {
         TestStep step = TestStep.builder()
                 .name("Verify response")
                 .status(TestStatus.PASSED)
@@ -59,7 +59,7 @@ class TestStepTest {
     }
 
     @Test
-    void testBuilderRequiresName() {
+    void builderRequiresName() {
         assertThrows(IllegalArgumentException.class, () ->
                 TestStep.builder()
                         .status(TestStatus.PASSED)
@@ -71,7 +71,7 @@ class TestStepTest {
     }
 
     @Test
-    void testBuilderRequiresStatus() {
+    void builderRequiresStatus() {
         assertThrows(IllegalArgumentException.class, () ->
                 TestStep.builder()
                         .name("step")
@@ -83,7 +83,7 @@ class TestStepTest {
     }
 
     @Test
-    void testJsonSerialization() throws Exception {
+    void jsonSerialization() throws Exception {
         Instant start = Instant.parse("2026-02-16T10:00:00Z");
         Instant end = Instant.parse("2026-02-16T10:00:01Z");
         
@@ -103,7 +103,7 @@ class TestStepTest {
     }
 
     @Test
-    void testJsonDeserialization() throws Exception {
+    void jsonDeserialization() throws Exception {
         String json = "{\"name\":\"Click button\",\"status\":\"PASSED\",\"startTime\":\"2026-02-16T10:00:00Z\",\"endTime\":\"2026-02-16T10:00:00.500Z\",\"duration\":500,\"description\":\"Click submit button\"}";
         TestStep step = objectMapper.readValue(json, TestStep.class);
 
@@ -114,7 +114,7 @@ class TestStepTest {
     }
 
     @Test
-    void testFailedStep() {
+    void failedStep() {
         TestStep step = TestStep.builder()
                 .name("Validate element")
                 .status(TestStatus.FAILED)
@@ -127,7 +127,7 @@ class TestStepTest {
     }
 
     @Test
-    void testEqualsAndHashCode() {
+    void equalsAndHashCode() {
         Instant start = Instant.ofEpochMilli(4000);
         Instant end = start.plusMillis(100);
         
@@ -152,7 +152,7 @@ class TestStepTest {
     }
 
     @Test
-    void testToString() {
+    void toString_containsKeyFields() {
         TestStep step = TestStep.builder()
                 .name("test step")
                 .status(TestStatus.PASSED)

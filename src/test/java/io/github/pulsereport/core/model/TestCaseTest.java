@@ -25,7 +25,7 @@ class TestCaseTest {
     }
 
     @Test
-    void testBuilderCreatesMinimalTestCase() {
+    void builderCreatesMinimalTestCase() {
         Instant start = Instant.ofEpochMilli(1000);
         Instant end = start.plusMillis(1000);
         
@@ -55,7 +55,7 @@ class TestCaseTest {
     }
 
     @Test
-    void testBuilderWithAllFields() {
+    void builderWithAllFields() {
         Instant start = Instant.ofEpochMilli(2000);
         Instant end = start.plusMillis(2000);
         
@@ -112,7 +112,7 @@ class TestCaseTest {
     }
 
     @Test
-    void testBuilderRequiresId() {
+    void builderRequiresId() {
         assertThrows(IllegalArgumentException.class, () ->
                 TestCase.builder()
                         .name("Test")
@@ -125,7 +125,7 @@ class TestCaseTest {
     }
 
     @Test
-    void testBuilderRequiresName() {
+    void builderRequiresName() {
         assertThrows(IllegalArgumentException.class, () ->
                 TestCase.builder()
                         .id("test-001")
@@ -138,7 +138,7 @@ class TestCaseTest {
     }
 
     @Test
-    void testBuilderRequiresStatus() {
+    void builderRequiresStatus() {
         assertThrows(IllegalArgumentException.class, () ->
                 TestCase.builder()
                         .id("test-001")
@@ -151,7 +151,7 @@ class TestCaseTest {
     }
 
     @Test
-    void testImmutabilityOfCollections() {
+    void immutabilityOfCollections() {
         TestStep step = TestStep.builder()
                 .name("Step")
                 .status(TestStatus.PASSED)
@@ -183,7 +183,7 @@ class TestCaseTest {
     }
 
     @Test
-    void testJsonSerialization() throws Exception {
+    void jsonSerialization() throws Exception {
         Instant start = Instant.parse("2026-02-16T10:00:00Z");
         Instant end = Instant.parse("2026-02-16T10:00:01Z");
         
@@ -206,7 +206,7 @@ class TestCaseTest {
     }
 
     @Test
-    void testJsonDeserialization() throws Exception {
+    void jsonDeserialization() throws Exception {
         String json = "{\"id\":\"test-004\",\"name\":\"Test REST\",\"className\":\"RestTest\",\"methodName\":\"testGet\",\"status\":\"PASSED\",\"startTime\":\"2026-02-16T10:00:00Z\",\"endTime\":\"2026-02-16T10:00:01Z\",\"duration\":1000,\"retryCount\":0}";
         TestCase testCase = objectMapper.readValue(json, TestCase.class);
 
@@ -219,7 +219,7 @@ class TestCaseTest {
     }
 
     @Test
-    void testFlakyTestWithRetries() {
+    void flakyTestWithRetries() {
         TestCase testCase = TestCase.builder()
                 .id("test-005")
                 .name("Flaky Test")
@@ -235,7 +235,7 @@ class TestCaseTest {
     }
 
     @Test
-    void testEmptyListsNotNull() {
+    void emptyListsNotNull() {
         TestCase testCase = TestCase.builder()
                 .id("test-006")
                 .name("Empty Test")
@@ -254,7 +254,7 @@ class TestCaseTest {
     }
 
     @Test
-    void testEqualsAndHashCode() {
+    void equalsAndHashCode() {
         Instant start = Instant.ofEpochMilli(9000);
         Instant end = start.plusMillis(100);
         
@@ -281,7 +281,7 @@ class TestCaseTest {
     }
 
     @Test
-    void testToString() {
+    void toString_containsKeyFields() {
         TestCase testCase = TestCase.builder()
                 .id("test-008")
                 .name("Test String")

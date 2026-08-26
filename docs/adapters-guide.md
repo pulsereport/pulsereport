@@ -18,7 +18,7 @@ Adapters bridge the gap between testing frameworks and PulseReport's reporting l
 | `CucumberAdapter` | Cucumber | BDD step tracking | Background steps, scenario outlines, feature-to-suite mapping | Stable |
 | `RestAssuredAdapter` | REST-assured | API testing | Request/response, timing | Stable |
 | `TestNGAdapter` | TestNG | Basic test reporting | Test results, timing | In development |
-| `SeleniumAdapter` | Selenium WebDriver | Web UI testing | Screenshots, page metrics | In development |
+| `SeleniumAdapter` | Selenium WebDriver | Web UI testing | — (manual capture methods) | In development |
 | `AppiumAdapter` | Appium | Mobile app testing | Screenshots, app metrics | In development |
 
 > **Note:** Adapters marked *In development* may not behave as expected.
@@ -35,7 +35,7 @@ The foundation adapter that integrates with TestNG's listener system.
 <dependency>
     <groupId>io.github.pulsereport</groupId>
     <artifactId>pulsereport</artifactId>
-    <version>1.0.0</version>
+    <version>${version}</version>
 </dependency>
 ```
 
@@ -218,18 +218,29 @@ Same as TestNGAdapter, plus Selenium dependency:
 
 ### Features
 
-#### Automatic Screenshot Capture
+`SeleniumAdapter` provides **manual capture methods only** — it has no built-in
+screenshot or metric hooks. Call the capture methods from your test code, or
+centrally from a base test's `@AfterMethod`. (The [Appium Adapter](#appium-adapter)
+does support failure capture via `MobileDriverHolder`; Selenium does not.)
 
-Screenshots are automatically captured:
+> **Note:** The adapter's artifact/metric stores are **static**, so any
+> `SeleniumAdapter` instance you create in test code shares data with the
+> TestNG-registered listener — no singleton plumbing required.
 
-- On test success
-- On test failure
-- On test skip (if applicable)
+#### Screenshot Capture
+
+Take the screenshot with WebDriver's `TakesScreenshot`, save it to disk, then
+attach it with `captureBrowserScreenshot(testName, fileName, filePath, fileSize)`:
 
 ```java
+import org.openqa.selenium.OutputType;
+import org.openqa.selenium.TakesScreenshot;
+import java.io.File;
+
 @Listeners(SeleniumAdapter.class)
 public class WebTest {
     private WebDriver driver;
+    private final SeleniumAdapter adapter = new SeleniumAdapter();
     
     @BeforeMethod
     public void setup() {
@@ -240,46 +251,39 @@ public class WebTest {
     public void testLogin() {
         driver.get("https://example.com");
         // Test logic...
-        // Screenshot automatically captured on completion
     }
     
-    @AfterMethod
-    public void teardown() {
+    @AfterMethod(alwaysRun = true)
+    public void teardown(ITestResult result) {
+        // Capture a screenshot after each test (e.g. on failure)
+        if (!result.isSuccess()) {
+            File file = ((TakesScreenshot) driver)
+                .getScreenshotAs(OutputType.FILE);
+            adapter.captureBrowserScreenshot(
+                result.getMethod().getMethodName(),
+                "failure-screenshot.png",
+                file.getAbsolutePath(),
+                file.length());
+        }
         driver.quit();
     }
 }
 ```
 
-#### Manual Screenshot Capture
+#### Browser and Console Logs
+
+Attach browser-level logs, JavaScript console output, or HAR network captures:
 
 ```java
-import org.openqa.selenium.OutputType;
-import org.openqa.selenium.TakesScreenshot;
-import io.github.pulsereport.core.model.Artifact;
-
-@Test
-public void testWithCheckpoint() {
-    driver.get("https://example.com");
-    
-    // Capture screenshot at checkpoint
-    byte[] screenshot = ((TakesScreenshot) driver)
-        .getScreenshotAs(OutputType.BYTES);
-    
-    Artifact screenshotArtifact = Artifact.builder()
-        .name("checkpoint-screenshot.png")
-        .type("screenshot")
-        .content(screenshot)
-        .mimeType("image/png")
-        .timestamp(Instant.now())
-        .build();
-    
-    adapter.addArtifact("testWithCheckpoint", screenshotArtifact);
-    
-    // Continue test...
-}
+adapter.captureBrowserLogs("testLogin", "browser.log", logContent);
+adapter.captureConsoleLogs("testLogin", "console.log", consoleContent);
+adapter.captureHarFile("testLogin", "network.har", harContent);
 ```
 
 #### Page Load Metrics
+
+Record page timing metrics with `recordPageLoadTime`, `recordDomReadyTime`, and
+`recordNetworkTiming`:
 
 ```java
 @Test
@@ -288,34 +292,26 @@ public void testPageLoad() {
     driver.get("https://example.com");
     long loadTime = System.currentTimeMillis() - start;
     
-    // Metric automatically recorded by SeleniumAdapter
-    System.out.println("Page loaded in " + loadTime + "ms");
+    adapter.recordPageLoadTime("testPageLoad", loadTime);
+    adapter.recordNetworkTiming("testPageLoad", "dns", dnsLookupMs);
 }
 ```
 
 #### Browser Information
 
-The adapter automatically captures:
+Record browser metadata for the run's environment section with
+`recordBrowserMetadata(browserName, browserVersion, platform)` — typically once
+per run, from the driver's capabilities:
 
-- Browser name and version
-- Operating system
-- Screen resolution
-- User agent
-
-### Configuration Options
-
-In the PulseReport configuration file (`reporter.properties`):
-
-```properties
-# Selenium screenshot settings
-reporter.selenium.screenshot.enabled=true
-reporter.selenium.screenshot.onSuccess=true
-reporter.selenium.screenshot.onFailure=true
-reporter.selenium.screenshot.format=png
-
-# Page metrics
-reporter.selenium.metrics.pageLoad=true
-reporter.selenium.metrics.domReady=true
+```java
+@BeforeSuite
+public void recordBrowserInfo() {
+    Capabilities caps = ((RemoteWebDriver) driver).getCapabilities();
+    adapter.recordBrowserMetadata(
+        caps.getBrowserName(),
+        caps.getBrowserVersion(),
+        System.getProperty("os.name"));
+}
 ```
 
 ### Example
@@ -543,11 +539,11 @@ public class Hooks {
 #### Option 2: With custom configuration
 
 ```java
-import io.github.pulsereport.core.ReporterConfig;
+import io.github.pulsereport.config.ReporterConfig;
 
 ReporterConfig config = ReporterConfig.builder()
     .maskSensitiveData(true)
-    .sensitiveHeaders("Authorization,X-API-Key,Cookie,Set-Cookie,X-Custom-Secret")
+    .maskHeaderFields("Authorization,X-API-Key,Cookie,Set-Cookie,X-Custom-Secret")
     .build();
 
 RestAssured.filters(new RestAssuredAdapter(config));
@@ -690,11 +686,16 @@ reporter.restassured.logging.request=true
 reporter.restassured.logging.response=true
 reporter.restassured.logging.headers=true
 reporter.restassured.logging.body=true
-reporter.restassured.mask.credentials=true
 
-# Sensitive data masking (enabled by default)
+# Sensitive data masking (enabled by default; see configuration.md
+# for the full masking reference, including body, XML, and token masking)
 reporter.maskSensitiveData=true
-reporter.sensitiveHeaders=Authorization,X-API-Key,Cookie,Set-Cookie
+reporter.maskHeaders.enabled=true
+reporter.maskHeaders.fields=Authorization,X-API-Key,Cookie,Set-Cookie
+reporter.maskBody.enabled=true
+reporter.maskBody.fields=password,secret,token,access_token,refresh_token,id_token,client_secret,api_key,apiKey,authorization
+reporter.maskBody.maskTokens=true
+reporter.maskXml.enabled=true
 ```
 
 ### Example
@@ -711,13 +712,46 @@ The Cucumber adapter integrates PulseReport with Cucumber JVM for BDD test repor
 
 Register the adapter as a Cucumber plugin. Choose one of these methods:
 
-**Option 1: `junit-platform.properties`** (recommended for JUnit Platform runner)
+**Option 1: `@ConfigurationParameter` on a JUnit Platform suite** (recommended)
+
+This is the approach used by the [Cucumber Example](../examples/cucumber-example/):
+the runner class is the single canonical source for engine configuration.
+
+```java
+import org.junit.platform.suite.api.ConfigurationParameter;
+import org.junit.platform.suite.api.IncludeEngines;
+import org.junit.platform.suite.api.SelectClasspathResource;
+import org.junit.platform.suite.api.Suite;
+
+import static io.cucumber.junit.platform.engine.Constants.FEATURES_PROPERTY_NAME;
+import static io.cucumber.junit.platform.engine.Constants.GLUE_PROPERTY_NAME;
+import static io.cucumber.junit.platform.engine.Constants.PLUGIN_PROPERTY_NAME;
+
+@Suite
+@IncludeEngines("cucumber")
+@SelectClasspathResource("features")
+@ConfigurationParameter(key = FEATURES_PROPERTY_NAME, value = "classpath:features")
+@ConfigurationParameter(key = GLUE_PROPERTY_NAME, value = "com.example.steps")
+@ConfigurationParameter(key = PLUGIN_PROPERTY_NAME,
+        value = "io.github.pulsereport.adapters.cucumber.CucumberAdapter")
+public class CucumberRunner { }
+```
+
+**Option 2: `junit-platform.properties`** (alternative — see warning)
 
 ```properties
 cucumber.plugin=io.github.pulsereport.adapters.cucumber.CucumberAdapter
 ```
 
-**Option 2: `@CucumberOptions` annotation**
+> **Warning — risk of double execution:** when using a `@Suite` runner with
+> `@SelectClasspathResource`, do **not** also define `cucumber.features` /
+> `cucumber.glue` / `cucumber.plugin` in `junit-platform.properties`. The
+> Cucumber engine merges property-based feature selectors with the suite's
+> selector, causing every scenario to be discovered and executed **twice**.
+> The project's cucumber-example removed these properties from
+> `junit-platform.properties` for exactly this reason.
+
+**Option 3: `@CucumberOptions` annotation** (legacy TestNG/JUnit 4 runner)
 
 ```java
 @CucumberOptions(
@@ -728,7 +762,7 @@ cucumber.plugin=io.github.pulsereport.adapters.cucumber.CucumberAdapter
 public class CucumberRunner { }
 ```
 
-**Option 3: CLI**
+**Option 4: CLI**
 
 ```bash
 --plugin io.github.pulsereport.adapters.cucumber.CucumberAdapter
@@ -740,7 +774,7 @@ public class CucumberRunner { }
 <dependency>
     <groupId>io.github.pulsereport</groupId>
     <artifactId>pulsereport</artifactId>
-    <version>1.0.0</version>
+    <version>${version}</version>
 </dependency>
 
 <!-- Cucumber (bring your own version) -->
@@ -772,27 +806,60 @@ public class CucumberRunner { }
 - **Feature-level grouping** — Tests are grouped by `.feature` file into suites
 - **Data tables and doc strings** — Step arguments are captured and displayed in reports
 - **Parallel execution support** — Thread-safe via `ThreadLocal` scenario context
-- **Artifact attachment** — Attach screenshots or HTTP data to specific steps using `CucumberStepContext`
+- **Step-level artifacts** — HTTP artifacts captured by `RestAssuredAdapter` are automatically routed to the currently executing step (see below)
 
 ### Attaching Artifacts to Steps
 
-Use `CucumberStepContext` to attach artifacts (screenshots, API calls) to the current step:
+Step-level attachment is **implicit**: `CucumberAdapter` exposes a per-thread
+artifact buffer via `CucumberStepContext.currentStepArtifacts` while a step is
+executing, and `RestAssuredAdapter.addArtifact` checks that buffer first — so
+HTTP request/response artifacts land on the current step automatically, with no
+extra code in your step definitions:
+
+```java
+import io.github.pulsereport.adapters.restassured.RestAssuredAdapter;
+import io.restassured.RestAssured;
+import io.cucumber.java.Before;
+import io.cucumber.java.en.When;
+
+public class Hooks {
+    @Before
+    public void setUp() {
+        RestAssured.filters(new RestAssuredAdapter());
+    }
+}
+
+public class ApiSteps {
+    @When("I call the API")
+    public void iCallTheApi() {
+        given().when().get("/api/users").then().statusCode(200);
+        // Request/response artifacts are attached to this step automatically
+    }
+}
+```
+
+Advanced: to attach a custom artifact to the current step, add it to the public
+buffer `CucumberStepContext.currentStepArtifacts.get()` (non-`null` while a step
+is executing on the current thread):
 
 ```java
 import io.github.pulsereport.adapters.cucumber.CucumberStepContext;
 import io.github.pulsereport.core.model.Artifact;
+import java.util.List;
 
 @When("I call the API")
 public void iCallTheApi() {
     // ... your step logic ...
     
-    Artifact httpRequest = Artifact.builder()
-        .name("POST /api/users")
-        .type("http-request")
-        .content("POST /api/users\nContent-Type: application/json\n\n{\"name\":\"John\"}")
-        .mimeType("text/plain")
-        .build();
-    CucumberStepContext.addArtifact(httpRequest);
+    List<Artifact> stepArtifacts = CucumberStepContext.currentStepArtifacts.get();
+    if (stepArtifacts != null) {  // null when no Cucumber step is active
+        stepArtifacts.add(Artifact.builder()
+            .name("POST /api/users")
+            .type("http-request")
+            .content("POST /api/users\nContent-Type: application/json\n\n{\"name\":\"John\"}")
+            .mimeType("text/plain")
+            .build());
+    }
 }
 ```
 
@@ -822,11 +889,13 @@ On test run completion, the adapter generates:
 
 ### Configuration
 
-The Cucumber adapter uses the default PulseReport output directory (`target/pulsereport/`). To customize, set system properties:
+The Cucumber adapter auto-detects `reporter.properties` from the working directory, `src/main/resources/`, or the classpath — no client-side configuration code is needed. To customize the output directory, set `reporter.output.directory` in that file, or override it with a system property (highest precedence):
 
 ```bash
-mvn test -Dpulsereport.output.dir=custom/output/path
+mvn test -Dreporter.output.directory=custom/output/path
 ```
+
+Precedence: `-Dreporter.output.directory` system property > `reporter.properties` value > default `target/pulsereport`.
 
 ---
 
@@ -836,7 +905,7 @@ mvn test -Dpulsereport.output.dir=custom/output/path
 | --------- | -------- | ---------- | -------- | -------------- |
 | Test Results | ✅ | ✅ | ✅ | ✅ |
 | Timing Metrics | ✅ | ✅ | ✅ | ✅ |
-| Screenshots | ❌ | ✅ Auto | ✅ Auto (on failure) | ❌ |
+| Screenshots | ❌ | ✅ Manual | ✅ Auto (on failure) | ❌ |
 | Steps | ✅ Manual | ✅ Manual | ✅ Manual | ❌ |
 | Video Recording | ❌ | ❌ | ✅ | ❌ |
 | Crash / ANR Reports | ❌ | ❌ | ✅ | ❌ |
@@ -924,13 +993,14 @@ Artifact video = captureFullVideo(); // Avoid unless necessary
 
 **Problem**: Tests run but screenshots are missing.
 
-**Solution**: Check configuration:
+**Solution**:
 
-```properties
-reporter.selenium.screenshot.enabled=true
-reporter.selenium.screenshot.onSuccess=true
-reporter.selenium.screenshot.onFailure=true
-```
+- **Selenium** — there is no automatic capture; call `captureBrowserScreenshot(...)`
+  from your test code or a base test's `@AfterMethod` (see
+  [Screenshot Capture](#screenshot-capture)).
+- **Appium** — automatic failure capture requires registering the driver with
+  `MobileDriverHolder.set(driver)` in setup (and `MobileDriverHolder.remove()`
+  in teardown).
 
 ### Request/Response Not Captured (REST-assured)
 

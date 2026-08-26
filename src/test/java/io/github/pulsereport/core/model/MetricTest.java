@@ -23,7 +23,7 @@ class MetricTest {
     }
 
     @Test
-    void testBuilderCreatesMetric() {
+    void builderCreatesMetric() {
         Instant now = Instant.ofEpochMilli(1000);
         Metric metric = Metric.builder()
                 .name("response_time")
@@ -39,7 +39,7 @@ class MetricTest {
     }
 
     @Test
-    void testBuilderRequiresName() {
+    void builderRequiresName() {
         assertThrows(IllegalArgumentException.class, () ->
                 Metric.builder()
                         .value(100.0)
@@ -50,7 +50,7 @@ class MetricTest {
     }
 
     @Test
-    void testBuilderRequiresUnit() {
+    void builderRequiresUnit() {
         assertThrows(IllegalArgumentException.class, () ->
                 Metric.builder()
                         .name("metric")
@@ -61,7 +61,7 @@ class MetricTest {
     }
 
     @Test
-    void testBuilderRequiresTimestamp() {
+    void builderRequiresTimestamp() {
         assertThrows(IllegalArgumentException.class, () ->
                 Metric.builder()
                         .name("metric")
@@ -72,7 +72,7 @@ class MetricTest {
     }
 
     @Test
-    void testJsonSerialization() throws Exception {
+    void jsonSerialization() throws Exception {
         Instant now = Instant.parse("2026-02-16T10:00:00Z");
         Metric metric = Metric.builder()
                 .name("throughput")
@@ -88,7 +88,7 @@ class MetricTest {
     }
 
     @Test
-    void testJsonDeserialization() throws Exception {
+    void jsonDeserialization() throws Exception {
         String json = "{\"name\":\"memory\",\"value\":2048.0,\"unit\":\"MB\",\"timestamp\":\"2026-02-16T10:00:00Z\"}";
         Metric metric = objectMapper.readValue(json, Metric.class);
 
@@ -99,7 +99,7 @@ class MetricTest {
     }
 
     @Test
-    void testEqualsAndHashCode() {
+    void equalsAndHashCode() {
         Instant now = Instant.ofEpochMilli(2000);
         Metric metric1 = Metric.builder()
                 .name("cpu")
@@ -120,7 +120,7 @@ class MetricTest {
     }
 
     @Test
-    void testToString() {
+    void toString_containsKeyFields() {
         Metric metric = Metric.builder()
                 .name("latency")
                 .value(50.0)

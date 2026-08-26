@@ -1,10 +1,12 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <meta name="color-scheme" content="light dark">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PulseReport - ${testRun.name?html}</title>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg' viewBox='0 0 48 48'%3E%3Crect x='2' y='2' width='44' height='44' rx='12' fill='%23F8F9FA' stroke='%23DEE2E6' stroke-width='1.5'/%3E%3Cpath d='M12 24H19L22.5 19L26.5 31L31 16L35 24H38' stroke='%230F8B8D' stroke-width='2.6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+    
     <style>
         :root {
             /* ── Primitives ── */
@@ -26,6 +28,8 @@
             --color-cyan-400: #0dcaf0;
             --color-cyan-100: #cff4fc;
             --color-cyan-200: #9eeaf9;
+            --color-violet-600: #7c3aed;
+            --color-orange-600: #ea580c;
             /* ── Surfaces ── */
             --bg: var(--color-gray-100);
             --surface: var(--color-gray-0);
@@ -53,6 +57,8 @@
             --blue: var(--color-cyan-400);
             --blue-bg: var(--color-cyan-100);
             --blue-border: var(--color-cyan-200);
+            --violet: var(--color-violet-600);
+            --orange: var(--color-orange-600);
             --not-run: var(--color-gray-600);
             /* ── Layout ── */
             --radius-sm: 6px;
@@ -61,9 +67,12 @@
             --font-brand: "Sora", "Segoe UI", sans-serif;
             --font: "Source Sans 3", "Segoe UI", sans-serif;
             --font-mono: 'SF Mono', 'Fira Code', 'Cascadia Code', 'Courier New', monospace;
+            color-scheme: light dark;
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        html { background: var(--bg); }
 
         body {
             font-family: var(--font);
@@ -443,7 +452,6 @@
 
         .report-hero-pinned .report-hero-compact-stats {
             display: flex;
-            height: -webkit-fill-available;
         }
 
         .report-hero-pinned .report-hero-body {
@@ -483,6 +491,11 @@
         .test-suite-header.passed { border-left-color: var(--green); }
         .test-suite-header.failed { border-left-color: var(--red); }
 
+        .test-suite-header-content {
+            flex: 1 1 auto;
+            min-width: 0;
+        }
+
         .test-suite-header h2 {
             font-size: 0.95rem;
             font-weight: 600;
@@ -500,18 +513,17 @@
         }
 
         .test-suite-stats {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
+            display: block;
+            margin-top: 3px;
             font-size: 0.78rem;
             color: var(--text-muted);
-            margin-top: 3px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
-        .test-suite-stats .test-case-tags {
-            margin-left: 0;
-        }
-        .test-suite-stats .test-case-tags .suite-stats-sep {
-            margin-left: 6px;
+        .test-suite-header:not(.collapsed) .test-suite-stats {
+            white-space: normal;
+            overflow: visible;
         }
         .test-suite-stats .tag-label {
             font-size: inherit;
@@ -522,7 +534,13 @@
 
         .test-suite-toggle {
             color: var(--text-muted);
+        }
+
+        .suite-stats-ratio,
+        .suite-stats-duration,
+        .test-suite-toggle {
             flex-shrink: 0;
+            white-space: nowrap;
         }
 
         .test-suite-body { overflow: hidden; }
@@ -566,8 +584,10 @@
         .test-case-name {
             font-weight: 500;
             flex: 1;
+            min-width: 0;
             font-size: 0.88rem;
             color: var(--text-primary);
+            overflow: hidden;
         }
 
         .test-case-method {
@@ -583,6 +603,8 @@
             font-size: 0.78rem;
             color: var(--text-muted);
             font-variant-numeric: tabular-nums;
+            flex-shrink: 0;
+            white-space: nowrap;
         }
 
         .test-case-toggle {
@@ -592,7 +614,26 @@
 
         /* ── Tag Labels ── */
         .test-case-tags {
+            display: inline-block;
+            max-width: 40ch;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            vertical-align: bottom;
+            color: var(--text-muted);
+        }
+
+        .test-suite-header:not(.collapsed) .test-case-tags,
+        .test-case-header.expanded .test-case-name .test-case-tags {
             display: inline;
+            max-width: none;
+            overflow: visible;
+            white-space: normal;
+            text-overflow: clip;
+        }
+
+        .test-case-name .test-case-tags {
+            margin-left: 6px;
         }
 
         .tag-label {
@@ -600,11 +641,7 @@
             font-weight: 400;
             color: var(--text-muted);
             white-space: nowrap;
-        }
-
-        .tag-label + .tag-label::before {
-            content: '';
-            margin: 0 2px;
+            margin-right: 4px;
         }
 
         /* ── Tag Filter Dropdown ── */
@@ -617,8 +654,9 @@
             display: none;
             position: absolute;
             top: calc(100% + 4px);
-            left: 0;
+            right: 0;
             min-width: 200px;
+            max-width: calc(100vw - 24px);
             max-height: 280px;
             overflow-y: auto;
             background: var(--surface);
@@ -813,7 +851,7 @@
         }
 
         .api-call-card {
-            margin-bottom: 10px;
+            margin: 10px 0px;
             border-radius: var(--radius-sm);
             overflow: hidden;
         }
@@ -915,7 +953,9 @@
             overflow-wrap: anywhere;
             line-height: 1.7;
             max-width: 100%;
+            max-height: 40vh;
             overflow-x: auto;
+            overflow-y: auto;
         }
 
         .artifact-content a {
@@ -1000,6 +1040,8 @@
 
         .bdd-step-name {
             flex: 1;
+            min-width: 0;
+            word-break: break-word;
             color: var(--text-primary);
         }
 
@@ -1052,12 +1094,20 @@
             font-family: var(--font-mono);
             font-size: 0.78rem;
             white-space: pre-wrap;
+            word-break: break-word;
+            overflow-wrap: anywhere;
             border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
             color: var(--text-primary);
         }
 
-        .bdd-step-datatable {
+        .bdd-table-scroll {
+            overflow-x: auto;
+            max-width: 100%;
             margin: 4px 0 4px 58px;
+        }
+
+        .bdd-step-datatable {
+            margin: 0;
             border-collapse: collapse;
             font-size: 0.78rem;
         }
@@ -1066,6 +1116,8 @@
             border: 1px solid var(--border);
             padding: 4px 10px;
             text-align: left;
+            overflow-wrap: break-word;
+            max-width: 320px;
         }
 
         .bdd-step-datatable thead tr {
@@ -1073,7 +1125,7 @@
             font-weight: 600;
         }
 
-        .bdd-step-artifacts { margin: 2px 0 6px 58px; }
+        .bdd-step-artifacts { margin: 2px 0 2px 58px; }
 
         .bdd-step-api-toggle { display: none; }
 
@@ -1085,8 +1137,7 @@
 
         .bdd-step-artifacts-body.expanded {
             max-height: none;
-            overflow: visible;
-            padding-top: 6px;
+            overflow-x: auto;
         }
 
         .bdd-step-toggle-chevron {
@@ -1179,7 +1230,7 @@
         .bdd-step.error-expanded .bdd-step-error-chevron .chevron-svg { transform: rotate(180deg); }
 
         /* ── Dark Mode ── */
-        body.dark {
+        :root[data-theme='dark'] {
             --bg: #212529;
             --surface: #2b3035;
             --surface-raised: #343a40;
@@ -1202,53 +1253,86 @@
             --blue: #6edff6;
             --blue-bg: #032830;
             --blue-border: #055160;
+            --violet: #a78bfa;
+            --orange: #fb923c;
             --not-run: #dee2e6;
-            background: var(--bg);
+            color-scheme: dark;
         }
 
-        body.dark .class-file-header,
-        body.dark .metric-chip,
-        body.dark .artifact-code,
-        body.dark .bdd-step-docstring,
-        body.dark .bdd-step-datatable thead tr,
-        body.dark .api-call-header {
+        /* No-JS fallback: follow the OS theme only when no preference is stored */
+        @media (prefers-color-scheme: dark) {
+            :root:not([data-theme]) {
+                --bg: #212529;
+                --surface: #2b3035;
+                --surface-raised: #343a40;
+                --surface-overlay: #3d4349;
+                --border: var(--color-gray-700);
+                --border-light: #3d4349;
+                --text-primary: #f8f9fa;
+                --text-secondary: #dee2e6;
+                --text-muted: #adb5bd;
+                --logo-tile-fill: #343a40;
+                --logo-tile-stroke: var(--color-gray-700);
+                --logo-pulse-stroke: var(--color-teal-400);
+                --accent: var(--color-teal-400);
+                --accent-light: #2b3035;
+                --green: #75b798;
+                --red: #ea868f;
+                --red-bg: #2c0b0e;
+                --red-border: #58151c;
+                --amber: #e4cf6e;
+                --blue: #6edff6;
+                --blue-bg: #032830;
+                --blue-border: #055160;
+                --violet: #a78bfa;
+                --orange: #fb923c;
+                --not-run: #dee2e6;
+            }
+        }
+
+        :root[data-theme='dark'] .class-file-header,
+        :root[data-theme='dark'] .metric-chip,
+        :root[data-theme='dark'] .artifact-code,
+        :root[data-theme='dark'] .bdd-step-docstring,
+        :root[data-theme='dark'] .bdd-step-datatable thead tr,
+        :root[data-theme='dark'] .api-call-header {
             background: var(--surface-raised);
         }
 
-        body.dark .metric-chip,
-        body.dark .api-call-card,
-        body.dark .api-call-header,
-        body.dark .artifact-code,
-        body.dark .bdd-step-docstring {
+        :root[data-theme='dark'] .metric-chip,
+        :root[data-theme='dark'] .api-call-card,
+        :root[data-theme='dark'] .api-call-header,
+        :root[data-theme='dark'] .artifact-code,
+        :root[data-theme='dark'] .bdd-step-docstring {
             border-color: var(--border-light);
         }
 
-        body.dark .test-suite-header:hover,
-        body.dark .test-case-header:hover,
-        body.dark .api-call-header:hover,
-        body.dark .artifact-header:hover,
-        body.dark .artifact-content a:hover {
+        :root[data-theme='dark'] .test-suite-header:hover,
+        :root[data-theme='dark'] .test-case-header:hover,
+        :root[data-theme='dark'] .api-call-header:hover,
+        :root[data-theme='dark'] .artifact-header:hover,
+        :root[data-theme='dark'] .artifact-content a:hover {
             background: var(--surface-overlay);
         }
 
-        body.dark .status-badge.not-run {
+        :root[data-theme='dark'] .status-badge.not-run {
             color: var(--text-secondary);
             border-color: var(--border-light);
         }
 
-        body.dark .artifact-item,
-        body.dark .test-case,
-        body.dark .test-case-content,
-        body.dark .class-file-header {
+        :root[data-theme='dark'] .artifact-item,
+        :root[data-theme='dark'] .test-case,
+        :root[data-theme='dark'] .test-case-content,
+        :root[data-theme='dark'] .class-file-header {
             border-color: var(--border-light);
         }
 
-        body.dark .copy-btn {
+        :root[data-theme='dark'] .copy-btn {
             background: rgba(30, 30, 30, 0.92);
         }
 
         /* bdd-step hover in dark mode */
-        body.dark .bdd-step:hover { background: var(--surface-raised); }
+        :root[data-theme='dark'] .bdd-step:hover { background: var(--surface-raised); }
 
         .theme-toggle {
             display: inline-flex;
@@ -1430,6 +1514,42 @@
             border-color: var(--accent);
         }
 
+        .filter-btn-failed:not(.active):hover {
+            background: var(--bg);
+            color: var(--red);
+            border-color: var(--red);
+        }
+        .filter-btn-passed:not(.active):hover {
+            background: var(--bg);
+            color: var(--green);
+            border-color: var(--green);
+        }
+        .filter-btn-skipped:not(.active):hover {
+            background: var(--bg);
+            color: var(--amber);
+            border-color: var(--amber);
+        }
+        .filter-btn-failed.active {
+            background: var(--red);
+            border-color: var(--red);
+            color: #fff;
+        }
+        .filter-btn-passed.active {
+            background: var(--green);
+            border-color: var(--green);
+            color: #fff;
+        }
+        .filter-btn-skipped.active {
+            background: var(--amber);
+            border-color: var(--amber);
+            color: #fff;
+        }
+        :root[data-theme='dark'] .filter-btn-failed.active,
+        :root[data-theme='dark'] .filter-btn-passed.active,
+        :root[data-theme='dark'] .filter-btn-skipped.active {
+            color: #fff;
+        }
+
         .expand-btns { display: flex; gap: 4px; margin-left: auto; }
 
         #expandCollapseBtn .ec-arrow-top {
@@ -1461,7 +1581,7 @@
         .method-post   { color: var(--amber); }
         .method-put    { color: var(--blue); }
         .method-delete { color: var(--red); }
-        .method-patch  { color: var(--text-secondary); }
+        .method-patch  { color: var(--violet); }
         .method-default { color: #6b7280; }
         .method-head, .method-options, .method-trace, .method-connect { color: #6b7280; }
 
@@ -1475,8 +1595,8 @@
         }
         .sc-1xx { color: var(--blue); }
         .sc-2xx { color: var(--green); }
-        .sc-3xx { color: var(--text-secondary); }
-        .sc-4xx { color: var(--amber); }
+        .sc-3xx { color: var(--amber); }
+        .sc-4xx { color: var(--orange); }
         .sc-5xx { color: var(--red); }
 
         /* ── Copy Button ── */
@@ -1534,6 +1654,27 @@
 
         .report-footer strong { color: var(--text-secondary); }
     </style>
+    <script>
+        (function() {
+            var theme = null;
+            try {
+                var stored = localStorage.getItem('pulse-report-theme');
+                if (stored === 'dark' || stored === 'light') {
+                    theme = stored;
+                } else if (stored === 'true' || stored === '1') {
+                    theme = 'dark';
+                } else if (stored === 'false' || stored === '0') {
+                    theme = 'light';
+                }
+            } catch (e) {
+                theme = null;
+            }
+            if (theme === null) {
+                theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+            }
+            document.documentElement.setAttribute('data-theme', theme);
+        })();
+    </script>
     <script>
         function openLightbox(src) {
             var lb = document.getElementById('screenshot-lightbox');
@@ -1678,7 +1819,7 @@
         function updateThemeIcon() {
             var btn = document.getElementById('themeToggle');
             if (!btn) return;
-            var isDark = document.body.classList.contains('dark');
+            var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
             if (isDark) {
                 btn.innerHTML = '<svg class="theme-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>';
                 btn.title = 'Switch to light mode';
@@ -1686,22 +1827,20 @@
                 btn.innerHTML = '<svg class="theme-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>';
                 btn.title = 'Switch to dark mode';
             }
+            btn.setAttribute('aria-pressed', isDark ? 'true' : 'false');
+            btn.setAttribute('aria-label', isDark ? 'Switch to light mode' : 'Switch to dark mode');
         }
 
         function applyTheme(isDark) {
-            if (isDark) {
-                document.body.classList.add('dark');
-            } else {
-                document.body.classList.remove('dark');
-            }
+            document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
             updateThemeIcon();
         }
 
         function toggleTheme() {
-            var isDark = !document.body.classList.contains('dark');
-            applyTheme(isDark);
+            var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+            applyTheme(!isDark);
             try {
-                localStorage.setItem('pulse-report-theme', isDark ? 'dark' : 'light');
+                localStorage.setItem('pulse-report-theme', isDark ? 'light' : 'dark');
             } catch (e) {
                 // Ignore storage failures and keep the current page theme.
             }
@@ -1752,8 +1891,14 @@
                 var suiteHeader = suite.querySelector('.test-suite-header');
                 if (visibleCount > 0) {
                     suite.style.display = '';
-                    if (suiteBody) suiteBody.classList.remove('collapsed');
-                    if (suiteHeader) suiteHeader.classList.remove('collapsed');
+                    var filterActive = q !== '' || status !== 'all' || selectedTags.length > 0;
+                    if (filterActive || isAllExpanded) {
+                        if (suiteBody) suiteBody.classList.remove('collapsed');
+                        if (suiteHeader) suiteHeader.classList.remove('collapsed');
+                    } else {
+                        if (suiteBody) suiteBody.classList.add('collapsed');
+                        if (suiteHeader) suiteHeader.classList.add('collapsed');
+                    }
                 } else {
                     suite.style.display = 'none';
                 }
@@ -1906,22 +2051,9 @@
         }
 
         document.addEventListener('DOMContentLoaded', function() {
-            var storedTheme = null;
-            try {
-                storedTheme = localStorage.getItem('pulse-report-theme');
-            } catch (e) {
-                storedTheme = null;
-            }
+            updateThemeIcon();
 
             var darkMQ = window.matchMedia('(prefers-color-scheme: dark)');
-
-            if (storedTheme === 'dark') {
-                applyTheme(true);
-            } else if (storedTheme === 'light') {
-                applyTheme(false);
-            } else {
-                applyTheme(darkMQ.matches);
-            }
 
             darkMQ.addEventListener('change', function(e) {
                 var storedTheme = null;
@@ -2050,16 +2182,15 @@
                         <span class="artifact-duration"><span class="method-badge method-${mth?lower_case}">${mth}</span> ${pth}</span>
                         <span class="toggle-icon"><svg class="chevron-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg></span>
                     </div>
-                    <div class="artifact-content"><#if req.content??><pre class="artifact-code">${prettyPrintHttpBody(req.content)?html}</pre></#if></div>
+                    <#if req.content??><div class="artifact-content"><pre class="artifact-code">${prettyPrintHttpBody(req.content)?html}</pre></div></#if>
                 </div>
             </#if>
             <#if rsp.type?? && rsp.type == "http-response">
                 <div class="artifact-item">
-                <div class="artifact-item">
                     <div class="artifact-header" onclick="toggleArtifact(this)">
                         <span class="artifact-type">RESPONSE</span><#if rsp.content?? && rsp.content?starts_with("Status: ")><#assign _rst = rsp.content?split("\n")?first?split(" ")?last?trim><#if _rst?length gt 0><#assign _rsc = _rst?substring(0,1)><#if _rsc == "1"><#assign _rscls = "sc-1xx"><#elseif _rsc == "2"><#assign _rscls = "sc-2xx"><#elseif _rsc == "3"><#assign _rscls = "sc-3xx"><#elseif _rsc == "4"><#assign _rscls = "sc-4xx"><#else><#assign _rscls = "sc-5xx"></#if><span class="sc-badge ${_rscls}">${_rst}</span></#if></#if><span class="artifact-duration"></span><span class="toggle-icon"><svg class="chevron-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg></span>
                     </div>
-                    <div class="artifact-content"><#if rsp.content??><pre class="artifact-code">${prettyPrintHttpBody(rsp.content)?html}</pre></#if></div>
+                    <#if rsp.content??><div class="artifact-content"><pre class="artifact-code">${prettyPrintHttpBody(rsp.content)?html}</pre></div></#if>
                 </div>
             </#if>
             <#if (pairCount > 1)>
@@ -2263,9 +2394,9 @@
             <input type="text" class="filter-input" id="filterInput" placeholder="Filter tests…" oninput="applyFilter()" aria-label="Filter tests by name">
             <div class="filter-btns" role="group" aria-label="Filter by status">
                 <button class="filter-btn active" onclick="setFilter(this, 'all')">All</button>
-                <button class="filter-btn" onclick="setFilter(this, 'failed')">Failed</button>
-                <button class="filter-btn" onclick="setFilter(this, 'passed')">Passed</button>
-                <button class="filter-btn" onclick="setFilter(this, 'skipped')">Skipped</button>
+                <button class="filter-btn filter-btn-failed" onclick="setFilter(this, 'failed')">Failed</button>
+                <button class="filter-btn filter-btn-passed" onclick="setFilter(this, 'passed')">Passed</button>
+                <button class="filter-btn filter-btn-skipped" onclick="setFilter(this, 'skipped')">Skipped</button>
             </div>
             <div class="tag-filter-wrapper">
                 <button class="tag-filter-btn" onclick="toggleTagDropdown()" id="tagFilterBtn">
@@ -2300,11 +2431,11 @@
             </#if>
         </#if>
         <div class="test-suite">
-            <div class="test-suite-header ${suite.status?lower_case}" onclick="toggleSuite(this)">
-                <div>
+            <div class="test-suite-header ${suite.status?lower_case} collapsed" onclick="toggleSuite(this)">
+                <div class="test-suite-header-content">
                     <h2>${suiteDisplayName?html}<#if suiteSecondaryText != ""> <span class="suite-class-path">${suiteSecondaryText?html}</span></#if></h2>
                     <div class="test-suite-stats">
-                        <#if suite.tags?? && (suite.tags?size > 0)><span class="test-case-tags"><#list suite.tags as tag><span class="tag-label">${tag}</span></#list><span class="suite-stats-sep">&middot;</span></span></#if>
+                        <#if suite.tags?? && (suite.tags?size > 0)><span class="test-case-tags" title="${suite.tags?join(', ')?html}"><#list suite.tags as tag><span class="tag-label">${tag}</span><#sep> </#sep></#list></span><span class="suite-stats-sep">&middot;</span></#if>
                         <span class="suite-stats-ratio">${suite.passedTests}/${suite.testCases?size} passed</span>
                         <span class="suite-stats-sep">&middot;</span>
                         <span class="suite-stats-duration">${formatDuration(suite.duration)}</span>
@@ -2312,7 +2443,7 @@
                 </div>
                 <span class="test-suite-toggle"><svg class="chevron-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg></span>
             </div>
-            <div class="test-suite-body">
+            <div class="test-suite-body collapsed">
             <#list suite.testCases as testCase>
             <#assign hasTestError = testCase.errorMessage?? && testCase.errorMessage?has_content>
             <#assign hasArtifacts = testCase.artifacts?? && (testCase.artifacts?size > 0)>
@@ -2326,7 +2457,7 @@
                     <span class="test-case-name">
                         <#if testCase.methodName??>${testCase.methodName?html}<#if testCase.name?? && testCase.name != testCase.methodName>
                         <span class="test-case-method">${testCase.name?html}</span></#if><#elseif testCase.name??>${testCase.name?html}</#if><#if testCase.className?? && !testCase.bddType??><span class="suite-class-path">${testCase.className?replace(".", "/")}.java</span></#if>
-                        <#if testCase.tags?? && (testCase.tags?size > 0)><span class="test-case-tags"><#list testCase.tags as tag><span class="tag-label">${tag}</span></#list></span></#if>
+                        <#if testCase.tags?? && (testCase.tags?size > 0)><span class="test-case-tags" title="${testCase.tags?join(', ')?html}"><#list testCase.tags as tag><span class="tag-label">${tag}</span><#sep> </#sep></#list></span></#if>
                     </span>
                     <span class="test-case-time">${formatDuration(testCase.duration)}</span>
                     <#if isExpandable>
@@ -2355,6 +2486,7 @@
                                 </#if>
                                 <#if bStep.dataTable?? && (bStep.dataTable?size > 0)>
                                 <li>
+                                    <div class="bdd-table-scroll">
                                     <table class="bdd-step-datatable">
                                         <#list bStep.dataTable as row>
                                         <#if row?is_first><thead><tr><#list row as cell><th>${cell?html}</th></#list></tr></thead><tbody>
@@ -2363,6 +2495,7 @@
                                         </#list>
                                         </tbody>
                                     </table>
+                                    </div>
                                 </li>
                                 </#if>
                                 <#if bStep.artifacts?? && (bStep.artifacts?size > 0)>
@@ -2397,6 +2530,7 @@
                             </#if>
                             <#if sStep.dataTable?? && (sStep.dataTable?size > 0)>
                             <li>
+                                <div class="bdd-table-scroll">
                                 <table class="bdd-step-datatable">
                                     <#list sStep.dataTable as row>
                                     <#if row?is_first><thead><tr><#list row as cell><th>${cell?html}</th></#list></tr></thead><tbody>
@@ -2405,6 +2539,7 @@
                                     </#list>
                                     </tbody>
                                 </table>
+                                </div>
                             </li>
                             </#if>
                             <#if sStep.artifacts?? && (sStep.artifacts?size > 0)>
