@@ -29,7 +29,7 @@ Add Maven dependency:
 <dependency>
     <groupId>io.github.pulsereport</groupId>
     <artifactId>pulsereport</artifactId>
-    <version>1.0.0</version>
+    <version>${version}</version>
 </dependency>
 ```
 
@@ -59,7 +59,7 @@ Exclude conflicting versions:
 <dependency>
     <groupId>io.github.pulsereport</groupId>
     <artifactId>pulsereport</artifactId>
-    <version>1.0.0</version>
+    <version>${version}</version>
     <exclusions>
         <exclusion>
             <groupId>org.testng</groupId>
@@ -80,8 +80,8 @@ Exclude conflicting versions:
 **Possible Causes**:
 
 1. Adapter not registered
-2. Reporter disabled in configuration
-3. Output directory not writable
+2. Output directory not writable
+3. Tests were not run through the framework the adapter hooks into (e.g. running TestNG tests directly from an IDE without listeners)
 
 **Solution**:
 
@@ -96,13 +96,7 @@ Exclude conflicting versions:
 </suite>
 ```
 
-**Step 2**: Check the PulseReport configuration file (`reporter.properties`):
-
-```properties
-reporter.enabled=true
-```
-
-**Step 3**: Verify output directory permissions:
+**Step 2**: Verify output directory permissions:
 
 ```bash
 ls -la target/pulsereport
@@ -110,21 +104,17 @@ ls -la target/pulsereport
 chmod 755 target/pulsereport
 ```
 
-**Step 4**: Enable debug logging:
-
-```properties
-log.level=DEBUG
-```
+**Step 3**: Check the console output at run completion — the adapters log the absolute path of each generated report (`PulseReport: HTML report generated` / `Location: ...`). If those lines are missing, the adapter never ran.
 
 ### Duplicate Test Results
 
 **Problem**: Same test appears multiple times in report.
 
-**Cause**: Adapter registered multiple times or parallel test execution issues.
+**Cause**: Adapter registered multiple times (e.g. both in `testng.xml` and via `@Listeners`).
 
 **Solution**:
 
-**Option 1**: Remove duplicate listener registrations:
+Remove duplicate listener registrations:
 
 ```xml
 <!-- Only register once -->
@@ -133,26 +123,6 @@ log.level=DEBUG
         <listener class-name="io.github.pulsereport.adapters.testng.TestNGAdapter"/>
     </listeners>
 </suite>
-```
-
-**Option 2**: For parallel tests, ensure thread safety:
-
-```properties
-reporter.aggregator.threadSafe=true
-```
-
-### Parameterized Tests Not Captured
-
-**Problem**: Data-driven tests not captured correctly.
-
-**Cause**: Parameter capture disabled.
-
-**Solution**:
-
-Enable parameter capture:
-
-```properties
-reporter.testng.captureParameters=true
 ```
 
 ---
@@ -178,37 +148,23 @@ ls -lh target/pulsereport/test-report.html
 # If > 50MB, it may be too large for browsers
 ```
 
-**Step 2**: Enable pagination for large reports:
+**Step 2**: Check browser console for JavaScript errors (F12).
 
-```properties
-reporter.html.pagination.enabled=true
-reporter.html.pagination.pageSize=50
-```
-
-**Step 3**: Check browser console for JavaScript errors (F12).
-
-**Step 4**: Try different browser or disable browser extensions.
+**Step 3**: Try different browser or disable browser extensions.
 
 ### Screenshots Not Appearing
 
 **Problem**: Tests run but screenshots missing from report.
 
-**Cause**: Screenshot capture disabled or failed.
+**Cause**: Screenshots are not captured automatically. The Selenium adapter only attaches screenshots you capture explicitly in your test code.
 
 **Solution**:
 
-**For Selenium**:
+Capture screenshots explicitly via the adapter:
 
-```properties
-reporter.selenium.screenshot.enabled=true
-reporter.selenium.screenshot.onSuccess=true
-reporter.selenium.screenshot.onFailure=true
-```
-
-**For Appium**:
-
-```properties
-reporter.appium.screenshot.enabled=true
+```java
+SeleniumAdapter adapter = new SeleniumAdapter(driver);
+adapter.captureBrowserScreenshot(); // attaches a screenshot to the current test
 ```
 
 **Check WebDriver is TakesScreenshot**:
@@ -222,21 +178,25 @@ if (driver instanceof TakesScreenshot) {
 }
 ```
 
-### JSON Schema Validation Fails
+### Invalid Test Run Structure
 
-**Problem**: `JsonSchemaException: Invalid test run structure`
+**Problem**: The generated report is missing data, or downstream tooling rejects the output.
 
-**Cause**: Test run object missing required fields.
+**Cause**: Required fields on the model objects were not set.
 
 **Solution**:
 
-Validate test run before generating JSON:
+Validate the model before generating output with `ModelValidator` (it returns a list of human-readable errors):
 
 ```java
-try {
-    testRun.validate();
-} catch (ValidationException e) {
-    System.err.println("Invalid test run: " + e.getMessage());
+import io.github.pulsereport.core.validation.ModelValidator;
+import java.util.List;
+
+ModelValidator validator = new ModelValidator();
+List<String> errors = validator.validate(testRun);
+// e.g. "TestRun.name is required (cannot be null)"
+if (!errors.isEmpty()) {
+    errors.forEach(System.err::println);
 }
 ```
 
@@ -263,12 +223,6 @@ Validate XML against schema:
 
 ```bash
 xmllint --schema junit-schema.xsd target/pulsereport/TEST-junit.xml
-```
-
-Ensure special characters are escaped:
-
-```properties
-reporter.junit.escapeSpecialChars=true
 ```
 
 ---
@@ -310,29 +264,6 @@ echo $AWS_SECRET_ACCESS_KEY
 # Should not be empty
 ```
 
-### S3: Slow Upload
-
-**Problem**: Large reports take minutes to upload.
-
-**Cause**: Single-part upload for large files.
-
-**Solution**:
-
-Enable multipart upload:
-
-```properties
-reporter.s3.multipart.enabled=true
-reporter.s3.multipart.partSize=5242880
-# Part size in bytes (5MB default)
-```
-
-Compress artifacts:
-
-```properties
-reporter.performance.compressArtifacts=true
-reporter.html.screenshots.compress=true
-```
-
 ### HTTP: Connection Timeout
 
 **Problem**: `SocketTimeoutException` when publishing to HTTP endpoint.
@@ -341,27 +272,23 @@ reporter.html.screenshots.compress=true
 
 **Solution**:
 
-Increase timeout:
-
-```properties
-reporter.http.timeout=60000
-# 60 seconds
-```
-
-Enable retries:
-
-```properties
-reporter.http.retry.enabled=true
-reporter.http.retry.maxAttempts=3
-reporter.http.retry.backoffMs=2000
-```
-
 Test endpoint directly:
 
 ```bash
 curl -X POST https://api.example.com/reports \
   -H "Content-Type: application/json" \
   -d '{"test": "data"}'
+```
+
+Tune retries on `HttpPublishConfig` (retry settings are a code-only API, not file properties):
+
+```java
+HttpPublishConfig config = HttpPublishConfig.builder()
+    .endpoint("https://api.example.com/test-reports")
+    .method("POST")
+    .retryAttempts(3)
+    .retryDelayMs(1000) // doubles on each retry
+    .build();
 ```
 
 ### Slack: Message Not Sent
@@ -392,20 +319,7 @@ curl -X POST -H 'Content-type: application/json' \
 # If error, check response message
 ```
 
-**Step 3**: Verify channel exists and bot has access.
-
-**Step 4**: Check rate limits:
-
-```properties
-reporter.slack.rateLimit.enabled=true
-reporter.slack.rateLimit.perMinute=60
-```
-
-**Step 5**: Enable debug logging:
-
-```properties
-log.level=DEBUG
-```
+**Step 3**: Verify channel exists and the webhook points at it. Note that `SlackNotifier` already retries failed sends with exponential backoff; tune `retryAttempts`/`retryDelayMs` on `SlackConfig` in code if needed.
 
 ### Slack: Webhook URL Exposed
 
@@ -450,34 +364,14 @@ reporter.properties
 
 **Solution**:
 
-**Step 1**: Use streaming aggregator:
-
-```properties
-reporter.aggregator.type=streaming
-reporter.aggregator.streaming.flushInterval=100
-```
-
-**Step 2**: Enable memory optimization:
-
-```properties
-reporter.performance.optimizeMemory=true
-reporter.performance.lazyLoadArtifacts=true
-```
-
-**Step 3**: Increase Java heap:
+**Step 1**: Increase Java heap:
 
 ```bash
 export MAVEN_OPTS="-Xmx2g"
 mvn test
 ```
 
-**Step 4**: Compress large artifacts:
-
-```properties
-reporter.performance.compressArtifacts=true
-reporter.html.screenshots.maxWidth=1920
-reporter.html.screenshots.maxHeight=1080
-```
+**Step 2**: Reduce what you attach — capture screenshots only on failure and avoid attaching large response bodies or logs to every test.
 
 ### Slow Report Generation
 
@@ -487,61 +381,36 @@ reporter.html.screenshots.maxHeight=1080
 
 **Solution**:
 
-**Step 1**: Enable parallel processing:
+**Step 1**: Reduce artifact volume — attach large files only for failed tests.
 
-```properties
-reporter.performance.parallel.enabled=true
-reporter.performance.parallel.threads=4
-```
+**Step 2**: Split very large suites into separate runs/reports.
 
-**Step 2**: Limit artifact size:
+**Step 3**: Check the file size of the generated report:
 
-```properties
-reporter.restassured.logging.maxBodySize=10240
-reporter.selenium.screenshot.compress=true
-```
-
-**Step 3**: Use pagination in HTML:
-
-```properties
-reporter.html.pagination.enabled=true
-reporter.html.pagination.pageSize=50
-```
-
-**Step 4**: Disable charts for very large reports:
-
-```properties
-reporter.html.charts.enabled=false
+```bash
+ls -lh target/pulsereport/
 ```
 
 ### Slow Test Execution
 
 **Problem**: Tests run slower with PulseReport enabled.
 
-**Cause**: Synchronous I/O operations or heavy artifact capture.
+**Cause**: Heavy artifact capture (screenshots, logs, response bodies) inside the test flow.
 
 **Solution**:
 
-**Step 1**: Disable unnecessary captures:
+**Step 1**: Capture expensive artifacts only on failure:
 
-```properties
-reporter.selenium.screenshot.onSuccess=false
-# Only capture on failure
-reporter.selenium.screenshot.onFailure=true
+```java
+try {
+    // test logic
+} catch (AssertionError | RuntimeException e) {
+    adapter.captureBrowserScreenshot(); // capture only when failing
+    throw e;
+}
 ```
 
-**Step 2**: Use async artifact processing:
-
-```properties
-reporter.performance.asyncArtifacts=true
-```
-
-**Step 3**: Disable temporary storage:
-
-```properties
-reporter.aggregator.streaming.enabled=false
-# Use in-memory aggregation for smaller suites
-```
+**Step 2**: Avoid capturing screenshots or logs for every passing step.
 
 ---
 
@@ -564,7 +433,7 @@ ls -la config/reporter.properties
 **Step 2**: Validate that same file explicitly:
 
 ```bash
-java -jar target/pulsereport-1.0.0.jar validate \
+java -jar target/pulsereport-${version}.jar validate \
     --config config/reporter.properties
 ```
 
@@ -577,7 +446,7 @@ ReporterConfig config = ReporterConfig.loadFromFile(new File("config/reporter.pr
 **Step 4**: If you are using the CLI, pass `--config` on commands that support it:
 
 ```bash
-java -jar target/pulsereport-1.0.0.jar generate \
+java -jar target/pulsereport-${version}.jar generate \
     --input target/test-results.json \
     --config config/reporter.properties
 ```
@@ -603,24 +472,30 @@ echo $SLACK_WEBHOOK_URL
 # Should show value, not empty
 ```
 
-**Step 3**: Use Java system property instead:
+**Step 3**: Use a Java system property instead — `${VAR}` placeholders fall back to system properties before environment variables:
 
 ```bash
-java -Dreporter.slack.webhookUrl="https://..." -jar app.jar
+java -DSLACK_WEBHOOK_URL="https://..." -jar app.jar
 ```
 
-### Invalid Property Values
+### Invalid Configuration Values
 
-**Problem**: `ConfigException: Invalid value for property X`
+**Problem**: `ConfigException` thrown during configuration validation, with messages such as:
 
-**Cause**: Property value doesn't match expected type or format.
+- `Invalid output format: <format>. Valid formats are: html, json, junit`
+- `S3 bucket must be specified when S3 is enabled`
+- `HTTP URL must be specified when HTTP publishing is enabled`
+- `Slack webhook URL must be specified when Slack is enabled`
+- `Invalid video storage: <value>. Valid values are: path, embed, url`
+
+**Cause**: `ReporterConfig.validate()` rejected the loaded configuration.
 
 **Solution**:
 
 **Step 1**: Validate configuration:
 
 ```bash
-java -jar target/pulsereport-1.0.0.jar validate --config reporter.properties
+java -jar target/pulsereport-${version}.jar validate --config reporter.properties
 ```
 
 **Step 2**: Check data types:
@@ -634,6 +509,9 @@ reporter.maxArtifactContentSize=51200
 
 # List: Comma-separated (no spaces)
 reporter.output.formats=html,json,junit
+
+# Enum-like: path | embed | url
+reporter.video.storage=path
 ```
 
 **Step 3**: Check URL formats:
@@ -654,23 +532,6 @@ reporter.http.url=https://api.example.com/reports
 
 **Solution**: Register adapter in `testng.xml` or via `@Listeners`.
 
-### "Output directory does not exist"
-
-**Cause**: Output directory not created, or no write permissions.
-
-**Solution**:
-
-```bash
-mkdir -p target/pulsereport
-chmod 755 target/pulsereport
-```
-
-Or enable auto-creation:
-
-```properties
-reporter.output.createDirectory=true
-```
-
 ### Report written to `target/pulsereport` instead of my configured directory
 
 **Cause**: The Cucumber and TestNG adapters resolve the output directory in this precedence order (highest first):
@@ -687,53 +548,44 @@ So either your `reporter.properties` was not auto-detected (it must be at `./rep
 - Under Maven Surefire the working directory is the module directory, so `./reporter.properties` means the module root, not necessarily the repo root. Putting the file in `src/main/resources/` (classpath) is the most reliable location.
 - Check whether a `-Dreporter.output.directory` system property is set (e.g. in the Maven command line or `surefire` `<systemPropertyVariables>`); it overrides the file value.
 
-### "Failed to serialize TestRun"
-
-**Cause**: TestRun contains non-serializable objects.
-
-**Solution**: Ensure all custom objects in artifacts are serializable or store as strings/bytes.
-
-### "Screenshot capture failed"
-
-**Cause**: WebDriver doesn't support screenshots or browser crashed.
-
-**Solution**:
-
-```java
-try {
-    if (driver instanceof TakesScreenshot) {
-        // Capture screenshot
-    }
-} catch (Exception e) {
-    // Log but don't fail test
-    logger.warn("Screenshot capture failed: " + e.getMessage());
-}
-```
-
 ---
 
 ## Getting Help
 
 ### Enable Debug Logging
 
-```properties
-log.level=DEBUG
-log.console.enabled=true
-log.file.enabled=true
-log.file=reporter-debug.log
+PulseReport logs through SLF4J, so logging is controlled by whichever SLF4J backend is on your classpath (Logback, Log4j2, JUL, etc.). For example, with Logback, add a `logback.xml` to your test classpath:
+
+```xml
+<configuration>
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{HH:mm:ss.SSS} %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+    <logger name="io.github.pulsereport" level="DEBUG"/>
+    <root level="INFO">
+        <appender-ref ref="STDOUT"/>
+    </root>
+</configuration>
 ```
+
+At DEBUG level the adapters log the absolute path of each generated report (`PulseReport: HTML report generated` / `Location: ...`).
 
 ### Check Logs
 
+PulseReport logs go to the console (or wherever your SLF4J backend writes). Under Maven Surefire, check the test output and per-class reports:
+
 ```bash
-# View recent logs
-tail -f reporter.log
+# Search for errors in test output
+mvn test > test-output.txt 2>&1
+grep -i error test-output.txt
 
-# Search for errors
-grep -i error reporter.log
+# Search Surefire reports
+grep -i error target/surefire-reports/*.txt
 
-# Search for specific test
-grep "testName" reporter.log
+# Search for a specific test
+grep "testName" test-output.txt
 ```
 
 ### Collect Diagnostic Information
@@ -776,41 +628,36 @@ Today, PulseReport is designed around TestNG adapters. JUnit support is not part
 
 ### Does it work with parallel test execution?
 
-Yes, set `reporter.aggregator.threadSafe=true` for parallel tests.
+There is no thread-safety configuration property to tune. Register the adapter exactly once (in `testng.xml` *or* via `@Listeners`, not both) and let the framework run tests in parallel; if you see duplicate results, check for double registration first.
 
 ### How do I exclude tests from reporting?
 
-Use TestNG groups:
+PulseReport has no exclusion configuration. Use standard TestNG mechanisms — for example, group exclusion in `testng.xml` — to control which tests run (and therefore which tests are reported):
 
-```java
-@Test(groups = "exclude-from-report")
-public void testNotInReport() {
-    // Not captured
-}
-```
-
-Configure in adapter:
-
-```properties
-reporter.testng.excludeGroups=exclude-from-report
+```xml
+<groups>
+    <run>
+        <exclude name="slow"/>
+    </run>
+</groups>
 ```
 
 ### Can I customize the HTML template?
 
 Not yet. The HTML report currently uses a fixed built-in template with a dark/light mode toggle. Runtime customization (custom CSS, custom templates) is planned but not yet available for projects consuming PulseReport as a dependency.
 
-### How do I archive reports by date?
+### How do I archive reports by date or build?
 
-Use date variables in output directory:
+Use environment variable interpolation (only `${VAR}` placeholders are supported; there is no `${date:...}` syntax):
 
 ```properties
-reporter.output.directory=target/pulsereport/${date:yyyyMMdd}
+reporter.output.directory=target/pulsereport/${BUILD_ID}
 ```
 
-Or in S3 key prefix:
+Or in the S3 key prefix:
 
 ```properties
-reporter.s3.keyPrefix=reports/${date:yyyy}/${date:MM}/${date:dd}/
+reporter.s3.keyPrefix=reports/${GIT_BRANCH}/${BUILD_NUMBER}/
 ```
 
 ---

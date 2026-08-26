@@ -14,12 +14,12 @@ Examples below use the packaged project JAR name from the current Maven build.
 mvn clean package
 ```
 
-The build produces `target/pulsereport-1.0.0.jar`.
+The build produces `target/pulsereport-${version}.jar`.
 
 ## Root Command
 
 ```bash
-java -jar target/pulsereport-1.0.0.jar [COMMAND] [OPTIONS]
+java -jar target/pulsereport-${version}.jar [COMMAND] [OPTIONS]
 ```
 
 ### Standard Options
@@ -36,7 +36,7 @@ The root command uses picocli standard help and version options:
 `--version` prints a single line:
 
 ```text
-PulseReport 1.0.0
+PulseReport ${version}
 ```
 
 If build metadata is unavailable, the fallback value is `PulseReport unknown`.
@@ -54,7 +54,7 @@ Generate reports from an input results file.
 ### Generate Usage
 
 ```bash
-java -jar target/pulsereport-1.0.0.jar generate [OPTIONS]
+java -jar target/pulsereport-${version}.jar generate [OPTIONS]
 ```
 
 ### Generate Options
@@ -82,7 +82,7 @@ java -jar target/pulsereport-1.0.0.jar generate [OPTIONS]
 Generate a single format from CLI flags:
 
 ```bash
-java -jar target/pulsereport-1.0.0.jar generate \
+java -jar target/pulsereport-${version}.jar generate \
   --input target/test-results.json \
   --format html \
   --output target/pulsereport
@@ -91,7 +91,7 @@ java -jar target/pulsereport-1.0.0.jar generate \
 Generate using an explicit configuration file:
 
 ```bash
-java -jar target/pulsereport-1.0.0.jar generate \
+java -jar target/pulsereport-${version}.jar generate \
   --input target/test-results.json \
   --config config/reporter.properties
 ```
@@ -99,7 +99,7 @@ java -jar target/pulsereport-1.0.0.jar generate \
 Dry run with explicit formats:
 
 ```bash
-java -jar target/pulsereport-1.0.0.jar generate \
+java -jar target/pulsereport-${version}.jar generate \
   --input target/test-results.json \
   --format html,json \
   --dry-run
@@ -117,7 +117,7 @@ DRY RUN - Would generate reports:
 Verbose generation with a config file:
 
 ```bash
-java -jar target/pulsereport-1.0.0.jar generate \
+java -jar target/pulsereport-${version}.jar generate \
   --input target/test-results.json \
   --config config/reporter.properties \
   --verbose
@@ -141,7 +141,7 @@ Validate an input report and a configuration file, then run the current publish 
 ### Publish Usage
 
 ```bash
-java -jar target/pulsereport-1.0.0.jar publish [OPTIONS]
+java -jar target/pulsereport-${version}.jar publish [OPTIONS]
 ```
 
 ### Publish Options
@@ -162,7 +162,7 @@ java -jar target/pulsereport-1.0.0.jar publish [OPTIONS]
 ### Publish Examples
 
 ```bash
-java -jar target/pulsereport-1.0.0.jar publish \
+java -jar target/pulsereport-${version}.jar publish \
   --input target/pulsereport/test-report.html \
   --target s3 \
   --config config/reporter.properties
@@ -171,7 +171,7 @@ java -jar target/pulsereport-1.0.0.jar publish \
 Multiple targets:
 
 ```bash
-java -jar target/pulsereport-1.0.0.jar publish \
+java -jar target/pulsereport-${version}.jar publish \
   --input target/pulsereport/test-report.html \
   --target s3,http,slack \
   --config config/reporter.properties
@@ -180,7 +180,7 @@ java -jar target/pulsereport-1.0.0.jar publish \
 Dry run:
 
 ```bash
-java -jar target/pulsereport-1.0.0.jar publish \
+java -jar target/pulsereport-${version}.jar publish \
   --input target/pulsereport/test-report.html \
   --target s3,http \
   --config config/reporter.properties \
@@ -198,7 +198,7 @@ DRY RUN - Would publish report:
 Verbose mode:
 
 ```bash
-java -jar target/pulsereport-1.0.0.jar publish \
+java -jar target/pulsereport-${version}.jar publish \
   --input target/pulsereport/test-report.html \
   --target s3,slack \
   --config config/reporter.properties \
@@ -222,7 +222,7 @@ Validate a configuration file.
 ### Validate Usage
 
 ```bash
-java -jar target/pulsereport-1.0.0.jar validate [OPTIONS]
+java -jar target/pulsereport-${version}.jar validate [OPTIONS]
 ```
 
 ### Validate Options
@@ -240,7 +240,7 @@ java -jar target/pulsereport-1.0.0.jar validate [OPTIONS]
 ### Validate Examples
 
 ```bash
-java -jar target/pulsereport-1.0.0.jar validate \
+java -jar target/pulsereport-${version}.jar validate \
   --config config/reporter.properties
 ```
 
@@ -253,7 +253,7 @@ Success output:
 Verbose validation:
 
 ```bash
-java -jar target/pulsereport-1.0.0.jar validate \
+java -jar target/pulsereport-${version}.jar validate \
   --config config/reporter.properties \
   --verbose
 ```

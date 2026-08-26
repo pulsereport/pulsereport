@@ -54,6 +54,7 @@ The current `ReporterConfig` implementation actively reads these keys:
 - `reporter.slack.mentionOnFailure`
 - `reporter.slack.reportUrl`
 - `reporter.maxArtifactContentSize`
+- `reporter.video.storage`
 - `reporter.maskSensitiveData`
 - `reporter.maskHeaders.enabled`
 - `reporter.maskHeaders.fields`
@@ -64,6 +65,8 @@ The current `ReporterConfig` implementation actively reads these keys:
 - `reporter.maskXml.fields`
 
 The masking keys are described in detail in [Sensitive Data Masking](#sensitive-data-masking).
+
+`reporter.video.storage` controls how Appium video evidence is stored: `path` (default), `embed`, or `url`.
 
 Other property examples in this document preserve the current PulseReport naming, but they are not all mapped by `ReporterConfig` yet.
 
@@ -76,7 +79,7 @@ Other property examples in this document preserve the current PulseReport naming
 reporter.name=PulseReport
 
 # Reporter version (for tracking)
-reporter.version=1.0.0
+reporter.version=${version}
 
 # Enable/disable reporter globally
 reporter.enabled=true
@@ -185,8 +188,8 @@ reporter.restassured.logging.body=true
 reporter.restassured.logging.cookies=false
 
 # Body size limits
-reporter.restassured.logging.maxBodySize=10240
-# In bytes (10KB default)
+reporter.maxArtifactContentSize=51200
+# In bytes (51200 = 50KB default); caps captured request/response body size
 
 # Sensitive data masking uses the reporter.mask* keys documented in
 # Sensitive Data Masking below (enabled by default).
@@ -668,6 +671,7 @@ try {
 - If `reporter.s3.enabled=true`, `reporter.s3.bucket` must be set
 - If `reporter.http.enabled=true`, `reporter.http.url` must be set
 - If `reporter.slack.enabled=true`, `reporter.slack.webhookUrl` must be set
+- `reporter.video.storage` must be one of `path`, `embed`, or `url` (default `path`); any other value fails validation with `Invalid video storage: …`
 
 ## Default Values
 
@@ -729,11 +733,11 @@ reporter.html.screenshots.compress=true
 
 ```bash
 # Validate a specific environment file
-java -jar target/pulsereport-1.0.0.jar validate \
+java -jar target/pulsereport-${version}.jar validate \
     --config config/reporter-dev.properties
 
 # Generate with a specific environment file
-java -jar target/pulsereport-1.0.0.jar generate \
+java -jar target/pulsereport-${version}.jar generate \
     --input target/test-results.json \
     --config config/reporter-prod.properties
 ```
@@ -753,7 +757,7 @@ java -jar target/pulsereport-1.0.0.jar generate \
 **Solution**: Run validation:
 
 ```bash
-java -jar target/pulsereport-1.0.0.jar validate --config reporter.properties
+java -jar target/pulsereport-${version}.jar validate --config reporter.properties
 ```
 
 ### Environment Variables Not Resolved

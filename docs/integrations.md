@@ -178,25 +178,20 @@ reporter.http.auth.type=bearer
 reporter.http.auth.token=${API_TOKEN}
 ```
 
-#### Basic Authentication
+#### Basic Authentication and Custom Headers
 
-```properties
-reporter.http.auth.type=basic
-reporter.http.auth.username=${API_USERNAME}
-reporter.http.auth.password=${API_PASSWORD}
-```
+The configuration file only reads `reporter.http.auth.type` and `reporter.http.auth.token` (bearer token). Basic authentication, API-key headers, and any other custom headers are configured in code on `HttpPublishConfig`:
 
-#### API Key Header
-
-```properties
-reporter.http.headers.X-API-Key=${API_KEY}
-```
-
-#### Custom Headers
-
-```properties
-reporter.http.headers.X-Custom-Header=CustomValue
-reporter.http.headers.X-Build-ID=${BUILD_ID}
+```java
+HttpPublishConfig config = HttpPublishConfig.builder()
+    .endpoint("https://api.example.com/test-reports")
+    .method("POST")
+    .headers(Map.of(
+        "Authorization", "Basic " + Base64.getEncoder().encodeToString(
+            (user + ":" + password).getBytes(StandardCharsets.UTF_8)),
+        "X-API-Key", System.getenv("API_KEY"),
+        "X-Build-ID", buildId))
+    .build();
 ```
 
 ### Request Payload
@@ -257,15 +252,19 @@ reporter.http.method=POST
 
 ```python
 # Simple Flask server to receive reports
+import json
 from flask import Flask, request
 
 app = Flask(__name__)
 
 @app.route('/test-reports', methods=['POST'])
 def receive_report():
-    report = request.json
-    print(f"Received report: {report['testRun']['name']}")
-    print(f"Total tests: {report['testRun']['summary']['totalTests']}")
+    # HttpPublisher sends the report file bytes as application/octet-stream
+    report = json.loads(request.data)
+    # The JSON root is the TestRun itself, with flat summary fields
+    print(f"Received report: {report['name']}")
+    print(f"Total tests: {report['totalTests']}")
+    print(f"Failed tests: {report['failedTests']}")
     return {"status": "received"}, 200
 
 if __name__ == '__main__':
@@ -311,57 +310,53 @@ reporter.slack.webhookUrl=${SLACK_WEBHOOK_URL}
 # Channel override (optional - webhook has default channel)
 reporter.slack.channel=#test-results
 
-# Bot name and icon
-reporter.slack.username=Test Reporter Bot
-reporter.slack.iconEmoji=:robot_face:
-# Or use icon URL: reporter.slack.iconUrl=https://example.com/icon.png
-
-# Notification settings
-reporter.slack.notifyOnSuccess=true
-reporter.slack.notifyOnFailure=true
+# Mention a user or group when the run fails (optional)
 reporter.slack.mentionOnFailure=@qa-team
 # Or user: reporter.slack.mentionOnFailure=@john.doe
 
-# Message formatting
-reporter.slack.includeStackTrace=false
-reporter.slack.maxStackTraceLines=10
+# Optional report URL attached to the message as a "View Report" button
+reporter.slack.reportUrl=https://reports.example.com/build-123/test-report.html
 ```
+
+`ReporterConfig` currently reads the Slack enabled flag, webhook URL, channel, mention-on-failure value, and report URL from the file. Retry behavior is tuned on `SlackConfig` in code.
 
 ### Message Format
 
-#### Success Message
+`SlackNotifier` posts an attachments-style JSON payload to the webhook. The message text is `Test Run: <run name>` (prefixed with the `mentionOnFailure` value when the run failed), and the attachment color is `good` when the run passed, `danger` when it failed, and `warning` otherwise. The attachment carries six short fields and an optional button:
 
-```text
-✅ Test Run Passed
-Suite: My Test Suite
-Total: 150 tests
-✅ Passed: 142 (94.7%)
-⊘ Skipped: 2 (1.3%)
-⏱ Duration: 2m 45s
-
-View Report: http://reports.example.com/build-123
+```json
+{
+  "channel": "#test-results",
+  "text": "Test Run: My Test Suite",
+  "attachments": [
+    {
+      "color": "good",
+      "fields": [
+        { "title": "Status", "value": "PASSED", "short": true },
+        { "title": "Total Tests", "value": "150", "short": true },
+        { "title": "Passed", "value": "142", "short": true },
+        { "title": "Failed", "value": "0", "short": true },
+        { "title": "Skipped", "value": "2", "short": true },
+        { "title": "Duration", "value": "2m 45s", "short": true }
+      ],
+      "actions": [
+        {
+          "type": "button",
+          "text": "View Report",
+          "url": "https://reports.example.com/build-123/test-report.html"
+        }
+      ]
+    }
+  ]
+}
 ```
 
-#### Failure Message
+Notes on the payload:
 
-```text
-❌ Test Run Failed
-Suite: My Test Suite
-Total: 150 tests
-✅ Passed: 142 (94.7%)
-❌ Failed: 6 (4.0%)
-⊘ Skipped: 2 (1.3%)
-⏱ Duration: 2m 45s
-
-Failed Tests:
-• testLoginWithInvalidCredentials
-• testDatabaseConnection
-• testApiTimeout
-
-@qa-team - Please investigate
-
-View Report: http://reports.example.com/build-123
-```
+- `channel` is only included when a channel is configured.
+- The `View Report` button action is only included when `reportUrl` is set.
+- The `mentionOnFailure` mention is prepended to the message text only when the run status is `FAILED`.
+- The payload contains no emojis, percentages, or failed-test lists.
 
 ### Slack Programmatic Usage
 
@@ -383,114 +378,35 @@ TestRun testRun = adapter.getTestRun();
 notifier.notify(testRun, config);
 ```
 
-### Custom Message Templates
-
-Create a custom message template:
-
-```properties
-reporter.slack.messageTemplate=/path/to/slack-template.json
-```
-
-Template file (`slack-template.json`):
-
-```json
-{
-  "text": "Test Results for ${PROJECT_NAME}",
-  "blocks": [
-    {
-      "type": "section",
-      "text": {
-        "type": "mrkdwn",
-        "text": "*Test Run: ${TEST_RUN_NAME}*\nStatus: ${STATUS}"
-      }
-    },
-    {
-      "type": "section",
-      "fields": [
-        {"type": "mrkdwn", "text": "*Total:*\n${TOTAL_TESTS}"},
-        {"type": "mrkdwn", "text": "*Passed:*\n${PASSED_TESTS}"},
-        {"type": "mrkdwn", "text": "*Failed:*\n${FAILED_TESTS}"},
-        {"type": "mrkdwn", "text": "*Duration:*\n${DURATION}"}
-      ]
-    },
-    {
-      "type": "actions",
-      "elements": [
-        {
-          "type": "button",
-          "text": {"type": "plain_text", "text": "View Report"},
-          "url": "${REPORT_URL}"
-        }
-      ]
-    }
-  ]
-}
-```
-
-### Conditional Notifications
-
-Only notify on specific conditions:
-
-```properties
-# Only notify on failures
-reporter.slack.notifyOnSuccess=false
-reporter.slack.notifyOnFailure=true
-
-# Only notify if failure rate > 5%
-reporter.slack.notifyThreshold.failureRate=5.0
-
-# Only notify if duration > 10 minutes
-reporter.slack.notifyThreshold.durationMinutes=10
-```
-
-### Multiple Channels
-
-Send different messages to different channels:
-
-```properties
-# Success notifications to general channel
-reporter.slack.success.webhookUrl=${SLACK_GENERAL_WEBHOOK}
-reporter.slack.success.channel=#general
-
-# Failure notifications to QA team channel
-reporter.slack.failure.webhookUrl=${SLACK_QA_WEBHOOK}
-reporter.slack.failure.channel=#qa-alerts
-reporter.slack.failure.mention=@qa-team
-```
-
 ---
 
 ## Integration Patterns
 
 ### Sequential Publishing
 
-Publish to multiple integrations in sequence:
+Publish to multiple integrations by calling each publisher explicitly, in whatever order fits your pipeline:
 
-```properties
-# Enable all integrations
-reporter.s3.enabled=true
-reporter.http.enabled=true
-reporter.slack.enabled=true
-
-# They execute in this order:
-# 1. Generate reports
-# 2. Publish to S3
-# 3. Publish to HTTP endpoint
-# 4. Send Slack notification
+```java
+s3Publisher.publish(reportFile, s3Config);       // S3
+httpPublisher.publish(reportFile, httpConfig);   // HTTP endpoint
+slackNotifier.notify(testRun, slackConfig);      // Slack notification
 ```
+
+There is no automatic publish pipeline: setting `reporter.s3.enabled`, `reporter.http.enabled`, or `reporter.slack.enabled` in a configuration file does not trigger publishing on its own. Your build helper decides the order and the error handling.
 
 ### With Report URL in Slack
 
-Include S3 URL in Slack notification:
+`S3Publisher` does not generate a public or pre-signed URL for the uploaded object. Construct the report URL yourself (from bucket, region, key prefix, and file name) and pass it to Slack:
 
-```properties
-reporter.s3.enabled=true
-reporter.s3.bucket=my-reports
-reporter.s3.generatePublicUrl=true
+```java
+String reportUrl = "https://" + bucket + ".s3." + region + ".amazonaws.com/"
+        + keyPrefix + reportFile.getName();
 
-reporter.slack.enabled=true
-reporter.slack.includeReportUrl=true
-# Slack message will include S3 URL
+SlackConfig slackConfig = SlackConfig.builder()
+    .webhookUrl(System.getenv("SLACK_WEBHOOK_URL"))
+    .channel("#test-results")
+    .reportUrl(reportUrl) // adds a "View Report" button to the message
+    .build();
 ```
 
 ### CI/CD Integration Pattern
@@ -528,12 +444,25 @@ exit $?
 
 ### HTTP: Connection Timeout
 
-**Problem**: HTTP publish times out.
+**Problem**: HTTP publish times out or the endpoint is flaky.
 
-**Solution**: Increase timeout:
+**Solution**: Test the endpoint directly:
 
-```properties
-reporter.http.timeout=60000
+```bash
+curl -X POST https://api.example.com/reports \
+  -H "Content-Type: application/json" \
+  -d '{"test": "data"}'
+```
+
+Then tune retries on `HttpPublishConfig` (retry settings are a code-only API, not file properties):
+
+```java
+HttpPublishConfig config = HttpPublishConfig.builder()
+    .endpoint("https://api.example.com/test-reports")
+    .method("POST")
+    .retryAttempts(3)
+    .retryDelayMs(1000) // doubles on each retry
+    .build();
 ```
 
 ### Slack: Invalid Webhook URL
@@ -549,27 +478,6 @@ curl -X POST -H 'Content-type: application/json' \
   $SLACK_WEBHOOK_URL
 ```
 
-### S3: Slow Upload
-
-**Problem**: Large reports take long to upload.
-
-**Solution**: Enable multipart upload:
-
-```properties
-reporter.s3.multipart.enabled=true
-reporter.s3.multipart.partSize=5242880
-```
-
-### HTTP: SSL Certificate Issues
-
-**Problem**: `SSLHandshakeException` or certificate errors
-
-**Solution**: For self-signed certificates (NOT recommended for production):
-
-```properties
-reporter.http.ssl.verify=false
-```
-
 ---
 
 ## Best Practices
@@ -580,12 +488,14 @@ Never hardcode credentials:
 
 ```properties
 # Good
-reporter.s3.accessKey=${AWS_ACCESS_KEY_ID}
 reporter.slack.webhookUrl=${SLACK_WEBHOOK_URL}
+reporter.http.auth.token=${API_TOKEN}
 
 # Bad
-reporter.s3.accessKey=AKIAIOSFODNN7EXAMPLE
+reporter.slack.webhookUrl=https://hooks.slack.com/services/T00/B00/xxxx
 ```
+
+AWS credentials are not read from the properties file at all — provide them through the standard AWS SDK credential chain (environment variables, system properties, shared credentials file, or IAM roles).
 
 ### 2. Organize S3 Structure
 
@@ -604,19 +514,26 @@ builds/
 
 ### 3. Error Handling
 
-Don't fail builds if publishing fails:
+Publishing is explicit, so decide per integration whether a failure should fail your build. Wrap each publish call and catch `PublishException`:
 
-```properties
-reporter.failOnPublishError=false
+```java
+try {
+    publisher.publish(reportFile, config);
+} catch (PublishException e) {
+    System.err.println("Publish failed (continuing build): " + e.getMessage());
+}
 ```
 
-### 4. Rate Limiting
+### 4. Rate Limiting and Retries
 
-Respect Slack rate limits:
+`SlackNotifier` and `HttpPublisher` already retry with exponential backoff. Tune the attempts and initial delay in code:
 
-```properties
-reporter.slack.rateLimit.enabled=true
-reporter.slack.rateLimit.perMinute=60
+```java
+SlackConfig config = SlackConfig.builder()
+    .webhookUrl(System.getenv("SLACK_WEBHOOK_URL"))
+    .retryAttempts(3)
+    .retryDelayMs(1000)
+    .build();
 ```
 
 ---
