@@ -197,7 +197,7 @@ class HtmlReportGeneratorTest {
         String content = generateHtml(createSampleTestRun());
 
         assertAll(
-                () -> assertTrue(content.contains("body.dark"), "HTML should include a dark theme selector"),
+                () -> assertTrue(content.contains(":root[data-theme='dark']"), "HTML should include a dark theme selector"),
                 () -> assertTrue(content.contains("--bg: #212529;"),
                         "HTML should use Bootstrap dark background token"),
                 () -> assertTrue(content.contains("--surface: #2b3035;"),
@@ -282,13 +282,13 @@ class HtmlReportGeneratorTest {
                         extractCssRuleDeclarations(styles, ".filter-btn-skipped:not(.active)").isEmpty(),
                         "HTML should not define a tinted default-state rule for the skipped filter button"),
                 () -> assertTrue(
-                        extractCssRuleDeclarations(styles, "body.dark .filter-btn-failed:not(.active)").isEmpty(),
+                        extractCssRuleDeclarations(styles, ":root[data-theme='dark'] .filter-btn-failed:not(.active)").isEmpty(),
                         "HTML should not define a dark-mode tinted default-state rule for the failed filter button"),
                 () -> assertTrue(
-                        extractCssRuleDeclarations(styles, "body.dark .filter-btn-passed:not(.active)").isEmpty(),
+                        extractCssRuleDeclarations(styles, ":root[data-theme='dark'] .filter-btn-passed:not(.active)").isEmpty(),
                         "HTML should not define a dark-mode tinted default-state rule for the passed filter button"),
                 () -> assertTrue(
-                        extractCssRuleDeclarations(styles, "body.dark .filter-btn-skipped:not(.active)").isEmpty(),
+                        extractCssRuleDeclarations(styles, ":root[data-theme='dark'] .filter-btn-skipped:not(.active)").isEmpty(),
                         "HTML should not define a dark-mode tinted default-state rule for the skipped filter button"));
     }
 
@@ -336,9 +336,9 @@ class HtmlReportGeneratorTest {
         String skippedActiveDeclarations = extractCssRuleDeclarations(styles, ".filter-btn-skipped.active");
         String darkActiveDeclarations = extractCssRuleDeclarations(
                 styles,
-                "body.dark .filter-btn-failed.active",
-                "body.dark .filter-btn-passed.active",
-                "body.dark .filter-btn-skipped.active");
+                ":root[data-theme='dark'] .filter-btn-failed.active",
+                ":root[data-theme='dark'] .filter-btn-passed.active",
+                ":root[data-theme='dark'] .filter-btn-skipped.active");
 
         assertAll(
                 () -> assertTrue(failedActiveDeclarations.contains("color: #fff;"),

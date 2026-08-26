@@ -1,10 +1,12 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <meta name="color-scheme" content="light dark">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PulseReport - ${testRun.name?html}</title>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg' viewBox='0 0 48 48'%3E%3Crect x='2' y='2' width='44' height='44' rx='12' fill='%23F8F9FA' stroke='%23DEE2E6' stroke-width='1.5'/%3E%3Cpath d='M12 24H19L22.5 19L26.5 31L31 16L35 24H38' stroke='%230F8B8D' stroke-width='2.6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+    
     <style>
         :root {
             /* ── Primitives ── */
@@ -65,9 +67,12 @@
             --font-brand: "Sora", "Segoe UI", sans-serif;
             --font: "Source Sans 3", "Segoe UI", sans-serif;
             --font-mono: 'SF Mono', 'Fira Code', 'Cascadia Code', 'Courier New', monospace;
+            color-scheme: light dark;
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        html { background: var(--bg); }
 
         body {
             font-family: var(--font);
@@ -1225,7 +1230,7 @@
         .bdd-step.error-expanded .bdd-step-error-chevron .chevron-svg { transform: rotate(180deg); }
 
         /* ── Dark Mode ── */
-        body.dark {
+        :root[data-theme='dark'] {
             --bg: #212529;
             --surface: #2b3035;
             --surface-raised: #343a40;
@@ -1251,52 +1256,83 @@
             --violet: #a78bfa;
             --orange: #fb923c;
             --not-run: #dee2e6;
-            background: var(--bg);
+            color-scheme: dark;
         }
 
-        body.dark .class-file-header,
-        body.dark .metric-chip,
-        body.dark .artifact-code,
-        body.dark .bdd-step-docstring,
-        body.dark .bdd-step-datatable thead tr,
-        body.dark .api-call-header {
+        /* No-JS fallback: follow the OS theme only when no preference is stored */
+        @media (prefers-color-scheme: dark) {
+            :root:not([data-theme]) {
+                --bg: #212529;
+                --surface: #2b3035;
+                --surface-raised: #343a40;
+                --surface-overlay: #3d4349;
+                --border: var(--color-gray-700);
+                --border-light: #3d4349;
+                --text-primary: #f8f9fa;
+                --text-secondary: #dee2e6;
+                --text-muted: #adb5bd;
+                --logo-tile-fill: #343a40;
+                --logo-tile-stroke: var(--color-gray-700);
+                --logo-pulse-stroke: var(--color-teal-400);
+                --accent: var(--color-teal-400);
+                --accent-light: #2b3035;
+                --green: #75b798;
+                --red: #ea868f;
+                --red-bg: #2c0b0e;
+                --red-border: #58151c;
+                --amber: #e4cf6e;
+                --blue: #6edff6;
+                --blue-bg: #032830;
+                --blue-border: #055160;
+                --violet: #a78bfa;
+                --orange: #fb923c;
+                --not-run: #dee2e6;
+            }
+        }
+
+        :root[data-theme='dark'] .class-file-header,
+        :root[data-theme='dark'] .metric-chip,
+        :root[data-theme='dark'] .artifact-code,
+        :root[data-theme='dark'] .bdd-step-docstring,
+        :root[data-theme='dark'] .bdd-step-datatable thead tr,
+        :root[data-theme='dark'] .api-call-header {
             background: var(--surface-raised);
         }
 
-        body.dark .metric-chip,
-        body.dark .api-call-card,
-        body.dark .api-call-header,
-        body.dark .artifact-code,
-        body.dark .bdd-step-docstring {
+        :root[data-theme='dark'] .metric-chip,
+        :root[data-theme='dark'] .api-call-card,
+        :root[data-theme='dark'] .api-call-header,
+        :root[data-theme='dark'] .artifact-code,
+        :root[data-theme='dark'] .bdd-step-docstring {
             border-color: var(--border-light);
         }
 
-        body.dark .test-suite-header:hover,
-        body.dark .test-case-header:hover,
-        body.dark .api-call-header:hover,
-        body.dark .artifact-header:hover,
-        body.dark .artifact-content a:hover {
+        :root[data-theme='dark'] .test-suite-header:hover,
+        :root[data-theme='dark'] .test-case-header:hover,
+        :root[data-theme='dark'] .api-call-header:hover,
+        :root[data-theme='dark'] .artifact-header:hover,
+        :root[data-theme='dark'] .artifact-content a:hover {
             background: var(--surface-overlay);
         }
 
-        body.dark .status-badge.not-run {
+        :root[data-theme='dark'] .status-badge.not-run {
             color: var(--text-secondary);
             border-color: var(--border-light);
         }
 
-        body.dark .artifact-item,
-        body.dark .test-case,
-        body.dark .test-case-content,
-        body.dark .class-file-header {
+        :root[data-theme='dark'] .artifact-item,
+        :root[data-theme='dark'] .test-case,
+        :root[data-theme='dark'] .test-case-content,
+        :root[data-theme='dark'] .class-file-header {
             border-color: var(--border-light);
         }
 
-        body.dark .copy-btn {
+        :root[data-theme='dark'] .copy-btn {
             background: rgba(30, 30, 30, 0.92);
         }
 
         /* bdd-step hover in dark mode */
-        body.dark .bdd-step:hover { background: var(--surface-raised); }
+        :root[data-theme='dark'] .bdd-step:hover { background: var(--surface-raised); }
 
         .theme-toggle {
             display: inline-flex;
@@ -1508,9 +1544,9 @@
             border-color: var(--amber);
             color: #fff;
         }
-        body.dark .filter-btn-failed.active,
-        body.dark .filter-btn-passed.active,
-        body.dark .filter-btn-skipped.active {
+        :root[data-theme='dark'] .filter-btn-failed.active,
+        :root[data-theme='dark'] .filter-btn-passed.active,
+        :root[data-theme='dark'] .filter-btn-skipped.active {
             color: #fff;
         }
 
@@ -1618,6 +1654,27 @@
 
         .report-footer strong { color: var(--text-secondary); }
     </style>
+    <script>
+        (function() {
+            var theme = null;
+            try {
+                var stored = localStorage.getItem('pulse-report-theme');
+                if (stored === 'dark' || stored === 'light') {
+                    theme = stored;
+                } else if (stored === 'true' || stored === '1') {
+                    theme = 'dark';
+                } else if (stored === 'false' || stored === '0') {
+                    theme = 'light';
+                }
+            } catch (e) {
+                theme = null;
+            }
+            if (theme === null) {
+                theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+            }
+            document.documentElement.setAttribute('data-theme', theme);
+        })();
+    </script>
     <script>
         function openLightbox(src) {
             var lb = document.getElementById('screenshot-lightbox');
@@ -1762,7 +1819,7 @@
         function updateThemeIcon() {
             var btn = document.getElementById('themeToggle');
             if (!btn) return;
-            var isDark = document.body.classList.contains('dark');
+            var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
             if (isDark) {
                 btn.innerHTML = '<svg class="theme-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>';
                 btn.title = 'Switch to light mode';
@@ -1770,22 +1827,20 @@
                 btn.innerHTML = '<svg class="theme-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>';
                 btn.title = 'Switch to dark mode';
             }
+            btn.setAttribute('aria-pressed', isDark ? 'true' : 'false');
+            btn.setAttribute('aria-label', isDark ? 'Switch to light mode' : 'Switch to dark mode');
         }
 
         function applyTheme(isDark) {
-            if (isDark) {
-                document.body.classList.add('dark');
-            } else {
-                document.body.classList.remove('dark');
-            }
+            document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
             updateThemeIcon();
         }
 
         function toggleTheme() {
-            var isDark = !document.body.classList.contains('dark');
-            applyTheme(isDark);
+            var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+            applyTheme(!isDark);
             try {
-                localStorage.setItem('pulse-report-theme', isDark ? 'dark' : 'light');
+                localStorage.setItem('pulse-report-theme', isDark ? 'light' : 'dark');
             } catch (e) {
                 // Ignore storage failures and keep the current page theme.
             }
@@ -1996,22 +2051,9 @@
         }
 
         document.addEventListener('DOMContentLoaded', function() {
-            var storedTheme = null;
-            try {
-                storedTheme = localStorage.getItem('pulse-report-theme');
-            } catch (e) {
-                storedTheme = null;
-            }
+            updateThemeIcon();
 
             var darkMQ = window.matchMedia('(prefers-color-scheme: dark)');
-
-            if (storedTheme === 'dark') {
-                applyTheme(true);
-            } else if (storedTheme === 'light') {
-                applyTheme(false);
-            } else {
-                applyTheme(darkMQ.matches);
-            }
 
             darkMQ.addEventListener('change', function(e) {
                 var storedTheme = null;
