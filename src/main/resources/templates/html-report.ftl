@@ -1365,7 +1365,6 @@
         }
 
         .theme-toggle:hover {
-            background: var(--surface-overlay);
             border-color: var(--accent);
             color: var(--accent);
         }
