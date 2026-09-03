@@ -69,9 +69,9 @@ class HtmlReportThemeTemplateTest {
         String html = generateHtml(createMinimalTestRun());
         String styles = extractStyleContent(html);
 
-        int mediaIndex = styles.indexOf("@media (prefers-color-scheme: dark)");
+        int mediaIndex = styles.indexOf("@media screen and (prefers-color-scheme: dark)");
         assertTrue(mediaIndex >= 0,
-                "A @media (prefers-color-scheme: dark) block should exist as a no-JS fallback");
+                "A @media screen and (prefers-color-scheme: dark) block should exist as a no-JS fallback");
 
         String mediaBlock = extractBlock(styles, mediaIndex);
         assertAll(

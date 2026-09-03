@@ -258,8 +258,6 @@ class HtmlReportGeneratorTest {
                         "HTML should retain expand button markup hooks"),
                 () -> assertTrue(!sharedHoverDeclarations.isEmpty(),
                         "HTML should define a light-theme base CSS rule that combines .filter-btn:hover and .expand-btn:hover"),
-                () -> assertTrue(sharedHoverDeclarations.contains("background: var(--surface-overlay);"),
-                        "HTML should give the shared light-theme hover rule the surface-overlay background"),
                 () -> assertTrue(sharedHoverDeclarations.contains("color: var(--accent);"),
                         "HTML should give the shared light-theme hover rule the approved accent text color"),
                 () -> assertTrue(sharedHoverDeclarations.contains("border-color: var(--accent);"),

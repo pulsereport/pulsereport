@@ -81,6 +81,8 @@
             line-height: 1.5;
             font-size: 14px;
             -webkit-font-smoothing: antialiased;
+            overflow-x: hidden; /* fallback for Safari < 16 */
+            overflow-x: clip;   /* clips without creating a scroll container */
         }
 
         .container {
@@ -115,7 +117,6 @@
             width: 48px;
             height: 48px;
             flex-shrink: 0;
-            transition: width 0.35s cubic-bezier(.4,0,.2,1), height 0.35s cubic-bezier(.4,0,.2,1);
         }
 
         .brand-wordmark {
@@ -371,20 +372,70 @@
             background: var(--bg);
         }
 
-        /* ── Sticky Hero: Spacer (height set by JS when hero is pinned) ── */
-        .hero-scroll-sentinel {
-            width: 100%;
-            pointer-events: none;
+        /* ── Slim Navbar (fixed, slides in once the hero scrolls away) ── */
+        .report-navbar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 300;
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            transform: translateY(-100%);
+            visibility: hidden;
         }
 
-        /* ── Sticky Hero: Compact Stats (hidden by default) ── */
-        .report-hero-compact-stats {
-            display: none;
+        .report-navbar-visible {
+            transform: translateY(0);
+            visibility: visible;
+        }
+
+        .report-navbar-inner {
+            padding: 10px 28px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+        }
+
+        .report-navbar-stats {
+            display: flex;
             align-items: center;
             gap: 16px;
-            flex: 1;
             min-width: 0;
             margin-left: 20px;
+        }
+
+        .report-navbar .brand-icon {
+            width: 32px;
+            height: 32px;
+        }
+
+        .report-navbar .brand-title {
+            font-size: 1.05rem;
+        }
+
+        .report-navbar .hero-status-pill {
+            padding: 5px 12px;
+            font-size: 0.75rem;
+            min-height: 28px;
+        }
+
+        @media (prefers-reduced-motion: no-preference) {
+            .report-navbar {
+                transition: transform 0.3s cubic-bezier(.4,0,.2,1), visibility 0.3s;
+            }
+        }
+
+        @media print {
+            .report-navbar { display: none; }
+
+            .bdd-table-scroll,
+            .stack-trace,
+            .bdd-step-stack,
+            .artifact-code {
+                overflow: visible;
+            }
         }
 
         .compact-stat {
@@ -412,58 +463,6 @@
             line-height: 1.1;
         }
 
-        /* ── Sticky Hero: Pinned State ── */
-        .report-hero-pinned {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            padding: 10px 28px;
-            margin-bottom: 0;
-            border-radius: 0 0 0 0;
-            border-top: 0;
-            z-index: 200;
-            animation: heroSlideDown 0.35s cubic-bezier(.4,0,.2,1);
-        }
-
-        @keyframes heroSlideDown {
-            from { transform: translateY(-100%); opacity: 0.8; }
-            to { transform: translateY(0); opacity: 1; }
-        }
-
-        .report-hero-pinned .header-top {
-            margin-bottom: 0;
-            align-items: center;
-        }
-
-        .report-hero-pinned .brand-icon {
-            width: 32px;
-            height: 32px;
-            transition: width 0.35s cubic-bezier(.4,0,.2,1), height 0.35s cubic-bezier(.4,0,.2,1);
-        }
-
-        .report-hero-pinned .brand-subtitle {
-            display: none;
-        }
-
-        .report-hero-pinned .brand-title {
-            font-size: 1.05rem;
-        }
-
-        .report-hero-pinned .report-hero-compact-stats {
-            display: flex;
-        }
-
-        .report-hero-pinned .report-hero-body {
-            display: none;
-        }
-
-        .report-hero-pinned .hero-status-pill {
-            padding: 5px 12px;
-            font-size: 0.75rem;
-            min-height: 28px;
-        }
-
         /* ── Test Suite ── */
         .test-suite {
             background: var(--surface);
@@ -471,6 +470,7 @@
             border-radius: var(--radius);
             border: 1px solid var(--border);
             overflow: hidden;
+            scroll-margin-top: 90px;
         }
 
         .test-suite-header {
@@ -510,6 +510,7 @@
             font-family: var(--font-mono);
             letter-spacing: 0;
             margin-left: 6px;
+            overflow-wrap: anywhere;
         }
 
         .test-suite-stats {
@@ -571,6 +572,7 @@
         .test-case-body {
             max-height: 0;
             overflow: hidden;
+            position: relative;
             transition: max-height 0.15s ease-out;
         }
 
@@ -588,6 +590,7 @@
             font-size: 0.88rem;
             color: var(--text-primary);
             overflow: hidden;
+            overflow-wrap: anywhere;
         }
 
         .test-case-method {
@@ -630,6 +633,11 @@
             overflow: visible;
             white-space: normal;
             text-overflow: clip;
+        }
+
+        .tags-hidden .test-case-tags,
+        .tags-hidden .test-case-tags + .suite-stats-sep {
+            display: none !important;
         }
 
         .test-case-name .test-case-tags {
@@ -727,6 +735,7 @@
             background: var(--bg);
             border-bottom: 1px solid var(--border-light);
             user-select: text;
+            overflow-wrap: anywhere;
         }
         .class-file-header svg { flex-shrink: 0; opacity: 0.6; }
 
@@ -753,6 +762,7 @@
             margin-top: 12px;
             font-family: var(--font-mono);
             font-size: 0.8rem;
+            overflow-wrap: anywhere;
         }
 
         .error-message-title {
@@ -763,9 +773,11 @@
 
         .stack-trace {
             white-space: pre-wrap;
+            overflow-wrap: anywhere;
             color: var(--text-secondary);
             max-height: 260px;
             overflow-y: auto;
+            overflow-x: auto;
             font-size: 0.78rem;
         }
 
@@ -887,6 +899,7 @@
         .api-call-body {
             max-height: 0;
             overflow: hidden;
+            position: relative;
             transition: max-height 0.15s ease-out;
         }
 
@@ -922,7 +935,11 @@
             color: var(--text-primary);
             font-size: 0.82rem;
             flex: 1;
+            min-width: 0;
             font-family: var(--font-mono);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         .toggle-icon {
@@ -932,6 +949,7 @@
         .artifact-content {
             max-height: 0;
             overflow: hidden;
+            position: relative;
             transition: max-height 0.15s ease-out;
         }
 
@@ -1132,6 +1150,7 @@
         .bdd-step-artifacts-body {
             max-height: 0;
             overflow: hidden;
+            position: relative;
             transition: max-height 0.15s ease-out;
         }
 
@@ -1196,9 +1215,11 @@
 
         .bdd-step-stack {
             white-space: pre-wrap;
+            overflow-wrap: anywhere;
             color: var(--text-secondary);
             max-height: 200px;
             overflow-y: auto;
+            overflow-x: auto;
             font-family: var(--font-mono);
             font-size: 0.78rem;
         }
@@ -1260,7 +1281,7 @@
         }
 
         /* No-JS fallback: follow the OS theme only when no preference is stored */
-        @media (prefers-color-scheme: dark) {
+        @media screen and (prefers-color-scheme: dark) {
             :root:not([data-theme]) {
                 --bg: #212529;
                 --surface: #2b3035;
@@ -1349,14 +1370,13 @@
         }
 
         .theme-toggle:hover {
-            background: var(--surface-overlay);
             border-color: var(--accent);
             color: var(--accent);
         }
 
         .theme-icon { width: 16px; height: 16px; }
 
-        @media (max-width: 900px) {
+        @media screen and (max-width: 900px) {
             .report-hero {
                 padding: 22px;
             }
@@ -1374,16 +1394,9 @@
             .report-hero-summary {
                 width: 100%;
             }
-
-            .report-hero-pinned .report-hero-compact-stats {
-                gap: 10px;
-            }
-            .report-hero-pinned {
-                display: none;
-            }
         }
 
-        @media (max-width: 640px) {
+        @media screen and (max-width: 640px) {
             .container {
                 padding: 20px 14px 28px;
             }
@@ -1392,7 +1405,7 @@
                 margin-bottom: 18px;
             }
 
-            .header-actions {
+            .header-top .header-actions {
                 width: 100%;
                 justify-content: space-between;
                 margin-left: 0;
@@ -1414,8 +1427,8 @@
                 gap: 8px;
             }
 
-            .report-meta-pill,
-            .hero-status-pill {
+            .report-hero .report-meta-pill,
+            .report-hero .hero-status-pill {
                 width: 100%;
                 justify-content: flex-start;
             }
@@ -1424,38 +1437,41 @@
                 grid-template-columns: 1fr;
             }
 
-            .report-hero-pinned {
-                padding: 8px 14px;
-                border-radius: 0;
-            }
-            .report-hero-pinned .report-hero-compact-stats {
-                gap: 6px;
-                margin-left: 10px;
-            }
-            .report-hero-pinned .compact-stat-value {
+
+            .report-navbar .compact-stat-value {
                 font-size: 0.88rem;
             }
-            .report-hero-pinned .hero-status-pill {
+
+            .report-navbar-stats {
                 display: none;
+            }
+
+            .bdd-table-scroll {
+                margin-left: 0;
+            }
+        }
+
+        @media screen and (max-width: 480px) {
+            .filter-input {
+                flex: 1 1 100%;
             }
         }
 
         /* ── Filter Bar ── */
         .filter-bar {
             display: flex;
+            flex-wrap: wrap;
             align-items: center;
             gap: 8px;
             margin-bottom: 16px;
             padding: 10px 14px;
             border: 1px solid var(--border);
             border-radius: var(--radius);
-            top: 0;
-            z-index: 100;
             background: var(--surface);
         }
 
         .filter-input {
-            flex: 1;
+            flex: 1 1 200px;
             min-width: 0;
             padding: 7px 12px;
             border: 1px solid var(--border);
@@ -1473,7 +1489,7 @@
 
         .filter-input::placeholder { color: var(--text-muted); }
 
-        .filter-btns { display: flex; gap: 4px; }
+        .filter-btns { display: contents; }
 
         .filter-btn,
         .tag-filter-btn,
@@ -1501,7 +1517,6 @@
         .filter-btn:not(.active):hover,
         .tag-filter-btn:not(.has-selection):hover,
         .expand-btn:not(.active):hover {
-            background: var(--surface-overlay);
             color: var(--accent);
             border-color: var(--accent);
         }
@@ -1550,7 +1565,7 @@
             color: #fff;
         }
 
-        .expand-btns { display: flex; gap: 4px; margin-left: auto; }
+        .expand-btns { display: contents; }
 
         #expandCollapseBtn .ec-arrow-top {
             transition: transform 0.3s ease;
@@ -1817,18 +1832,20 @@
 
         // ── Dark Mode ──
         function updateThemeIcon() {
-            var btn = document.getElementById('themeToggle');
-            if (!btn) return;
+            var buttons = document.querySelectorAll('.theme-toggle');
+            if (!buttons.length) return;
             var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-            if (isDark) {
-                btn.innerHTML = '<svg class="theme-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>';
-                btn.title = 'Switch to light mode';
-            } else {
-                btn.innerHTML = '<svg class="theme-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>';
-                btn.title = 'Switch to dark mode';
-            }
-            btn.setAttribute('aria-pressed', isDark ? 'true' : 'false');
-            btn.setAttribute('aria-label', isDark ? 'Switch to light mode' : 'Switch to dark mode');
+            buttons.forEach(function(btn) {
+                if (isDark) {
+                    btn.innerHTML = '<svg class="theme-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>';
+                    btn.title = 'Switch to light mode';
+                } else {
+                    btn.innerHTML = '<svg class="theme-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>';
+                    btn.title = 'Switch to dark mode';
+                }
+                btn.setAttribute('aria-pressed', isDark ? 'true' : 'false');
+                btn.setAttribute('aria-label', isDark ? 'Switch to light mode' : 'Switch to dark mode');
+            });
         }
 
         function applyTheme(isDark) {
@@ -2011,9 +2028,7 @@
         function toggleTagVisibility() {
             tagsVisible = !tagsVisible;
             var btn = document.getElementById('tagVisibilityBtn');
-            document.querySelectorAll('.test-case-tags').forEach(function(el) {
-                el.style.display = tagsVisible ? '' : 'none';
-            });
+            document.body.classList.toggle('tags-hidden', !tagsVisible);
             if (tagsVisible) {
                 btn.classList.remove('active');
                 btn.title = 'Hide tags';
@@ -2085,39 +2100,16 @@
                 } catch(e) { /* leave raw value on parse error */ }
             });
 
-            // Sticky hero: pin/unpin on scroll past hero
+            // Slim navbar: slide in once the hero has scrolled out of view
+            // (hero geometry never changes, so the boundary is stable — no hysteresis needed).
             var heroEl = document.querySelector('.report-hero');
-            var spacer = document.getElementById('heroSentinel');
-            if (heroEl && spacer) {
-                var pinThreshold = 0;
-                var heroHeight = 0;
-                var pinned = false;
-
-                function measureHero() {
-                    if (pinned) return;
-                    var rect = heroEl.getBoundingClientRect();
-                    heroHeight = rect.height;
-                    pinThreshold = window.scrollY + rect.bottom;
-                }
-
-                function onScroll() {
-                    var scrollY = window.scrollY;
-                    if (!pinned && scrollY >= pinThreshold) {
-                        pinned = true;
-                        spacer.style.height = heroHeight + 'px';
-                        heroEl.classList.add('report-hero-pinned');
-                    } else if (pinned && scrollY < pinThreshold) {
-                        pinned = false;
-                        heroEl.classList.remove('report-hero-pinned');
-                        spacer.style.height = '0';
-                    }
-                }
-
-                measureHero();
-                window.addEventListener('scroll', onScroll, { passive: true });
-                window.addEventListener('resize', function() {
-                    if (!pinned) measureHero();
-                }, { passive: true });
+            var navbar = document.getElementById('reportNavbar');
+            if (heroEl && navbar && 'IntersectionObserver' in window) {
+                new IntersectionObserver(function(entries) {
+                    var show = entries[0].boundingClientRect.bottom < 0;
+                    navbar.classList.toggle('report-navbar-visible', show);
+                    navbar.setAttribute('aria-hidden', show ? 'false' : 'true');
+                }, { threshold: [0] }).observe(heroEl);
             }
         });
     </script>
@@ -2289,8 +2281,29 @@
         </#if>
     </#list>
     <#assign suiteCount = (testRun.suites![])?size>
+    <nav class="report-navbar" id="reportNavbar" aria-hidden="true">
+        <div class="report-navbar-inner">
+            <div class="brand">
+                <svg class="brand-icon" viewBox="0 0 48 48" aria-hidden="true">
+                    <use href="#pulse-mark" x="0" y="0" width="48" height="48"/>
+                </svg>
+                <div class="brand-wordmark">
+                    <div class="brand-title">PulseReport</div>
+                </div>
+            </div>
+            <div class="report-navbar-stats">
+                <div class="compact-stat"><span class="compact-stat-label">Tests</span><span class="compact-stat-value">${testRun.totalTests}</span></div>
+                <div class="compact-stat"><span class="compact-stat-label">Suites</span><span class="compact-stat-value">${suiteCount}</span></div>
+                <div class="compact-stat"><span class="compact-stat-label">Pass</span><span class="compact-stat-value"><#if (testRun.totalTests > 0)>${(testRun.passedTests / testRun.totalTests * 100)?string("0.#")}%<#else>0%</#if></span></div>
+                <div class="compact-stat"><span class="compact-stat-label">Duration</span><span class="compact-stat-value">${formatDuration(testRun.duration)}</span></div>
+            </div>
+            <div class="header-actions">
+                <span class="report-meta-pill status-pill hero-status-pill ${heroStatusClass}">Status: ${testRun.status}</span>
+                <button class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle dark mode" title="Toggle dark mode"></button>
+            </div>
+        </div>
+    </nav>
     <div class="container">
-        <div class="hero-scroll-sentinel" id="heroSentinel"></div>
         <header class="report-hero">
             <div class="header-top">
                 <div>
@@ -2303,12 +2316,6 @@
                             <div class="brand-subtitle">Automated test results</div>
                         </div>
                     </div>
-                </div>
-                <div class="report-hero-compact-stats">
-                    <div class="compact-stat"><span class="compact-stat-label">Tests</span><span class="compact-stat-value">${testRun.totalTests}</span></div>
-                    <div class="compact-stat"><span class="compact-stat-label">Suites</span><span class="compact-stat-value">${suiteCount}</span></div>
-                    <div class="compact-stat"><span class="compact-stat-label">Pass</span><span class="compact-stat-value"><#if (testRun.totalTests > 0)>${(testRun.passedTests / testRun.totalTests * 100)?string("0.#")}%<#else>0%</#if></span></div>
-                    <div class="compact-stat"><span class="compact-stat-label">Duration</span><span class="compact-stat-value">${formatDuration(testRun.duration)}</span></div>
                 </div>
                 <div class="header-actions">
                     <span class="report-meta-pill status-pill hero-status-pill ${heroStatusClass}">Status: ${testRun.status}</span>
