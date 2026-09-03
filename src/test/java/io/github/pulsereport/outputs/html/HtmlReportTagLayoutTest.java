@@ -212,6 +212,61 @@ class HtmlReportTagLayoutTest {
                 "Both the suite-level and scenario-level tags spans should be rendered");
     }
 
+    @Test
+    void toggleUsesRootClassNotInlineStyles() throws IOException {
+        String html = generateHtml(createTestRunWithManyTags(20));
+
+        Matcher matcher = Pattern.compile("(?s)function toggleTagVisibility\\(\\)\\s*\\{(.*?)\\n {8}\\}")
+                .matcher(html);
+        assertTrue(matcher.find(), "Rendered report should contain toggleTagVisibility()");
+        String handler = matcher.group(1);
+
+        assertAll(
+                () -> assertTrue(handler.contains("document.body.classList.toggle('tags-hidden'"),
+                        "Toggle should flip a single 'tags-hidden' class on the report root "
+                                + "(document.body)"),
+                () -> assertFalse(handler.contains("style.display"),
+                        "Toggle must not set per-element inline styles"),
+                () -> assertFalse(handler.contains("querySelectorAll('.test-case-tags')"),
+                        "Toggle must not loop over every .test-case-tags element"),
+                () -> assertTrue(handler.contains("'Hide tags'"),
+                        "Button title flip to 'Hide tags' should be preserved"),
+                () -> assertTrue(handler.contains("'Show tags'"),
+                        "Button title flip to 'Show tags' should be preserved"));
+    }
+
+    @Test
+    void cssHidesSeparatorWhenTagsHidden() throws IOException {
+        String html = generateHtml(createTestRunWithManyTags(20));
+        String styles = extractStyleContent(html);
+
+        String hidden = extractCssRuleDeclarations(styles,
+                ".tags-hidden .test-case-tags",
+                ".tags-hidden .test-case-tags + .suite-stats-sep");
+        assertTrue(hidden.contains("display: none"),
+                "When the root carries .tags-hidden, both .test-case-tags and the separator "
+                        + "directly adjacent to it must be hidden");
+    }
+
+    @Test
+    void secondSeparatorNotAffected() throws IOException {
+        String html = generateHtml(createTestRunWithManyTags(20));
+        String styles = extractStyleContent(html).replaceAll("(?s)/\\*.*?\\*/", "");
+
+        // The separator between the pass ratio and the duration never directly
+        // follows a .test-case-tags span, so requiring adjacency keeps it visible
+        assertAll(
+                () -> assertTrue(
+                        Pattern.compile("\\.tags-hidden\\s+\\.test-case-tags\\s*\\+\\s*\\.suite-stats-sep")
+                                .matcher(styles).find(),
+                        "Separator hide rule must use the adjacent-sibling selector "
+                                + "'.tags-hidden .test-case-tags + .suite-stats-sep'"),
+                () -> assertFalse(
+                        Pattern.compile("\\.tags-hidden\\s+\\.suite-stats-sep").matcher(styles).find(),
+                        "A blanket '.tags-hidden .suite-stats-sep' rule would also hide the "
+                                + "separator between the pass ratio and the duration"));
+    }
+
     private TestRun createTestRunWithManyTags(int tagCount) {
         List<String> manyTags = new ArrayList<>();
         for (int i = 1; i <= tagCount; i++) {

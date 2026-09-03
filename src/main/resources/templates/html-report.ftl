@@ -635,6 +635,11 @@
             text-overflow: clip;
         }
 
+        .tags-hidden .test-case-tags,
+        .tags-hidden .test-case-tags + .suite-stats-sep {
+            display: none !important;
+        }
+
         .test-case-name .test-case-tags {
             margin-left: 6px;
         }
@@ -2023,9 +2028,7 @@
         function toggleTagVisibility() {
             tagsVisible = !tagsVisible;
             var btn = document.getElementById('tagVisibilityBtn');
-            document.querySelectorAll('.test-case-tags').forEach(function(el) {
-                el.style.display = tagsVisible ? '' : 'none';
-            });
+            document.body.classList.toggle('tags-hidden', !tagsVisible);
             if (tagsVisible) {
                 btn.classList.remove('active');
                 btn.title = 'Hide tags';
