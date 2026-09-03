@@ -1496,7 +1496,6 @@
         .filter-btn:not(.active):hover,
         .tag-filter-btn:not(.has-selection):hover,
         .expand-btn:not(.active):hover {
-            background: var(--surface-overlay);
             color: var(--accent);
             border-color: var(--accent);
         }
