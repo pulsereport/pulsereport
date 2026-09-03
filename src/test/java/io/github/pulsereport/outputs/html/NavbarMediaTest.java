@@ -97,34 +97,17 @@ class NavbarMediaTest {
     }
 
     @Test
-    void mediumBreakpointTightensNavbarStats() {
-        String block = mediaBlock("(max-width: 900px)");
-        String stats = ruleBody(block, ".report-navbar-stats");
-        assertTrue(stats.contains("gap: 10px"),
-                "the 900px breakpoint must tighten .report-navbar-stats gap to 10px");
-        assertTrue(stats.contains("margin-left: 10px"),
-                "the 900px breakpoint must set .report-navbar-stats margin-left to 10px");
+    void smallBreakpointKeepsNavbarStatusPillVisible() {
+        String block = mediaBlock("screen and (max-width: 640px)");
+        assertFalse(Pattern.compile(Pattern.quote(".report-navbar .hero-status-pill")
+                        + "\\s*\\{[^}]*display:\\s*none").matcher(block).find(),
+                "the 640px breakpoint must keep the navbar status pill visible");
     }
 
     @Test
-    void smallBreakpointHidesNavbarStatusPill() {
-        String block = mediaBlock("(max-width: 640px)");
-        String pill = ruleBody(block, ".report-navbar .hero-status-pill");
-        assertTrue(pill.contains("display: none"),
-                "the 640px breakpoint must hide the navbar status pill");
-    }
-
-    @Test
-    void smallBreakpointCompactsNavbarLayout() {
-        String block = mediaBlock("(max-width: 640px)");
-        assertTrue(ruleBody(block, ".report-navbar-inner").contains("padding: 8px 14px"),
-                "the 640px breakpoint must shrink navbar padding to 8px 14px");
-        String stats = ruleBody(block, ".report-navbar-stats");
-        assertTrue(stats.contains("gap: 6px"),
-                "the 640px breakpoint must tighten .report-navbar-stats gap to 6px");
-        assertTrue(stats.contains("margin-left: 10px"),
-                "the 640px breakpoint must keep .report-navbar-stats margin-left at 10px");
-        assertTrue(ruleBody(block, ".report-navbar .compact-stat-value").contains("font-size: 0.88rem"),
-                "the 640px breakpoint must shrink compact stat values to 0.88rem");
+    void smallBreakpointHidesNavbarStats() {
+        String block = mediaBlock("screen and (max-width: 640px)");
+        assertTrue(ruleBody(block, ".report-navbar-stats").contains("display: none"),
+                "the 640px breakpoint must hide .report-navbar-stats entirely");
     }
 }
