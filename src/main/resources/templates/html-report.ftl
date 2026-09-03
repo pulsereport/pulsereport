@@ -409,6 +409,16 @@
             height: 32px;
         }
 
+        .report-navbar .brand-title {
+            font-size: 1.05rem;
+        }
+
+        .report-navbar .hero-status-pill {
+            padding: 5px 12px;
+            font-size: 0.75rem;
+            min-height: 28px;
+        }
+
         @media (prefers-reduced-motion: no-preference) {
             .report-navbar {
                 transition: transform 0.3s cubic-bezier(.4,0,.2,1), visibility 0.3s;

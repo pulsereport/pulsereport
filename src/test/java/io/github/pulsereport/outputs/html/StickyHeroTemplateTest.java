@@ -37,6 +37,18 @@ class StickyHeroTemplateTest {
     private static final Pattern NAVBAR_HEADER_ACTIONS_RULE =
             Pattern.compile("\\.report-navbar \\.header-actions\\s*\\{([^}]*)\\}", Pattern.DOTALL);
 
+    private static final Pattern NAVBAR_BRAND_TITLE_RULE =
+            Pattern.compile("\\.report-navbar \\.brand-title\\s*\\{([^}]*)\\}", Pattern.DOTALL);
+
+    private static final Pattern NAVBAR_STATUS_PILL_RULE =
+            Pattern.compile("\\.report-navbar \\.hero-status-pill\\s*\\{([^}]*)\\}", Pattern.DOTALL);
+
+    private static final Pattern BASE_BRAND_TITLE_RULE =
+            Pattern.compile("(?m)^\\s*\\.brand-title\\s*\\{([^}]*)\\}", Pattern.DOTALL);
+
+    private static final Pattern BASE_STATUS_PILL_RULE =
+            Pattern.compile("(?m)^\\s*\\.hero-status-pill\\s*\\{([^}]*)\\}", Pattern.DOTALL);
+
     private static String template;
     private static String reportHeroRule;
     private static String reportNavbarRule;
@@ -147,5 +159,47 @@ class StickyHeroTemplateTest {
                     ".report-navbar .header-actions must not zero out margin-left;"
                             + " the base .header-actions margin-left: auto must push the actions flush right");
         }
+    }
+
+    @Test
+    void navbarBrandTitleUsesCompactFontSize() {
+        Matcher matcher = NAVBAR_BRAND_TITLE_RULE.matcher(template);
+        assertTrue(matcher.find(), "template must contain a .report-navbar .brand-title rule");
+        assertTrue(matcher.group(1).contains("font-size: 1.05rem"),
+                ".report-navbar .brand-title must override the hero size with font-size: 1.05rem");
+    }
+
+    @Test
+    void navbarStatusPillUsesCompactSizing() {
+        Matcher matcher = NAVBAR_STATUS_PILL_RULE.matcher(template);
+        boolean compactRuleFound = false;
+        while (matcher.find()) {
+            String body = matcher.group(1);
+            if (body.contains("font-size: 0.75rem")
+                    && body.contains("min-height: 28px")
+                    && body.contains("height: 28px")) {
+                compactRuleFound = true;
+                break;
+            }
+        }
+        assertTrue(compactRuleFound,
+                "a .report-navbar .hero-status-pill rule must exist with font-size: 0.75rem,"
+                        + " min-height: 28px and height: 28px (fixed height overrides the base 37px pill)");
+    }
+
+    @Test
+    void baseBrandTitleKeepsHeroFontSize() {
+        Matcher matcher = BASE_BRAND_TITLE_RULE.matcher(template);
+        assertTrue(matcher.find(), "template must contain a base .brand-title rule");
+        assertTrue(matcher.group(1).contains("font-size: 1.35rem"),
+                "base .brand-title must keep font-size: 1.35rem for the hero");
+    }
+
+    @Test
+    void baseStatusPillKeepsHeroHeight() {
+        Matcher matcher = BASE_STATUS_PILL_RULE.matcher(template);
+        assertTrue(matcher.find(), "template must contain a base .hero-status-pill rule");
+        assertTrue(matcher.group(1).contains("height: 37px"),
+                "base .hero-status-pill must keep height: 37px for the hero");
     }
 }
