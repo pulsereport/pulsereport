@@ -1,1 +1,13 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256"><title>PulseReport</title><rect x="2" y="2" width="252" height="252" rx="54" fill="#F8F9FA" stroke="#DEE2E6" stroke-width="4"/><g fill="#212529"><circle cx="58.88" cy="138.84" r="12.96"/><rect x="116.48" y="125.88" width="25.92" height="77.76" rx="12.96"/><rect x="151.76" y="97.08" width="25.92" height="54.72" rx="12.96"/><circle cx="200" cy="138.84" r="12.96"/></g><g fill="#0F8B8D"><path d="M81.2 138.84 L94.16 42.36 L107.12 138.84 A12.96 12.96 0 0 1 81.2 138.84 Z"/></g></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+    <title>PulseReport</title>
+    <rect x="2" y="2" width="252" height="252" rx="54" fill="#F8F9FA" stroke="#DEE2E6" stroke-width="4"/>
+    <g fill="#212529">
+        <circle cx="58.88" cy="138.84" r="12.96"/>
+        <rect x="116.48" y="125.88" width="25.92" height="77.76" rx="12.96"/>
+        <rect x="151.76" y="97.08" width="25.92" height="54.72" rx="12.96"/>
+        <circle cx="200" cy="138.84" r="12.96"/>
+    </g>
+    <g fill="#0F8B8D">
+        <path d="M81.2 138.84 L94.16 42.36 L107.12 138.84 A12.96 12.96 0 0 1 81.2 138.84 Z"/>
+    </g>
+</svg>
