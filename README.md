@@ -1,5 +1,10 @@
 # PulseReport
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="branding/logo/pulsereport-horizontal-reversed.svg">
+  <img src="branding/logo/pulsereport-horizontal.svg" alt="PulseReport" width="360">
+</picture>
+
 [![CI](https://github.com/pulsereport/pulsereport/actions/workflows/ci.yml/badge.svg)](https://github.com/pulsereport/pulsereport/actions/workflows/ci.yml)
 [![Java 17+](https://img.shields.io/badge/Java-17%2B-blue.svg)](https://www.oracle.com/java/technologies/downloads/#java17)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
