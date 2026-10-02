@@ -1,8 +1,8 @@
 # PulseReport
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="branding/logo/pulsereport-horizontal-reversed.svg">
-  <img src="branding/logo/pulsereport-horizontal.svg" alt="PulseReport" width="360">
+  <source media="(prefers-color-scheme: dark)" srcset="logo/icon/pulsereport-horizontal-reversed.svg">
+  <img src="logo/icon/pulsereport-horizontal.svg" alt="PulseReport" width="360">
 </picture>
 
 [![CI](https://github.com/pulsereport/pulsereport/actions/workflows/ci.yml/badge.svg)](https://github.com/pulsereport/pulsereport/actions/workflows/ci.yml)
