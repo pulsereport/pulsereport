@@ -497,6 +497,8 @@ class HtmlReportGeneratorTest {
                         "HTML should render the bars and wordmark with theme-aware ink"),
                 () -> assertTrue(content.contains("fill=\"var(--logo-signal)\""),
                         "HTML should render the needle with the theme-aware signal colour"),
+                () -> assertTrue(content.contains("%40media (prefers-color-scheme:dark)"),
+                        "HTML favicon should switch to its dark-scheme colours with the browser theme"),
                 () -> assertFalse(content.contains("M12 24H19L22.5 19L26.5 31L31 16L35 24H38"),
                         "HTML should not embed the legacy pulse-line logo"),
                 () -> assertFalse(content.contains("<symbol id=\"pulse-wave\""),

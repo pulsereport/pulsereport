@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PulseReport - ${testRun.name?html}</title>
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg' viewBox='0 0 256 256'%3E%3Crect width='256' height='256' rx='56' fill='%23212529'/%3E%3Cg fill='%23FFFFFF'%3E%3Ccircle cx='58.88' cy='138.84' r='12.96'/%3E%3Crect x='116.48' y='125.88' width='25.92' height='77.76' rx='12.96'/%3E%3Crect x='151.76' y='97.08' width='25.92' height='54.72' rx='12.96'/%3E%3Ccircle cx='200' cy='138.84' r='12.96'/%3E%3C/g%3E%3Cpath fill='%2358B7B8' d='M81.2 138.84 L94.16 42.36 L107.12 138.84 A12.96 12.96 0 0 1 81.2 138.84 Z'/%3E%3C/svg%3E">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg' viewBox='0 0 256 256'%3E%3Cstyle%3E.i%7Bfill:%23212529%7D.s%7Bfill:%230F8B8D%7D%40media (prefers-color-scheme:dark)%7B.i%7Bfill:%23F8F9FA%7D.s%7Bfill:%2358B7B8%7D%7D%3C/style%3E%3Cg class='i'%3E%3Ccircle cx='32' cy='150' r='18'/%3E%3Crect x='112' y='132' width='36' height='108' rx='18'/%3E%3Crect x='161' y='92' width='36' height='76' rx='18'/%3E%3Ccircle cx='228' cy='150' r='18'/%3E%3C/g%3E%3Cpath class='s' d='M63 150 L81 16 L99 150 A18 18 0 0 1 63 150 Z'/%3E%3C/svg%3E">
     
     <style>
         :root {
@@ -2108,7 +2108,6 @@
 <body>
 <svg aria-hidden="true" style="display:none">
   <defs>
-        <#-- Needle Pulse small cut and outlined wordmark; masters live in branding/logo -->
         <symbol id="pulse-mark" viewBox="0 0 256 256" preserveAspectRatio="xMidYMid meet">
             <g fill="var(--logo-ink)">
                 <circle cx="32" cy="150" r="18"/>
