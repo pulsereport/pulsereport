@@ -160,6 +160,32 @@ class HtmlReportThemeTemplateTest {
                                 + "already-applied data-theme attribute"));
     }
 
+    @Test
+    void shouldFollowOsThemeChangesAndRepaintFavicon() throws IOException {
+        String html = generateHtml(createMinimalTestRun());
+
+        int domReadyIndex = html.indexOf("document.addEventListener('DOMContentLoaded'");
+        assertTrue(domReadyIndex >= 0, "The template should keep a DOMContentLoaded init");
+        String initBlock = extractBlock(html, domReadyIndex);
+        int changeListenerIndex = initBlock.indexOf("addEventListener('change'");
+        assertTrue(changeListenerIndex >= 0, "The init should listen for OS theme changes");
+        int listenerEnd = initBlock.indexOf("addCopyButtons()", changeListenerIndex);
+        String listener = initBlock.substring(changeListenerIndex,
+                listenerEnd > 0 ? listenerEnd : initBlock.length());
+
+        assertAll(
+                () -> assertTrue(listener.contains("localStorage.removeItem('pulse-report-theme')"),
+                        "An OS theme change should clear a stale manual pick so the report follows the OS"),
+                () -> assertFalse(listener.contains("return;"),
+                        "A stored manual pick must not block the OS theme change"),
+                () -> assertTrue(listener.contains("applyTheme(e.matches)"),
+                        "The report theme should follow the new OS scheme"),
+                () -> assertTrue(listener.contains("syncFavicon(e.matches)"),
+                        "The tab icon should repaint without a page reload"),
+                () -> assertTrue(html.contains("id=\"favicon\""),
+                        "The favicon link needs an id so the script can swap it"));
+    }
+
     private TestRun createMinimalTestRun() {
         TestCase testCase = TestCase.builder()
                 .id("tc-theme")
