@@ -206,12 +206,8 @@ class HtmlReportGeneratorTest {
                         "HTML should use light neutral text in dark mode"),
                 () -> assertTrue(content.contains("--text-secondary: #dee2e6;"),
                         "HTML should use muted secondary text in dark mode"),
-                () -> assertTrue(content.contains("--logo-tile-fill: #343a40;"),
-                        "HTML should darken the logo tile fill in dark mode"),
-                () -> assertTrue(content.contains("--logo-tile-stroke: var(--color-gray-700);"),
-                        "HTML should set the logo tile border in dark mode"),
-                () -> assertTrue(content.contains("--logo-pulse-stroke: var(--color-teal-400);"),
-                        "HTML should use brand primary light for the pulse stroke in dark mode"),
+                () -> assertFalse(content.contains("--logo-tile-fill"),
+                        "HTML should not keep the legacy logo tile tokens"),
                 () -> assertTrue(content.contains("--accent-light: #2b3035;"),
                         "HTML should use the surface token for dark-mode accent-light"));
     }
@@ -229,12 +225,10 @@ class HtmlReportGeneratorTest {
                         "HTML should keep report cards on a clean neutral surface"),
                 () -> assertTrue(content.contains("--text-primary: var(--color-gray-900);"),
                         "HTML should use brand-secondary for light-theme text"),
-                () -> assertTrue(content.contains("--logo-tile-fill: var(--color-gray-100);"),
-                        "HTML should keep the light-theme logo tile on the neutral-100 surface"),
-                () -> assertTrue(content.contains("--logo-tile-stroke: var(--color-gray-300);"),
-                        "HTML should keep the light-theme logo tile border on the neutral-300 edge"),
-                () -> assertTrue(content.contains("--logo-pulse-stroke: var(--accent);"),
-                        "HTML should keep the light-theme logo pulse aliased to accent"),
+                () -> assertTrue(content.contains("--logo-ink: var(--text-primary);"),
+                        "HTML should draw the logo bars and wordmark in the theme's primary text colour"),
+                () -> assertTrue(content.contains("--logo-signal: var(--accent);"),
+                        "HTML should draw the logo needle in the theme's accent colour"),
                 () -> assertTrue(content.contains("--accent: var(--color-teal-600);"),
                         "HTML should use Signal Teal as the primary accent"),
                 () -> assertTrue(content.contains("--accent-light: var(--color-gray-200);"),
@@ -485,22 +479,28 @@ class HtmlReportGeneratorTest {
     }
 
     @Test
-    void htmlUsesCurrentPulseReportLogoMarkInsteadOfLegacyWave() throws IOException {
+    void htmlUsesNeedlePulseLogoInsteadOfLegacyPulseTile() throws IOException {
         String content = generateHtml(createSampleTestRun());
 
         assertAll(
                 () -> assertTrue(content.contains("<symbol id=\"pulse-mark\""),
-                        "HTML should embed the current PulseReport logo mark definition"),
+                        "HTML should embed the Needle Pulse mark definition"),
                 () -> assertTrue(content.contains("<use href=\"#pulse-mark\""),
-                        "HTML header should render the current PulseReport logo mark"),
-                () -> assertTrue(content.contains("fill=\"var(--logo-tile-fill)\""),
-                        "HTML should render the logo tile with theme-aware fill tokens"),
-                () -> assertTrue(content.contains("stroke=\"var(--logo-tile-stroke)\""),
-                        "HTML should render the logo tile with theme-aware stroke tokens"),
-                () -> assertTrue(content.contains("stroke=\"var(--logo-pulse-stroke)\""),
-                        "HTML should render the pulse line with theme-aware stroke tokens"),
-                () -> assertTrue(content.contains("rx=\"12\""),
-                        "HTML should render the rounded-square container from the current PulseReport mark"),
+                        "HTML header should render the Needle Pulse mark"),
+                () -> assertTrue(content.contains("<symbol id=\"pulse-wordmark\""),
+                        "HTML should embed the outlined wordmark definition"),
+                () -> assertTrue(content.contains("<use href=\"#pulse-wordmark\""),
+                        "HTML header should render the outlined wordmark"),
+                () -> assertTrue(content.contains("role=\"img\" aria-label=\"PulseReport\""),
+                        "HTML should expose the wordmark to assistive technology as PulseReport"),
+                () -> assertTrue(content.contains("fill=\"var(--logo-ink)\""),
+                        "HTML should render the bars and wordmark with theme-aware ink"),
+                () -> assertTrue(content.contains("fill=\"var(--logo-signal)\""),
+                        "HTML should render the needle with the theme-aware signal colour"),
+                () -> assertTrue(content.contains("%40media (prefers-color-scheme:dark)"),
+                        "HTML favicon should switch to its dark-scheme colours with the browser theme"),
+                () -> assertFalse(content.contains("M12 24H19L22.5 19L26.5 31L31 16L35 24H38"),
+                        "HTML should not embed the legacy pulse-line logo"),
                 () -> assertFalse(content.contains("<symbol id=\"pulse-wave\""),
                         "HTML should not embed the legacy pulse-wave logo definition"));
     }

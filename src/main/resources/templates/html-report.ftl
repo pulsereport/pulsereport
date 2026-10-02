@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PulseReport - ${testRun.name?html}</title>
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg' viewBox='0 0 48 48'%3E%3Crect x='2' y='2' width='44' height='44' rx='12' fill='%23F8F9FA' stroke='%23DEE2E6' stroke-width='1.5'/%3E%3Cpath d='M12 24H19L22.5 19L26.5 31L31 16L35 24H38' stroke='%230F8B8D' stroke-width='2.6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+    <link rel="icon" id="favicon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg' viewBox='0 0 256 256'%3E%3Cstyle%3E.i%7Bfill:%23212529%7D.s%7Bfill:%230F8B8D%7D%40media (prefers-color-scheme:dark)%7B.i%7Bfill:%23F8F9FA%7D.s%7Bfill:%2358B7B8%7D%7D%3C/style%3E%3Cg class='i'%3E%3Ccircle cx='32' cy='150' r='18'/%3E%3Crect x='112' y='132' width='36' height='108' rx='18'/%3E%3Crect x='161' y='92' width='36' height='76' rx='18'/%3E%3Ccircle cx='228' cy='150' r='18'/%3E%3C/g%3E%3Cpath class='s' d='M63 150 L81 16 L99 150 A18 18 0 0 1 63 150 Z'/%3E%3C/svg%3E">
     
     <style>
         :root {
@@ -44,10 +44,9 @@
             /* ── Accent ── */
             --accent: var(--color-teal-600);
             --accent-light: var(--color-gray-200);
-            /* ── Logo ── */
-            --logo-tile-fill: var(--color-gray-100);
-            --logo-tile-stroke: var(--color-gray-300);
-            --logo-pulse-stroke: var(--accent);
+            /* ── Logo ── (follows the theme through text-primary and accent) */
+            --logo-ink: var(--text-primary);
+            --logo-signal: var(--accent);
             /* ── Status ── */
             --green: var(--color-green-600);
             --red: var(--color-red-500);
@@ -126,12 +125,10 @@
         }
 
         .brand-title {
-            font-family: var(--font-brand);
+            display: block;
             font-size: 1.35rem;
-            font-weight: 700;
-            letter-spacing: -0.03em;
-            color: var(--text-primary);
-            line-height: 1;
+            height: 1.3em;
+            width: auto;
         }
 
         .brand-subtitle {
@@ -1261,9 +1258,6 @@
             --text-primary: #f8f9fa;
             --text-secondary: #dee2e6;
             --text-muted: #adb5bd;
-            --logo-tile-fill: #343a40;
-            --logo-tile-stroke: var(--color-gray-700);
-            --logo-pulse-stroke: var(--color-teal-400);
             --accent: var(--color-teal-400);
             --accent-light: #2b3035;
             --green: #75b798;
@@ -1292,9 +1286,6 @@
                 --text-primary: #f8f9fa;
                 --text-secondary: #dee2e6;
                 --text-muted: #adb5bd;
-                --logo-tile-fill: #343a40;
-                --logo-tile-stroke: var(--color-gray-700);
-                --logo-pulse-stroke: var(--color-teal-400);
                 --accent: var(--color-teal-400);
                 --accent-light: #2b3035;
                 --green: #75b798;
@@ -1689,6 +1680,22 @@
             }
             document.documentElement.setAttribute('data-theme', theme);
         })();
+
+        function syncFavicon(isDark) {
+            var link = document.getElementById('favicon');
+            if (!link) return;
+            var ink = isDark ? '%23F8F9FA' : '%23212529';
+            var signal = isDark ? '%2358B7B8' : '%230F8B8D';
+            var next = link.cloneNode(false);
+            next.href = "data:image/svg+xml,%3Csvg xmlns='http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg' viewBox='0 0 256 256'%3E"
+                + "%3Cg fill='" + ink + "'%3E%3Ccircle cx='32' cy='150' r='18'/%3E"
+                + "%3Crect x='112' y='132' width='36' height='108' rx='18'/%3E"
+                + "%3Crect x='161' y='92' width='36' height='76' rx='18'/%3E"
+                + "%3Ccircle cx='228' cy='150' r='18'/%3E%3C/g%3E"
+                + "%3Cpath fill='" + signal + "' d='M63 150 L81 16 L99 150 A18 18 0 0 1 63 150 Z'/%3E%3C/svg%3E";
+            link.parentNode.replaceChild(next, link);
+        }
+        syncFavicon(window.matchMedia('(prefers-color-scheme: dark)').matches);
     </script>
     <script>
         function openLightbox(src) {
@@ -2079,10 +2086,15 @@
                 }
 
                 if (storedTheme === 'dark' || storedTheme === 'light') {
-                    return;
+                    try {
+                        localStorage.removeItem('pulse-report-theme');
+                    } catch (err) {
+                        // Ignore storage failures; the theme still follows the OS for this page.
+                    }
                 }
 
                 applyTheme(e.matches);
+                syncFavicon(e.matches);
             });
             addCopyButtons();
             initTagFilter();
@@ -2117,9 +2129,30 @@
 <body>
 <svg aria-hidden="true" style="display:none">
   <defs>
-        <symbol id="pulse-mark" viewBox="0 0 48 48" preserveAspectRatio="xMidYMid meet">
-            <rect x="2" y="2" width="44" height="44" rx="12" fill="var(--logo-tile-fill)" stroke="var(--logo-tile-stroke)" stroke-width="1.5" vector-effect="non-scaling-stroke"/>
-            <path d="M12 24H19L22.5 19L26.5 31L31 16L35 24H38" stroke="var(--logo-pulse-stroke)" stroke-width="2.6" fill="none" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>
+        <symbol id="pulse-mark" viewBox="0 0 256 256" preserveAspectRatio="xMidYMid meet">
+            <g fill="var(--logo-ink)">
+                <circle cx="32" cy="150" r="18"/>
+                <rect x="112" y="132" width="36" height="108" rx="18"/>
+                <rect x="161" y="92" width="36" height="76" rx="18"/>
+                <circle cx="228" cy="150" r="18"/>
+            </g>
+            <path fill="var(--logo-signal)" d="M63 150 L81 16 L99 150 A18 18 0 0 1 63 150 Z"/>
+        </symbol>
+        <symbol id="pulse-wordmark" viewBox="26 26 627 107" preserveAspectRatio="xMinYMid meet">
+            <path fill="var(--logo-ink)" d="M26 132.2V51.92H40.64V64.28H39.44Q41.24 58.16 46.82 54.44Q52.4 50.72 59.84 50.72Q67.52 50.72 73.34 54.44Q79.16 58.16 82.4 64.94Q85.64 71.72 85.64 81.2Q85.64 90.56 82.4 97.46Q79.16 104.36 73.4 108.08Q67.64 111.8 59.84 111.8Q52.52 111.8 47 108.14Q41.48 104.48 39.56 98.6H41V132.2H26Z
+M55.64 100.4Q62.36 100.4 66.44 95.54Q70.52 90.68 70.52 81.2Q70.52 71.6 66.44 66.86Q62.36 62.12 55.64 62.12Q48.92 62.12 44.84 66.86Q40.76 71.6 40.76 81.2Q40.76 90.68 44.84 95.54Q48.92 100.4 55.64 100.4Z
+M119.24 111.8Q111.92 111.8 107.12 109.1Q102.32 106.4 99.98 101Q97.64 95.6 97.64 87.56V51.92H112.64V87.8Q112.64 91.88 113.75 94.64Q114.86 97.4 117.25 98.72Q119.63 100.04 123.25 100.04Q127.28 100.04 130.34 98.18Q133.4 96.32 135.14 92.91Q136.88 89.5 136.88 84.92V51.92H151.88V110.6H137.24V98.36H138.92Q136.4 104.84 131.3 108.32Q126.2 111.8 119.24 111.8Z
+M187.88 111.8Q177.44 111.8 172.46 106.1Q167.48 100.4 167.48 89.36V26H182.48V88.64Q182.48 92.12 183.5 94.58Q184.52 97.04 186.56 98.24Q188.6 99.44 191.6 99.44Q192.92 99.44 194.24 99.32Q195.56 99.2 196.76 98.84L196.52 110.72Q194.36 111.2 192.26 111.5Q190.16 111.8 187.88 111.8Z
+M226.64 111.8Q221.72 111.8 217.1 110.96Q212.48 110.12 208.64 108.62Q204.8 107.12 201.92 104.84L205.76 95Q208.76 96.92 212.24 98.36Q215.72 99.8 219.44 100.52Q223.16 101.24 226.76 101.24Q232.52 101.24 235.34 99.26Q238.16 97.28 238.16 94.04Q238.16 91.28 236.3 89.78Q234.44 88.28 230.72 87.56L218.72 85.28Q211.28 83.84 207.38 79.82Q203.48 75.8 203.48 69.44Q203.48 63.68 206.66 59.48Q209.84 55.28 215.48 53Q221.12 50.72 228.44 50.72Q232.64 50.72 236.6 51.5Q240.56 52.28 244.1 53.78Q247.64 55.28 250.28 57.68L246.2 67.52Q243.92 65.6 240.92 64.22Q237.92 62.84 234.74 62.06Q231.56 61.28 228.56 61.28Q222.68 61.28 219.86 63.32Q217.04 65.36 217.04 68.72Q217.04 71.24 218.72 72.92Q220.4 74.6 223.88 75.2L235.88 77.48Q243.68 78.92 247.7 82.76Q251.72 86.6 251.72 93.08Q251.72 98.96 248.6 103.16Q245.48 107.36 239.84 109.58Q234.2 111.8 226.64 111.8Z
+M292.64 111.8Q282.68 111.8 275.48 108.08Q268.28 104.36 264.38 97.52Q260.48 90.68 260.48 81.32Q260.48 72.2 264.26 65.36Q268.04 58.52 274.7 54.62Q281.36 50.72 289.88 50.72Q298.28 50.72 304.28 54.32Q310.28 57.92 313.58 64.52Q316.88 71.12 316.88 80.24V84.68H272.6V76.04H306.32L304.4 77.84Q304.4 69.68 300.8 65.3Q297.2 60.92 290.48 60.92Q285.44 60.92 281.9 63.26Q278.36 65.6 276.5 69.86Q274.64 74.12 274.64 80V80.84Q274.64 87.44 276.68 91.76Q278.72 96.08 282.8 98.24Q286.88 100.4 292.88 100.4Q297.8 100.4 302.72 98.9Q307.64 97.4 311.72 94.16L315.92 104.24Q311.72 107.72 305.36 109.76Q299 111.8 292.64 111.8Z
+M330.03 110.6V52.24H339.52V66.08H338.32Q340.38 58.94 345.43 55.29Q350.48 51.64 358.76 51.04L362.24 50.74L363.01 59.14L356.79 59.78Q348.64 60.57 344.25 65.08Q339.86 69.59 339.86 77.32V110.6H330.03Z
+M398.65 111.67Q389.39 111.67 382.7 108.02Q376.01 104.36 372.36 97.62Q368.71 90.87 368.71 81.57Q368.71 72.45 372.3 65.65Q375.89 58.84 382.23 55Q388.58 51.17 396.78 51.17Q404.73 51.17 410.35 54.64Q415.97 58.11 419.02 64.49Q422.06 70.87 422.06 79.79V83.53H376.13V77.12H415.7L413.72 78.73Q413.72 69.11 409.48 63.74Q405.24 58.38 397 58.38Q390.94 58.38 386.7 61.22Q382.46 64.07 380.28 69.06Q378.1 74.06 378.1 80.64V81.35Q378.1 88.65 380.46 93.67Q382.82 98.69 387.44 101.26Q392.06 103.84 398.63 103.84Q403.81 103.84 408.63 102.21Q413.46 100.58 417.85 96.9L421.1 103.79Q417.16 107.4 411.05 109.54Q404.94 111.67 398.65 111.67Z
+M436.11 132.2V52.24H445.66V66.06H444.4Q446.33 59.24 452.03 55.2Q457.74 51.17 465.69 51.17Q473.5 51.17 479.29 54.85Q485.07 58.54 488.28 65.29Q491.49 72.04 491.49 81.39Q491.49 90.62 488.31 97.46Q485.14 104.3 479.35 107.98Q473.55 111.67 465.69 111.67Q457.8 111.67 452.12 107.63Q446.44 103.59 444.46 96.95H445.83V132.2H436.11Z
+M463.65 103.84Q471.9 103.84 476.78 98.02Q481.65 92.21 481.65 81.39Q481.65 70.52 476.78 64.76Q471.9 59 463.65 59Q455.47 59 450.56 64.76Q445.66 70.52 445.66 81.39Q445.66 92.21 450.56 98.02Q455.47 103.84 463.65 103.84Z
+M530.35 111.67Q521.86 111.67 515.62 107.95Q509.38 104.23 505.95 97.43Q502.51 90.63 502.51 81.39Q502.51 72.16 505.95 65.38Q509.38 58.61 515.62 54.89Q521.86 51.17 530.35 51.17Q538.84 51.17 545.08 54.89Q551.32 58.61 554.75 65.39Q558.19 72.18 558.19 81.39Q558.19 90.62 554.75 97.43Q551.32 104.23 545.08 107.95Q538.84 111.67 530.35 111.67Z
+M530.33 103.84Q538.6 103.84 543.47 98.02Q548.35 92.21 548.35 81.36Q548.35 70.52 543.47 64.76Q538.6 59 530.33 59Q522.17 59 517.26 64.76Q512.35 70.52 512.35 81.36Q512.35 92.21 517.26 98.02Q522.17 103.84 530.33 103.84Z
+M572.79 110.6V52.24H582.28V66.08H581.08Q583.14 58.94 588.19 55.29Q593.24 51.64 601.52 51.04L605 50.74L605.77 59.14L599.55 59.78Q591.4 60.57 587.01 65.08Q582.62 69.59 582.62 77.32V110.6H572.79Z
+M642.32 111.67Q631.96 111.67 626.83 106.17Q621.71 100.68 621.71 90.41V59.83H610.24V52.24H621.71V34.4H631.43V52.24H649.89V59.83H631.43V89.45Q631.43 96.29 634.27 99.84Q637.1 103.38 643.64 103.38Q645.57 103.38 647.47 102.9Q649.36 102.42 650.96 101.94L652.67 109.35Q651.08 110.3 648.07 110.98Q645.06 111.67 642.32 111.67Z"/>
         </symbol>
   </defs>
 </svg>
@@ -2284,11 +2317,13 @@
     <nav class="report-navbar" id="reportNavbar" aria-hidden="true">
         <div class="report-navbar-inner">
             <div class="brand">
-                <svg class="brand-icon" viewBox="0 0 48 48" aria-hidden="true">
-                    <use href="#pulse-mark" x="0" y="0" width="48" height="48"/>
+                <svg class="brand-icon" viewBox="0 0 256 256" aria-hidden="true">
+                    <use href="#pulse-mark" x="0" y="0" width="256" height="256"/>
                 </svg>
                 <div class="brand-wordmark">
-                    <div class="brand-title">PulseReport</div>
+                    <svg class="brand-title" viewBox="26 26 627 107" role="img" aria-label="PulseReport">
+                        <use href="#pulse-wordmark" x="26" y="26" width="627" height="107"/>
+                    </svg>
                 </div>
             </div>
             <div class="report-navbar-stats">
@@ -2308,11 +2343,13 @@
             <div class="header-top">
                 <div>
                     <div class="brand">
-                        <svg class="brand-icon" viewBox="0 0 48 48" aria-hidden="true">
-                            <use href="#pulse-mark" x="0" y="0" width="48" height="48"/>
+                        <svg class="brand-icon" viewBox="0 0 256 256" aria-hidden="true">
+                            <use href="#pulse-mark" x="0" y="0" width="256" height="256"/>
                         </svg>
                         <div class="brand-wordmark">
-                            <div class="brand-title">PulseReport</div>
+                            <svg class="brand-title" viewBox="26 26 627 107" role="img" aria-label="PulseReport">
+                                <use href="#pulse-wordmark" x="26" y="26" width="627" height="107"/>
+                            </svg>
                             <div class="brand-subtitle">Automated test results</div>
                         </div>
                     </div>
