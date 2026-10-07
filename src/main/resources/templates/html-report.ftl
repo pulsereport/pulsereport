@@ -2720,23 +2720,32 @@
                 refreshTip(themeBtn);
             }
 
-            themeBtn.addEventListener('click', () => {
-                const next = currentTheme() === 'dark' ? 'light' : 'dark';
+            function setTheme(theme) {
                 const apply = () => {
-                    document.documentElement.dataset.theme = next;
+                    document.documentElement.dataset.theme = theme;
                     syncThemeButton();
                 };
                 try {
-                    localStorage.setItem('pulse-report-theme', next);
+                    if (theme === 'auto') localStorage.removeItem('pulse-report-theme');
+                    else localStorage.setItem('pulse-report-theme', theme);
                 } catch {
                     /* storage unavailable */
                 }
-                if (document.startViewTransition && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                if (
+                    document.startViewTransition &&
+                    document.visibilityState === 'visible' &&
+                    !matchMedia('(prefers-reduced-motion: reduce)').matches
+                ) {
                     document.startViewTransition(apply);
                 } else apply();
+            }
+
+            themeBtn.addEventListener('click', () => {
+                const next = currentTheme() === 'dark' ? 'light' : 'dark';
+                setTheme(next === (systemDark.matches ? 'dark' : 'light') ? 'auto' : next);
             });
 
-            systemDark.addEventListener('change', syncThemeButton);
+            systemDark.addEventListener('change', () => setTheme('auto'));
             syncThemeButton();
 
             // ---------- Keyboard ----------
