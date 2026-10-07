@@ -39,6 +39,7 @@ The current `ReporterConfig` implementation actively reads these keys:
 
 - `reporter.output.formats`
 - `reporter.output.directory`
+- `reporter.report.title`
 - `reporter.s3.enabled`
 - `reporter.s3.bucket`
 - `reporter.s3.region`
@@ -95,6 +96,10 @@ reporter.output.formats=html,json,junit
 
 # Output directory
 reporter.output.directory=target/pulsereport
+
+# Title shown in the HTML report header and browser tab.
+# Defaults to the test run name. Can also be set with -Dreporter.report.title=...
+reporter.report.title=Checkout regression
 
 # Create output directory if missing
 reporter.output.createDirectory=true

@@ -180,10 +180,12 @@ public class ReporterCLI implements Callable<Integer> {
                     }
                 }
 
+                String reportTitle = config.getReportTitle();
                 if (formats != null) {
                     config = ReporterConfig.builder()
                             .outputFormats(formats)
                             .outputDirectory(outputDirectory != null ? outputDirectory : config.getOutputDirectory())
+                            .reportTitle(reportTitle)
                             .build();
                 }
 
@@ -218,7 +220,7 @@ public class ReporterCLI implements Callable<Integer> {
                 TestRun testRun = mapper.readValue(inputFile, TestRun.class);
 
                 for (String format : config.getOutputFormats()) {
-                    OutputGenerator generator = createGenerator(format);
+                    OutputGenerator generator = createGenerator(format, reportTitle);
                     String extension = getFileExtension(format);
                     File outputFile = new File(config.getOutputDirectory(), "test-report." + extension);
                     generator.generate(testRun, outputFile);
@@ -240,10 +242,10 @@ public class ReporterCLI implements Callable<Integer> {
             }
         }
 
-        private static OutputGenerator createGenerator(String format) {
+        private static OutputGenerator createGenerator(String format, String reportTitle) {
             switch (format.toLowerCase()) {
                 case "html":
-                    return new HtmlReportGenerator();
+                    return reportTitle != null ? new HtmlReportGenerator(reportTitle) : new HtmlReportGenerator();
                 case "json":
                     return new JsonReportGenerator();
                 case "junit":

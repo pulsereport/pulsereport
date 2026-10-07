@@ -230,6 +230,23 @@ class ReporterConfigTest {
     }
 
     @Test
+    void configLoadsReportTitle() {
+        Properties props = new Properties();
+        props.setProperty("reporter.report.title", "  Checkout regression  ");
+
+        assertEquals("Checkout regression", ReporterConfig.loadFromProperties(props).getReportTitle());
+    }
+
+    @Test
+    void blankReportTitleMeansUseRunName() {
+        Properties props = new Properties();
+        props.setProperty("reporter.report.title", "   ");
+
+        assertEquals(null, ReporterConfig.loadFromProperties(props).getReportTitle());
+        assertEquals(null, ReporterConfig.loadFromProperties(new Properties()).getReportTitle());
+    }
+
+    @Test
     void configLoadsDefaultContentSizeLimit() {
         Properties props = new Properties();
         props.setProperty("reporter.output.formats", "html");
