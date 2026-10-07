@@ -34,16 +34,22 @@ Rich, interactive HTML reports for human consumption.
 
 ### Features
 
-- **Test Summary**: Pass/fail/skip counts with percentages
-- **Dark/Light Mode**: Built-in theme toggle with `localStorage` persistence
-- **Screenshot Gallery**: Embedded screenshots for Selenium/Appium tests
-- **Expandable Details**: Click to expand stack traces and logs
-- **Search and Filter**: Find tests by name, status, or tags
-- **Responsive Design**: Works on desktop and mobile
+- **Verdict and run timeline**: The header states the outcome ("3 failed of 46 tests") next to a timeline with one bar per test in execution order; bar height shows duration and color shows status. Click a bar to open that test.
+- **Failure first**: The first failed test opens automatically. When nothing failed, the report lists the slowest tests instead.
+- **Run metadata**: The top bar shows environment details recorded by adapters (browser, device, platform, and so on) plus start and finish times.
+- **Search and filter**: Search by test name, suite, tag, class or error text, and filter by status.
+- **Keyboard navigation**: `↑`/`↓` move between tests, `f` toggles failures only, `/` focuses search.
+- **Readable failures**: Exception name and message first, with framework stack frames collapsed and a copy button for the full trace.
+- **BDD steps**: Cucumber scenarios show Given/When/Then steps with status, data tables, doc strings and per-step attachments.
+- **HTTP exchanges**: REST-assured requests and responses side by side, with status, headers and pretty-printed JSON bodies.
+- **Screenshots and recordings**: Embedded inline; click a screenshot to enlarge it.
+- **Light and dark themes**: Follows the operating system or browser theme, with a toggle in the top bar.
+- **Deep links**: The URL hash (`#t=<test id>`) opens a specific test.
+- **Responsive and printable**: Works on narrow screens; printing outputs every failure with its full stack trace.
 
 ### Generated Files
 
-```
+```text
 target/pulsereport/
 └── test-report.html          # Self-contained single-file report
 ```
@@ -63,71 +69,22 @@ start target/pulsereport/test-report.html
 
 ### Customization
 
-#### Dark Mode
+#### Report Title
 
-The HTML report includes a built-in dark/light mode toggle. Users can switch themes via the button in the report header. The preference is persisted in `localStorage`.
+The title in the top bar and browser tab defaults to the run name. Override it with `reporter.report.title` in `reporter.properties` or `-Dreporter.report.title=...`.
 
-#### CSS Token System
+#### Themes
 
-The report uses a two-layer CSS custom property system for consistent theming:
+The report follows the operating system or browser theme. Picking the other theme with the top-bar toggle is remembered in `localStorage` until the system theme changes again.
 
-**Primitives** — raw color values (e.g., `--color-teal-600`, `--color-gray-100`)
+> **Note:** Runtime customization of the HTML report (custom CSS, custom templates) is not yet supported for projects consuming PulseReport as a dependency. The report uses a fixed built-in template. If you are contributing to PulseReport itself, the color tokens (`--surface`, `--raised`, `--ink`, `--accent`, `--pass`, `--fail`, `--skip`, and so on) are defined at the top of `src/main/resources/templates/html-report.ftl`.
 
-**Semantic tokens** — functional meanings that reference primitives:
+### Report Layout
 
-```css
-:root {
-    /* Surfaces */
-    --bg: var(--color-gray-100);
-    --surface: var(--color-gray-0);
-    --border: var(--color-gray-300);
-    /* Text */
-    --text-primary: var(--color-gray-900);
-    --text-secondary: var(--color-gray-600);
-    /* Accent */
-    --accent: var(--color-teal-600);
-    /* Status */
-    --green: var(--color-green-600);
-    --red: var(--color-red-500);
-    --amber: var(--color-amber-400);
-    --not-run: var(--color-gray-600);
-}
-```
-
-> **Note:** Runtime customization of the HTML report (custom CSS, custom templates) is not yet supported for projects consuming PulseReport as a dependency. The report uses a fixed built-in template. If you are contributing to PulseReport itself, modify the tokens in `src/main/resources/templates/html-report.ftl`.
-
-### Report Sections
-
-#### 1. Summary Section
-
-```
-Test Execution Summary
-━━━━━━━━━━━━━━━━━━━━━
-Total Tests:    150
-Passed:         142 (94.7%)
-Failed:         6   (4.0%)
-Skipped:        2   (1.3%)
-
-Duration:       2m 45s
-Start Time:     2026-02-16 10:30:00
-End Time:       2026-02-16 10:32:45
-```
-
-#### 2. Test Details
-
-Each test shows:
-
-- Test name and description
-- Status (✅ Pass, ❌ Fail, ⊘ Skip)
-- Execution time
-- Parameters (for data-driven tests)
-- Stack trace (for failures)
-- Artifacts (screenshots, logs)
-- Metrics (response times, etc.)
-
-#### 3. Artifacts
-
-Screenshots and API call artifacts displayed inline with expand/collapse controls.
+- **Top bar**: Report title, run metadata, theme toggle
+- **Verdict band**: Outcome headline, passed/skipped breakdown, run timeline
+- **Test list**: Tests grouped by suite or feature, with status filters and search
+- **Detail pane**: For the selected test, in order: failure, steps, HTTP exchanges, screenshots, recordings, attachments, then details (class, method, start time, duration, retries, metrics)
 
 ### Example
 

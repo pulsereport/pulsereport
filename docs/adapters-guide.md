@@ -549,15 +549,24 @@ ReporterConfig config = ReporterConfig.builder()
 RestAssured.filters(new RestAssuredAdapter(config));
 ```
 
-#### Option 3: TestNG listener (if using TestNG)
+#### Option 3: With TestNG
+
+`RestAssuredAdapter` is a REST-assured `Filter`, not a TestNG listener. Register `TestNGAdapter` as the listener; it attaches every exchange the filter captures to the test that was running:
 
 ```xml
 <suite name="API Test Suite">
     <listeners>
-        <listener class-name="io.github.pulsereport.adapters.restassured.RestAssuredAdapter"/>
+        <listener class-name="io.github.pulsereport.adapters.testng.TestNGAdapter"/>
     </listeners>
     <!-- tests -->
 </suite>
+```
+
+```java
+@BeforeClass
+public void setUp() {
+    RestAssured.filters(new RestAssuredAdapter());
+}
 ```
 
 ### Features
@@ -681,12 +690,6 @@ Response durations are automatically formatted in human-readable units (e.g., `2
 In the PulseReport configuration file (`reporter.properties`):
 
 ```properties
-# REST-assured settings
-reporter.restassured.logging.request=true
-reporter.restassured.logging.response=true
-reporter.restassured.logging.headers=true
-reporter.restassured.logging.body=true
-
 # Sensitive data masking (enabled by default; see configuration.md
 # for the full masking reference, including body, XML, and token masking)
 reporter.maskSensitiveData=true

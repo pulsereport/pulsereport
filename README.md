@@ -15,7 +15,7 @@ A unified test reporting library for Java. PulseReport captures results from Tes
 <dependency>
     <groupId>io.github.pulsereport</groupId>
     <artifactId>pulsereport</artifactId>
-    <version>1.1.1</version>
+    <version>1.2.0</version>
 </dependency>
 ```
 
@@ -52,7 +52,7 @@ Adapters are optional dependencies — add only the framework JARs you actually 
 
 ## Output Formats
 
-- **HTML** — Interactive report with charts, screenshots, and filtering
+- **HTML** — Self-contained interactive report with a run timeline, failure-first navigation, search and filters, screenshots, HTTP exchanges, and light/dark themes
 - **JSON** — Machine-readable for custom tooling and dashboards
 - **JUnit XML** — Compatible with Jenkins, GitLab CI, GitHub Actions, and TeamCity
 
