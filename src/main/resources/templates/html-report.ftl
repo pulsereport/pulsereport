@@ -41,11 +41,12 @@
             --accent-ink: #0a6c6e;
             --accent-bg: #e2f1f1;
             --pass: #2b7a3d;
+            --pass-bg: #e5f2e8;
             --fail: #c0362f;
             --fail-bg: #fbe9e7;
             --skip: #8a5f00;
             --skip-bg: #f7eed8;
-            --bar-skip: #d9b46e;
+            --bar-skip: #f6c73c;
             color-scheme: light;
         }
 
@@ -62,11 +63,12 @@
                 --accent-ink: #5cc8ca;
                 --accent-bg: #11302f;
                 --pass: #5bbf73;
+                --pass-bg: #142a1b;
                 --fail: #f07171;
                 --fail-bg: #311617;
                 --skip: #e0ad48;
                 --skip-bg: #2c2312;
-                --bar-skip: #d9bc84;
+                --bar-skip: #e4cf6e;
                 color-scheme: dark;
             }
         }
@@ -84,11 +86,12 @@
                 --accent-ink: #5cc8ca;
                 --accent-bg: #11302f;
                 --pass: #5bbf73;
+                --pass-bg: #142a1b;
                 --fail: #f07171;
                 --fail-bg: #311617;
                 --skip: #e0ad48;
                 --skip-bg: #2c2312;
-                --bar-skip: #d9bc84;
+                --bar-skip: #e4cf6e;
                 color-scheme: dark;
             }
         }
@@ -571,6 +574,9 @@
         }
 
         .chip {
+            --chip-fg: var(--ink);
+            --chip-bg: var(--sunken);
+            --chip-line: var(--ink-muted);
             display: inline-flex;
             align-items: center;
             gap: 6px;
@@ -583,6 +589,24 @@
             cursor: pointer;
         }
 
+        .chip[data-status='FAILED'] {
+            --chip-fg: var(--fail);
+            --chip-bg: var(--fail-bg);
+            --chip-line: var(--fail);
+        }
+
+        .chip[data-status='SKIPPED'] {
+            --chip-fg: var(--bar-skip);
+            --chip-bg: var(--skip-bg);
+            --chip-line: var(--bar-skip);
+        }
+
+        .chip[data-status='PASSED'] {
+            --chip-fg: var(--pass);
+            --chip-bg: var(--pass-bg);
+            --chip-line: var(--pass);
+        }
+
         .chip .n {
             font-family: var(--font-mono);
             font-size: 11px;
@@ -590,15 +614,17 @@
         }
 
         .chip:hover:not(:disabled):not([aria-pressed='true']) {
-            background: var(--sunken);
+            border-color: var(--chip-line);
+            color: var(--chip-fg);
         }
 
         .chip[aria-pressed='true'] {
-            background: var(--ink);
-            border-color: var(--ink);
-            color: var(--raised);
+            background: var(--chip-fg);
+            border-color: var(--chip-line);
+            color: white;
         }
 
+        .chip:hover:not(:disabled) .n,
         .chip[aria-pressed='true'] .n {
             color: inherit;
             opacity: 0.75;
@@ -760,9 +786,6 @@
         }
 
         .d-head h2 {
-            display: flex;
-            gap: 10px;
-            align-items: center;
             margin: 0;
             font-size: 18px;
             line-height: 1.3;
@@ -2174,7 +2197,7 @@
                 return h(
                     'header',
                     { class: 'd-head' },
-                    h('h2', null, glyph(tc.status), h('span', null, h('span', { class: 'sr-only' }, `${s.label}: `), tc.name)),
+                    h('h2', null, h('span', { class: 'sr-only' }, `${s.label}: `), tc.name),
                     h(
                         'div',
                         { class: 'd-meta' },
