@@ -15,6 +15,7 @@ import org.testng.ITestResult;
 
 import java.time.Instant;
 import java.util.Base64;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -463,7 +464,7 @@ public class AppiumAdapter extends TestNGAdapter {
             throw new IllegalArgumentException("Metadata cannot be null");
         }
         String suiteKey = currentSuiteKey();
-        sessionMetadataBySuite.computeIfAbsent(suiteKey, k -> new ConcurrentHashMap<>())
+        sessionMetadataBySuite.computeIfAbsent(suiteKey, k -> Collections.synchronizedMap(new LinkedHashMap<>()))
                 .putAll(metadata.toEnvironmentMap());
         logger.debug("Recorded mobile session metadata for suite '{}': {}", suiteKey, metadata);
     }
@@ -554,12 +555,16 @@ public class AppiumAdapter extends TestNGAdapter {
         if (finishingSuite != null) {
             Map<String, String> bucket = sessionMetadataBySuite.get(finishingSuite);
             if (bucket != null) {
-                result.putAll(bucket);
+                synchronized (bucket) {
+                    result.putAll(bucket);
+                }
             }
         }
         Map<String, String> defaultBucket = sessionMetadataBySuite.remove("default");
         if (defaultBucket != null) {
-            result.putAll(defaultBucket);
+            synchronized (defaultBucket) {
+                result.putAll(defaultBucket);
+            }
         }
         return result;
     }

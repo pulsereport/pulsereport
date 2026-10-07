@@ -1,9 +1,9 @@
 package io.github.pulsereport.adapters.selenium;
 
 import java.time.Instant;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -101,7 +101,7 @@ public class SeleniumAdapter extends TestNGAdapter {
 
     private static final Logger logger = LoggerFactory.getLogger(SeleniumAdapter.class);
 
-    private final Map<String, String> runBrowserMetadata = new ConcurrentHashMap<>();
+    private final Map<String, String> runBrowserMetadata = Collections.synchronizedMap(new LinkedHashMap<>());
 
     /**
      * Constructs a new SeleniumAdapter.
@@ -354,7 +354,9 @@ public class SeleniumAdapter extends TestNGAdapter {
         if (builtTestRun.getEnvironment() != null) {
             mergedEnvironment.putAll(builtTestRun.getEnvironment());
         }
-        mergedEnvironment.putAll(runBrowserMetadata);
+        synchronized (runBrowserMetadata) {
+            mergedEnvironment.putAll(runBrowserMetadata);
+        }
 
         return TestRun.builder()
                 .id(builtTestRun.getId())

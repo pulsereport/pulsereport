@@ -7,7 +7,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -57,7 +57,7 @@ public final class TestRun {
         this.duration = duration;
         this.status = status;
         this.suites = suites != null ? new ArrayList<>(suites) : new ArrayList<>();
-        this.environment = environment != null ? new HashMap<>(environment) : null;
+        this.environment = environment != null ? new LinkedHashMap<>(environment) : null;
         this.totalTests = totalTests;
         this.passedTests = passedTests;
         this.failedTests = failedTests;
