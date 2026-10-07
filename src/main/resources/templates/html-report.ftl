@@ -1647,7 +1647,8 @@
                 const text = el.dataset.tip;
                 if (!text || !el.isConnected) return;
                 const [head, ...rest] = text.split('\n');
-                tip.replaceChildren(h('strong', null, head), rest.length ? h('span', { class: 'tip-sub' }, rest.join('\n')) : null);
+                tip.replaceChildren(h('strong', null, head));
+                if (rest.length) tip.append(h('span', { class: 'tip-sub' }, rest.join('\n')));
                 tipFor = el;
                 const r = el.getBoundingClientRect();
                 const { width, height } = tip.getBoundingClientRect();
@@ -1675,7 +1676,7 @@
                 hideTip();
                 if (!el?.dataset.tip) return;
                 // Sweeping from one tooltip to the next (e.g. along the timeline) skips the delay.
-                tipTimer = setTimeout(() => showTip(el), performance.now() - tipHiddenAt < 400 ? 0 : 250);
+                tipTimer = setTimeout(() => showTip(el), performance.now() - tipHiddenAt < 300 ? 0 : 600);
             });
 
             document.addEventListener('pointerdown', hideTip);
