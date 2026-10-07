@@ -3,6 +3,7 @@ package io.github.pulsereport.outputs.html;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
@@ -37,6 +38,10 @@ import io.github.pulsereport.outputs.OutputGenerator;
 public class HtmlReportGenerator implements OutputGenerator {
 
     private static final String DEFAULT_RUN_NAME = "Test run";
+
+    // Latin subsets of Geist (OFL 1.1, see /fonts/OFL-Geist.txt), inlined so reports render the same offline.
+    private static final String FONT_FACES = fontFace("Geist", "Geist-Variable-latin.woff2")
+            + fontFace("Geist Mono", "GeistMono-Variable-latin.woff2");
 
     private final Configuration freemarkerConfig;
     private final ObjectMapper objectMapper;
@@ -121,6 +126,7 @@ public class HtmlReportGenerator implements OutputGenerator {
             String name = reportTitle != null ? reportTitle : testRun.getName();
             dataModel.put("runName", name == null || name.isBlank() ? DEFAULT_RUN_NAME : name);
             dataModel.put("runJson", toScriptSafeJson(testRun));
+            dataModel.put("fontFaces", FONT_FACES);
 
             try (Writer writer = new OutputStreamWriter(outputStream, StandardCharsets.UTF_8)) {
                 template.process(dataModel, writer);
@@ -128,6 +134,19 @@ public class HtmlReportGenerator implements OutputGenerator {
             }
         } catch (TemplateException e) {
             throw new IOException("Failed to process FreeMarker template", e);
+        }
+    }
+
+    private static String fontFace(String family, String file) {
+        try (InputStream in = HtmlReportGenerator.class.getResourceAsStream("/fonts/" + file)) {
+            if (in == null) {
+                return "";
+            }
+            return "@font-face{font-family:'" + family + "';src:url(data:font/woff2;base64,"
+                    + Base64.getEncoder().encodeToString(in.readAllBytes())
+                    + ") format('woff2');font-weight:100 900;font-style:normal;font-display:swap}";
+        } catch (IOException e) {
+            return "";
         }
     }
 

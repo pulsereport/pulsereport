@@ -348,6 +348,14 @@ class HtmlReportGeneratorTest {
     }
 
     @Test
+    void embedsGeistFontsAsDataUris() throws IOException {
+        String html = generateHtml(createSampleTestRun());
+
+        assertTrue(hasCss(html, "@font-face\\{font-family:'Geist';src:url\\(data:font/woff2;base64,d09GMg"));
+        assertTrue(hasCss(html, "@font-face\\{font-family:'Geist Mono';src:url\\(data:font/woff2;base64,d09GMg"));
+    }
+
+    @Test
     void htmlContainsShellAndRenderer() throws IOException {
         String html = generateHtml(createSampleTestRun());
 

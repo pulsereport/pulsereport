@@ -7,6 +7,7 @@
     <meta name="color-scheme" content="light dark">
     <title>${runName} - PulseReport</title>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg' viewBox='0 0 256 256'%3E%3Cstyle%3E.i%7Bfill:%23212529%7D.s%7Bfill:%230F8B8D%7D%40media (prefers-color-scheme:dark)%7B.i%7Bfill:%23F8F9FA%7D.s%7Bfill:%2358B7B8%7D%7D%3C/style%3E%3Cg class='i'%3E%3Ccircle cx='32' cy='150' r='18'/%3E%3Crect x='112' y='132' width='36' height='108' rx='18'/%3E%3Crect x='161' y='92' width='36' height='76' rx='18'/%3E%3Ccircle cx='228' cy='150' r='18'/%3E%3C/g%3E%3Cpath class='s' d='M63 150 L81 16 L99 150 A18 18 0 0 1 63 150 Z'/%3E%3C/svg%3E">
+    <style>${fontFaces?no_esc}</style>
     <#noparse>
     <script>
         try {
