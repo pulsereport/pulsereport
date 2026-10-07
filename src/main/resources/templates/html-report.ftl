@@ -1330,6 +1330,12 @@
                     opacity 120ms,
                     visibility 120ms;
             }
+
+            ::view-transition-old(root),
+            ::view-transition-new(root) {
+                animation-duration: 220ms;
+                animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+            }
         }
 
         @keyframes pr-in {
@@ -2716,13 +2722,18 @@
 
             themeBtn.addEventListener('click', () => {
                 const next = currentTheme() === 'dark' ? 'light' : 'dark';
-                document.documentElement.dataset.theme = next;
+                const apply = () => {
+                    document.documentElement.dataset.theme = next;
+                    syncThemeButton();
+                };
                 try {
                     localStorage.setItem('pulse-report-theme', next);
                 } catch {
                     /* storage unavailable */
                 }
-                syncThemeButton();
+                if (document.startViewTransition && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                    document.startViewTransition(apply);
+                } else apply();
             });
 
             systemDark.addEventListener('change', syncThemeButton);
