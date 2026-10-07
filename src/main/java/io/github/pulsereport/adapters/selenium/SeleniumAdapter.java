@@ -101,7 +101,7 @@ public class SeleniumAdapter extends TestNGAdapter {
 
     private static final Logger logger = LoggerFactory.getLogger(SeleniumAdapter.class);
 
-    private final Map<String, String> runBrowserMetadata = Collections.synchronizedMap(new LinkedHashMap<>());
+    private static final Map<String, String> runBrowserMetadata = Collections.synchronizedMap(new LinkedHashMap<>());
 
     /**
      * Constructs a new SeleniumAdapter.
