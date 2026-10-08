@@ -3,48 +3,75 @@ package io.github.pulsereport.outputs.html;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.InvalidPathException;
 import java.nio.file.Paths;
 import java.util.Base64;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
 import freemarker.template.Configuration;
 import freemarker.template.Template;
 import freemarker.template.TemplateException;
-import freemarker.template.TemplateMethodModelEx;
-import freemarker.template.TemplateModelException;
+import io.github.pulsereport.config.ReporterConfig;
 import io.github.pulsereport.core.model.TestRun;
 import io.github.pulsereport.outputs.OutputGenerator;
 
 /**
- * Generates HTML reports from test run data using FreeMarker templates. Output
- * is self-contained with embedded CSS for offline viewing.
+ * Generates a self-contained HTML report. The test run is embedded as JSON and
+ * rendered in the browser, so the file needs no network access.
  *
  * @author Pulse Report Team
  * @since 1.0.0
  */
 public class HtmlReportGenerator implements OutputGenerator {
 
+    private static final String DEFAULT_RUN_NAME = "Test run";
+
+    // Latin subsets of Geist (OFL 1.1, see /fonts/OFL-Geist.txt), inlined so reports render the same offline.
+    private static final String FONT_FACES = fontFace("Geist", "Geist-Variable-latin.woff2")
+            + fontFace("Geist Mono", "GeistMono-Variable-latin.woff2");
+
     private final Configuration freemarkerConfig;
+    private final ObjectMapper objectMapper;
+    private final String reportTitle;
 
     /**
-     * Creates a new HTML report generator with default FreeMarker
-     * configuration.
+     * Creates a generator whose title comes from {@code reporter.report.title}
+     * (system property or auto-detected reporter.properties), falling back to
+     * the test run name.
      */
     public HtmlReportGenerator() {
+        this(ReporterConfig.resolveReportTitle());
+    }
+
+    /**
+     * Creates a generator with an explicit report title.
+     *
+     * @param reportTitle title for the header and browser tab; null or blank
+     * uses the test run name
+     */
+    public HtmlReportGenerator(String reportTitle) {
+        this.reportTitle = reportTitle == null || reportTitle.isBlank() ? null : reportTitle.trim();
         this.freemarkerConfig = new Configuration(Configuration.VERSION_2_3_32);
         this.freemarkerConfig.setClassForTemplateLoading(this.getClass(), "/templates");
         this.freemarkerConfig.setDefaultEncoding("UTF-8");
         this.freemarkerConfig.setLogTemplateExceptions(false);
 
-        // Set the date/time format to handle Java 8 Instant
-        this.freemarkerConfig.setAPIBuiltinEnabled(true);
+        this.objectMapper = new ObjectMapper();
+        this.objectMapper.registerModule(new JavaTimeModule());
+        this.objectMapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
     }
 
     /**
@@ -96,11 +123,10 @@ public class HtmlReportGenerator implements OutputGenerator {
             Template template = freemarkerConfig.getTemplate("html-report.ftl");
 
             Map<String, Object> dataModel = new HashMap<>();
-            dataModel.put("testRun", testRun);
-            dataModel.put("prettyPrintJson", new PrettyPrintJsonMethod());
-            dataModel.put("prettyPrintXml", new PrettyPrintXmlMethod());
-            dataModel.put("prettyPrintHttpBody", new PrettyPrintHttpBodyMethod());
-            dataModel.put("toDataUri", new ToDataUriMethod());
+            String name = reportTitle != null ? reportTitle : testRun.getName();
+            dataModel.put("runName", name == null || name.isBlank() ? DEFAULT_RUN_NAME : name);
+            dataModel.put("runJson", toScriptSafeJson(testRun));
+            dataModel.put("fontFaces", FONT_FACES);
 
             try (Writer writer = new OutputStreamWriter(outputStream, StandardCharsets.UTF_8)) {
                 template.process(dataModel, writer);
@@ -111,231 +137,76 @@ public class HtmlReportGenerator implements OutputGenerator {
         }
     }
 
-    /**
-     * Pretty-prints JSON with indentation.
-     *
-     * @param json the JSON string to format
-     * @return formatted JSON with newlines and indentation
-     */
-    private String prettyPrintJson(String json) {
-        if (json == null || json.trim().isEmpty()) {
-            return json;
+    private static String fontFace(String family, String file) {
+        try (InputStream in = HtmlReportGenerator.class.getResourceAsStream("/fonts/" + file)) {
+            if (in == null) {
+                return "";
+            }
+            return "@font-face{font-family:'" + family + "';src:url(data:font/woff2;base64,"
+                    + Base64.getEncoder().encodeToString(in.readAllBytes())
+                    + ") format('woff2');font-weight:100 900;font-style:normal;font-display:swap}";
+        } catch (IOException e) {
+            return "";
         }
-
-        StringBuilder result = new StringBuilder();
-        int indent = 0;
-        boolean inString = false;
-        boolean escape = false;
-
-        for (int i = 0; i < json.length(); i++) {
-            char ch = json.charAt(i);
-
-            if (escape) {
-                result.append(ch);
-                escape = false;
-                continue;
-            }
-
-            if (ch == '\\') {
-                result.append(ch);
-                escape = true;
-                continue;
-            }
-
-            if (ch == '"') {
-                inString = !inString;
-                result.append(ch);
-                continue;
-            }
-
-            if (inString) {
-                result.append(ch);
-                continue;
-            }
-
-            switch (ch) {
-                case '{':
-                case '[':
-                    result.append(ch);
-                    result.append('\n');
-                    indent++;
-                    result.append("  ".repeat(indent));
-                    break;
-                case '}':
-                case ']':
-                    result.append('\n');
-                    indent--;
-                    result.append("  ".repeat(indent));
-                    result.append(ch);
-                    break;
-                case ',':
-                    result.append(ch);
-                    result.append('\n');
-                    result.append("  ".repeat(indent));
-                    break;
-                case ':':
-                    result.append(ch);
-                    result.append(' ');
-                    break;
-                default:
-                    if (!Character.isWhitespace(ch)) {
-                        result.append(ch);
-                    }
-                    break;
-            }
-        }
-
-        return result.toString();
     }
 
-    /**
-     * Pretty-prints XML with indentation.
-     *
-     * @param xml the XML string to format
-     * @return formatted XML with newlines and indentation
-     */
-    private String prettyPrintXml(String xml) {
-        if (xml == null || xml.trim().isEmpty()) {
-            return xml;
-        }
+    private String toScriptSafeJson(TestRun testRun) throws IOException {
+        JsonNode tree = objectMapper.valueToTree(testRun);
+        inlineImageArtifacts(tree);
+        return escapeForScriptBlock(objectMapper.writeValueAsString(tree));
+    }
 
-        try {
-            StringBuilder result = new StringBuilder();
-            int indent = 0;
-            boolean inTag = false;
-
-            for (int i = 0; i < xml.length(); i++) {
-                char ch = xml.charAt(i);
-
-                if (ch == '<') {
-                    if (i + 1 < xml.length() && xml.charAt(i + 1) == '/') {
-                        indent = Math.max(0, indent - 1);
-                        if (result.length() > 0 && result.charAt(result.length() - 1) != '\n') {
-                            result.append('\n');
-                        }
-                        result.append("  ".repeat(indent));
-                    } else if (i > 0 && xml.charAt(i - 1) == '>') {
-                        result.append('\n');
-                        result.append("  ".repeat(indent));
-                    }
-                    inTag = true;
-                    result.append(ch);
-                } else if (ch == '>') {
-                    result.append(ch);
-                    inTag = false;
-                    // Check if it's not a self-closing or closing tag
-                    if (i > 0 && xml.charAt(i - 1) != '/') {
-                        // Look ahead to see if next is immediately a closing tag
-                        if (i + 1 < xml.length() && xml.charAt(i + 1) == '<'
-                                && i + 2 < xml.length() && xml.charAt(i + 2) != '/') {
-                            indent++;
-                        } else if (i + 1 >= xml.length() || xml.charAt(i + 1) != '<') {
-                            // There's content between tags
-                            indent++;
-                        }
-                    }
-                } else if (!inTag || !Character.isWhitespace(ch)) {
-                    result.append(ch);
+    private void inlineImageArtifacts(JsonNode node) {
+        JsonNode artifacts = node.isObject() ? node.get("artifacts") : null;
+        if (artifacts != null && artifacts.isArray()) {
+            for (JsonNode artifact : artifacts) {
+                if (artifact.isObject()) {
+                    inlineImage((ObjectNode) artifact);
                 }
             }
+        }
+        node.forEach(this::inlineImageArtifacts);
+    }
 
-            return result.toString().trim();
-        } catch (Exception e) {
-            return xml;
+    /** Reads a path-backed screenshot into base64 content so the report stays viewable when moved. */
+    private void inlineImage(ObjectNode artifact) {
+        if (!artifact.path("content").asText("").isEmpty()) {
+            return;
+        }
+        String mimeType = artifact.path("mimeType").asText("");
+        boolean image = mimeType.startsWith("image/") || "screenshot".equals(artifact.path("type").asText(""));
+        String path = artifact.path("path").asText("");
+        if (!image || path.isEmpty()) {
+            return;
+        }
+        try {
+            byte[] bytes = Files.readAllBytes(Paths.get(path));
+            artifact.put("content", Base64.getEncoder().encodeToString(bytes));
+            if (mimeType.isEmpty()) {
+                artifact.put("mimeType", "image/png");
+            }
+        } catch (IOException | InvalidPathException e) {
+            // Unreadable screenshots stay path-only; the report renders them as not embedded.
         }
     }
 
     /**
-     * Reformats an HTTP request content string so that any JSON found after the
-     * "Body:" label is pretty-printed while the rest of the text is kept
-     * unchanged.
+     * Escapes characters that could end a {@code <script>} element or break JavaScript parsing.
+     * They only occur inside JSON strings, where the unicode escapes decode to the same text.
      */
-    private String prettyPrintHttpBody(String content) {
-        if (content == null || content.trim().isEmpty()) {
-            return content;
-        }
-        // Split on the "Body:" separator (handles both "\nBody:\n" and leading "Body:\n")
-        int bodyIdx = content.indexOf("\nBody:\n");
-        if (bodyIdx == -1) {
-            return content;
-        }
-        String prefix = content.substring(0, bodyIdx + "\nBody:\n".length());
-        String body = content.substring(bodyIdx + "\nBody:\n".length());
-        String trimmedBody = body.trim();
-        if (!trimmedBody.isEmpty() && (trimmedBody.charAt(0) == '{' || trimmedBody.charAt(0) == '[')) {
-            return prefix + prettyPrintJson(trimmedBody);
-        }
-        return content;
-    }
-
-    /**
-     * FreeMarker method adapter for prettyPrintJson.
-     */
-    private class PrettyPrintJsonMethod implements TemplateMethodModelEx {
-
-        @Override
-        @SuppressWarnings("rawtypes")
-        public Object exec(List arguments) throws TemplateModelException {
-            if (arguments.isEmpty()) {
-                return "";
-            }
-            String json = arguments.get(0).toString();
-            return prettyPrintJson(json);
-        }
-    }
-
-    /**
-     * FreeMarker method adapter for prettyPrintHttpBody.
-     */
-    private class PrettyPrintHttpBodyMethod implements TemplateMethodModelEx {
-
-        @Override
-        @SuppressWarnings("rawtypes")
-        public Object exec(List arguments) throws TemplateModelException {
-            if (arguments.isEmpty()) {
-                return "";
-            }
-            String content = arguments.get(0).toString();
-            return prettyPrintHttpBody(content);
-        }
-    }
-
-    /**
-     * FreeMarker method adapter for prettyPrintXml.
-     */
-    private class PrettyPrintXmlMethod implements TemplateMethodModelEx {
-
-        @Override
-        @SuppressWarnings("rawtypes")
-        public Object exec(List arguments) throws TemplateModelException {
-            if (arguments.isEmpty()) {
-                return "";
-            }
-            String xml = arguments.get(0).toString();
-            return prettyPrintXml(xml);
-        }
-    }
-
-    /**
-     * FreeMarker method that reads an image file and returns a base64 data URI
-     * so screenshots can be embedded directly inside the HTML report.
-     */
-    private class ToDataUriMethod implements TemplateMethodModelEx {
-
-        @Override
-        @SuppressWarnings("rawtypes")
-        public Object exec(List arguments) throws TemplateModelException {
-            if (arguments.size() < 2) {
-                return "";
-            }
-            String path = arguments.get(0).toString();
-            String mimeType = arguments.get(1).toString();
-            try {
-                byte[] bytes = Files.readAllBytes(Paths.get(path));
-                return "data:" + mimeType + ";base64," + Base64.getEncoder().encodeToString(bytes);
-            } catch (IOException e) {
-                return "";
+    private static String escapeForScriptBlock(String json) {
+        StringBuilder out = new StringBuilder(json.length() + 32);
+        for (int i = 0; i < json.length(); i++) {
+            char c = json.charAt(i);
+            switch (c) {
+                case '<' -> out.append("\\u003c");
+                case '>' -> out.append("\\u003e");
+                case '&' -> out.append("\\u0026");
+                case '\u2028' -> out.append("\\u2028");
+                case '\u2029' -> out.append("\\u2029");
+                default -> out.append(c);
             }
         }
+        return out.toString();
     }
 }

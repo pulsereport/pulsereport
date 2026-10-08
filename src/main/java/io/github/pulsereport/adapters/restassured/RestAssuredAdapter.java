@@ -409,11 +409,11 @@ public class RestAssuredAdapter implements Filter {
                             .append(bodyString.length())
                             .append(BINARY_SIZE_SUFFIX);
                 } else {
-                    requestContent.append(BODY_PREFIX).append(maskBodyIfEnabled(bodyString));
+                    requestContent.append(BODY_PREFIX).append(applyContentSizeLimit(maskBodyIfEnabled(bodyString)));
                 }
             }
 
-            String finalContent = applyContentSizeLimit(requestContent.toString());
+            String finalContent = requestContent.toString();
 
             Artifact httpRequest = Artifact.builder()
                     .name("http-request.txt")
@@ -477,11 +477,11 @@ public class RestAssuredAdapter implements Filter {
                             .append(body.length())
                             .append(BINARY_SIZE_SUFFIX);
                 } else {
-                    responseContent.append(BODY_PREFIX).append(maskBodyIfEnabled(body));
+                    responseContent.append(BODY_PREFIX).append(applyContentSizeLimit(maskBodyIfEnabled(body)));
                 }
             }
 
-            String finalContent = applyContentSizeLimit(responseContent.toString());
+            String finalContent = responseContent.toString();
 
             Artifact httpResponse = Artifact.builder()
                     .name("http-response.txt")
@@ -518,7 +518,8 @@ public class RestAssuredAdapter implements Filter {
     }
 
     /**
-     * Applies content size limit and adds truncation message if needed.
+     * Caps a captured body at the configured size and appends a truncation
+     * note. Headers are never truncated, so they cannot crowd out the body.
      */
     private String applyContentSizeLimit(String content) {
         if (content == null) {

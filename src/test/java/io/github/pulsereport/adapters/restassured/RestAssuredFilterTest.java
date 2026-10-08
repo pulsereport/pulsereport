@@ -200,6 +200,37 @@ public class RestAssuredFilterTest {
     }
 
     @Test
+    public void largeHeadersDoNotCrowdOutTheBody() throws Exception {
+        RestAssuredAdapter.setCurrentTestName("testApiCall");
+
+        Header[] headers = new Header[40];
+        for (int i = 0; i < headers.length; i++) {
+            headers[i] = new Header("X-Edge-" + i, "value-that-takes-up-space-" + i);
+        }
+        String body = "{\"id\":1,\"title\":\"kept\"}";
+
+        when(requestSpec.getMethod()).thenReturn("GET");
+        when(requestSpec.getURI()).thenReturn("http://api.example.com/data");
+        when(requestSpec.getHeaders()).thenReturn(new Headers());
+        when(requestSpec.getBody()).thenReturn(null);
+        when(responseBody.asString()).thenReturn(body);
+        when(response.getStatusCode()).thenReturn(200);
+        when(response.getHeaders()).thenReturn(new Headers(headers));
+
+        adapter.filter(requestSpec, responseSpec, filterContext);
+
+        String content = RestAssuredAdapter.getArtifacts("testApiCall").stream()
+                .filter(a -> a.getType().equals("http-response"))
+                .findFirst().orElseThrow().getContent();
+        assertTrue(content.length() > 1024, "headers alone exceed the 1KB limit");
+        assertTrue(content.contains("X-Edge-39: value-that-takes-up-space-39"));
+        assertTrue(content.endsWith("Body:\n" + body));
+        assertFalse(content.contains("[Content truncated at"));
+
+        RestAssuredAdapter.clearCurrentTestName();
+    }
+
+    @Test
     public void filterMasksSensitiveHeaders() throws Exception {
         RestAssuredAdapter.setCurrentTestName("testApiCall");
 

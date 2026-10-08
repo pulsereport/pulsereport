@@ -18,9 +18,11 @@ public class ReporterConfig {
 
     private static final List<String> VALID_FORMATS = Arrays.asList("html", "json", "junit");
     private static final Pattern ENV_VAR_PATTERN = Pattern.compile("\\$\\{([^}]+)\\}");
+    private static final String REPORT_TITLE_KEY = "reporter.report.title";
 
     private List<String> outputFormats;
     private File outputDirectory;
+    private String reportTitle;
     private S3Config s3Config;
     private HttpConfig httpConfig;
     private SlackConfig slackConfig;
@@ -150,6 +152,26 @@ public class ReporterConfig {
     }
 
     /**
+     * Resolves the HTML report title: the {@code reporter.report.title} system
+     * property first, then the same key in an auto-detected
+     * {@code reporter.properties}. Never throws.
+     *
+     * @return the configured title, or null when none is set
+     */
+    public static String resolveReportTitle() {
+        String sysProp = System.getProperty(REPORT_TITLE_KEY);
+        if (sysProp != null && !sysProp.isBlank()) {
+            return sysProp.trim();
+        }
+        try {
+            ReporterConfig config = autoDetect();
+            return config != null ? config.getReportTitle() : null;
+        } catch (RuntimeException e) {
+            return null;
+        }
+    }
+
+    /**
      * Loads configuration from Properties object.
      *
      * @param props the properties object
@@ -170,6 +192,9 @@ public class ReporterConfig {
         if (!outputDir.isEmpty()) {
             config.outputDirectory = new File(outputDir);
         }
+
+        String title = interpolate(props.getProperty(REPORT_TITLE_KEY, "")).trim();
+        config.reportTitle = title.isEmpty() ? null : title;
 
         config.s3Config.enabled = Boolean.parseBoolean(props.getProperty("reporter.s3.enabled", "false"));
         config.s3Config.bucket = interpolate(props.getProperty("reporter.s3.bucket", ""));
@@ -291,6 +316,16 @@ public class ReporterConfig {
         return outputDirectory;
     }
 
+    /**
+     * Gets the title shown in the HTML report header and browser tab. When
+     * null, the report uses the test run name.
+     *
+     * @return the report title, or null
+     */
+    public String getReportTitle() {
+        return reportTitle;
+    }
+
     public S3Config getS3Config() {
         return s3Config;
     }
@@ -393,6 +428,7 @@ public class ReporterConfig {
         return "ReporterConfig{"
                 + "outputFormats=" + outputFormats
                 + ", outputDirectory=" + outputDirectory
+                + ", reportTitle='" + reportTitle + '\''
                 + ", s3Config=" + s3Config
                 + ", httpConfig=" + httpConfig
                 + ", slackConfig=" + slackConfig
@@ -427,6 +463,11 @@ public class ReporterConfig {
 
         public Builder outputDirectory(File directory) {
             config.outputDirectory = directory;
+            return this;
+        }
+
+        public Builder reportTitle(String reportTitle) {
+            config.reportTitle = reportTitle;
             return this;
         }
 
