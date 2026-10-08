@@ -47,6 +47,8 @@
             --skip: #8a5f00;
             --skip-bg: #f7eed8;
             --bar-skip: #f6c73c;
+            --chip-all-bg: var(--ink);
+            --chip-all-fg: #fff;
             color-scheme: light;
         }
 
@@ -69,6 +71,8 @@
                 --skip: #e0ad48;
                 --skip-bg: #2c2312;
                 --bar-skip: #e4cf6e;
+                --chip-all-bg: var(--border-strong);
+                --chip-all-fg: var(--ink);
                 color-scheme: dark;
             }
         }
@@ -92,6 +96,8 @@
                 --skip: #e0ad48;
                 --skip-bg: #2c2312;
                 --bar-skip: #e4cf6e;
+                --chip-all-bg: var(--border-strong);
+                --chip-all-fg: var(--ink);
                 color-scheme: dark;
             }
         }
@@ -421,6 +427,11 @@
             scrollbar-width: thin;
         }
 
+        .pulse-track.sparse {
+            justify-content: flex-start;
+            gap: 6px;
+        }
+
         .bar {
             position: relative;
             flex: 1 1 0;
@@ -622,6 +633,12 @@
             background: var(--chip-fg);
             border-color: var(--chip-line);
             color: white;
+        }
+
+        .chip[data-status='all'][aria-pressed='true'] {
+            background: var(--chip-all-bg);
+            border-color: var(--chip-all-bg);
+            color: var(--chip-all-fg);
         }
 
         .chip:hover:not(:disabled) .n,
@@ -1022,6 +1039,15 @@
 
         .xwrap[open] > summary {
             margin-bottom: 8px;
+        }
+
+        .xcode {
+            font-weight: 600;
+        }
+
+        .xlist {
+            display: grid;
+            gap: 10px;
         }
 
         .dt-scroll {
@@ -1944,6 +1970,7 @@
                     role: 'img',
                     'aria-label': `Run timeline: ${totals.all} ${totals.all === 1 ? 'test' : 'tests'} in execution order, bar height shows duration. ${totals.FAILED} failed, ${totals.SKIPPED} skipped.`
                 });
+                if (timeline.length < 15) track.classList.add('sparse');
                 if (timeline.length > 160) track.style.setProperty('--bar-gap', '1px');
                 for (const t of timeline) {
                     const d = t.tc.duration || 0;
@@ -2177,7 +2204,12 @@
                 const arts = tc.artifacts || [];
                 const exchanges = pairExchanges(arts);
                 if (exchanges.length)
-                    d.append(section(exchanges.length > 1 ? 'HTTP exchanges' : 'HTTP exchange', exchanges.map(exchangeEl)));
+                    d.append(
+                        section(
+                            exchanges.length > 1 ? 'HTTP exchanges' : 'HTTP exchange',
+                            exchanges.length > 1 ? h('div', { class: 'xlist' }, exchanges.map(exchangeDetails)) : exchangeEl(exchanges[0])
+                        )
+                    );
                 const shots = renderShots(arts);
                 if (shots) d.append(section('Screenshots', shots));
                 const videos = renderVideos(arts);
@@ -2380,9 +2412,7 @@
                 if (s.errorMessage && s.errorMessage !== ctx.testError) extra.push(h('pre', { class: 'step-err' }, s.errorMessage));
                 if (s.dataTable?.length) extra.push(dataTable(s.dataTable));
                 if (s.docString) extra.push(h('pre', { class: 'body' }, s.docString));
-                for (const pair of pairExchanges(arts)) {
-                    extra.push(h('details', { class: 'dz xwrap' }, h('summary', null, exchangeTitle(pair)), exchangeEl(pair)));
-                }
+                for (const pair of pairExchanges(arts)) extra.push(exchangeDetails(pair));
                 extra.push(renderShots(arts), renderVideos(arts), renderFiles(arts));
                 const present = extra.filter(Boolean);
                 if (present.length) li.append(h('div', { class: 'step-extra' }, present));
@@ -2486,6 +2516,7 @@
             }
 
             const statusCode = res => +((res.line.match(/\b\d{3}\b/) || [])[0] || 0);
+            const statusClass = code => (code >= 400 ? 's-fail' : code >= 200 && code < 300 ? 's-pass' : '');
 
             function exchangeTitle({ req, res }) {
                 let title = 'HTTP';
@@ -2499,9 +2530,11 @@
                     }
                     title = `${method} ${path}`;
                 }
-                if (res) title += ` → ${statusCode(res) || res.line}`;
-                else if (req) title += ' → no response';
-                return title;
+                if (res) {
+                    const code = statusCode(res);
+                    return [`${title} → `, h('span', { class: `xcode ${statusClass(code)}` }, code ? String(code) : res.line)];
+                }
+                return req ? [`${title} → `, h('span', { class: 'xcode s-fail' }, 'no response')] : title;
             }
 
             function prettyBody(body) {
@@ -2523,8 +2556,7 @@
                 let line;
                 if (isResponse) {
                     const code = statusCode(p);
-                    const cls = code >= 400 ? 's-fail' : code >= 200 && code < 300 ? 's-pass' : '';
-                    line = h('div', { class: `xline xstatus ${cls}` }, code ? `${code} ${REASONS[code] || ''}`.trim() : p.line);
+                    line = h('div', { class: `xline xstatus ${statusClass(code)}` }, code ? `${code} ${REASONS[code] || ''}`.trim() : p.line);
                 } else {
                     line = h('div', { class: 'xline' }, p.line);
                 }
@@ -2552,6 +2584,9 @@
 
             const exchangeEl = pair =>
                 h('div', { class: 'xchg' }, httpSide('Request', pair.req, false), httpSide('Response', pair.res, true));
+
+            const exchangeDetails = pair =>
+                h('details', { class: 'dz xwrap' }, h('summary', null, exchangeTitle(pair)), exchangeEl(pair));
 
             // ---------- Artifacts ----------
             function renderShots(arts) {
