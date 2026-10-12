@@ -56,6 +56,10 @@ The current `ReporterConfig` implementation actively reads these keys:
 - `reporter.slack.reportUrl`
 - `reporter.maxArtifactContentSize`
 - `reporter.video.storage`
+- `reporter.screenshots.mode`
+- `reporter.video.mode`
+- `reporter.video.fps`
+- `reporter.video.ffmpegPath`
 - `reporter.maskSensitiveData`
 - `reporter.maskHeaders.enabled`
 - `reporter.maskHeaders.fields`
@@ -68,6 +72,17 @@ The current `ReporterConfig` implementation actively reads these keys:
 The masking keys are described in detail in [Sensitive Data Masking](#sensitive-data-masking).
 
 `reporter.video.storage` controls how Appium video evidence is stored: `path` (default), `embed`, or `url`.
+
+For drivers wrapped with `SeleniumAdapter.track(...)`:
+
+| Key | Values | Default |
+| --- | --- | --- |
+| `reporter.screenshots.mode` | `all` (every step), `failed` (failed steps and failed tests), `last` (last step of each test, plus failures), `none` | `failed` |
+| `reporter.video.mode` | `always`, `failed` (kept only for failed tests), `none` | `none` |
+| `reporter.video.fps` | Frames captured per second, 1–30 | `2` |
+| `reporter.video.ffmpegPath` | ffmpeg executable used to encode MP4 | `ffmpeg` |
+
+Videos are written to `<output directory>/videos/` and need [ffmpeg](https://ffmpeg.org) with libx264; if ffmpeg is missing, a warning is logged and tests run without video. All four keys can also be passed as `-D` system properties.
 
 Other property examples in this document preserve the current PulseReport naming, but they are not all mapped by `ReporterConfig` yet.
 

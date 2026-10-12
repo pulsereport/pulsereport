@@ -19,6 +19,8 @@ public class ReporterConfig {
     private static final List<String> VALID_FORMATS = Arrays.asList("html", "json", "junit");
     private static final Pattern ENV_VAR_PATTERN = Pattern.compile("\\$\\{([^}]+)\\}");
     private static final String REPORT_TITLE_KEY = "reporter.report.title";
+    private static final List<String> VALID_SCREENSHOT_MODES = Arrays.asList("all", "failed", "last", "none");
+    private static final List<String> VALID_VIDEO_MODES = Arrays.asList("always", "failed", "none");
 
     private List<String> outputFormats;
     private File outputDirectory;
@@ -36,6 +38,10 @@ public class ReporterConfig {
     private String xmlFields;
     private boolean maskTokens;
     private String videoStorage;
+    private String screenshotMode;
+    private String videoMode;
+    private int videoFps;
+    private String ffmpegPath;
 
     /**
      * Private constructor - use builder or load methods.
@@ -56,6 +62,10 @@ public class ReporterConfig {
                 + "id_token,client_secret,api_key,apiKey,authorization";
         this.maskTokens = true;
         this.videoStorage = "path"; // path | embed | url
+        this.screenshotMode = "failed";
+        this.videoMode = "none";
+        this.videoFps = 2;
+        this.ffmpegPath = "ffmpeg";
     }
 
     /**
@@ -228,6 +238,10 @@ public class ReporterConfig {
         config.maskTokens = Boolean.parseBoolean(props.getProperty("reporter.maskBody.maskTokens", "true"));
         String videoStorageValue = interpolate(props.getProperty("reporter.video.storage", "path"));
         config.videoStorage = videoStorageValue == null ? "path" : videoStorageValue.trim().toLowerCase();
+        config.screenshotMode = interpolate(props.getProperty("reporter.screenshots.mode", "failed")).trim().toLowerCase();
+        config.videoMode = interpolate(props.getProperty("reporter.video.mode", "none")).trim().toLowerCase();
+        config.videoFps = Integer.parseInt(props.getProperty("reporter.video.fps", "2").trim());
+        config.ffmpegPath = interpolate(props.getProperty("reporter.video.ffmpegPath", "ffmpeg")).trim();
 
         return config;
     }
@@ -304,6 +318,20 @@ public class ReporterConfig {
                 && !videoStorage.equals("url")) {
             throw new ConfigException("Invalid video storage: " + videoStorage
                     + ". Valid values are: path, embed, url");
+        }
+
+        if (!VALID_SCREENSHOT_MODES.contains(screenshotMode)) {
+            throw new ConfigException("Invalid screenshot mode: " + screenshotMode
+                    + ". Valid values are: " + String.join(", ", VALID_SCREENSHOT_MODES));
+        }
+
+        if (!VALID_VIDEO_MODES.contains(videoMode)) {
+            throw new ConfigException("Invalid video mode: " + videoMode
+                    + ". Valid values are: " + String.join(", ", VALID_VIDEO_MODES));
+        }
+
+        if (videoFps < 1 || videoFps > 30) {
+            throw new ConfigException("Invalid video fps: " + videoFps + ". Must be between 1 and 30");
         }
     }
 
@@ -423,6 +451,42 @@ public class ReporterConfig {
         return videoStorage;
     }
 
+    /**
+     * Gets when step screenshots are taken: all, failed (default), last, or none.
+     *
+     * @return the screenshot mode
+     */
+    public String getScreenshotMode() {
+        return screenshotMode;
+    }
+
+    /**
+     * Gets when browser videos are kept: always, failed, or none (default).
+     *
+     * @return the video mode
+     */
+    public String getVideoMode() {
+        return videoMode;
+    }
+
+    /**
+     * Gets the frame capture rate for browser videos. Defaults to 2.
+     *
+     * @return frames per second
+     */
+    public int getVideoFps() {
+        return videoFps;
+    }
+
+    /**
+     * Gets the ffmpeg executable used to encode browser videos. Defaults to "ffmpeg".
+     *
+     * @return the ffmpeg path
+     */
+    public String getFfmpegPath() {
+        return ffmpegPath;
+    }
+
     @Override
     public String toString() {
         return "ReporterConfig{"
@@ -442,6 +506,10 @@ public class ReporterConfig {
                 + ", xmlFields='" + xmlFields + '\''
                 + ", maskTokens=" + maskTokens
                 + ", videoStorage='" + videoStorage + '\''
+                + ", screenshotMode='" + screenshotMode + '\''
+                + ", videoMode='" + videoMode + '\''
+                + ", videoFps=" + videoFps
+                + ", ffmpegPath='" + ffmpegPath + '\''
                 + '}';
     }
 
@@ -533,6 +601,26 @@ public class ReporterConfig {
 
         public Builder videoStorage(String videoStorage) {
             config.videoStorage = videoStorage;
+            return this;
+        }
+
+        public Builder screenshotMode(String screenshotMode) {
+            config.screenshotMode = screenshotMode;
+            return this;
+        }
+
+        public Builder videoMode(String videoMode) {
+            config.videoMode = videoMode;
+            return this;
+        }
+
+        public Builder videoFps(int videoFps) {
+            config.videoFps = videoFps;
+            return this;
+        }
+
+        public Builder ffmpegPath(String ffmpegPath) {
+            config.ffmpegPath = ffmpegPath;
             return this;
         }
 
