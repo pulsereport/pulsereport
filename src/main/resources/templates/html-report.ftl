@@ -1190,7 +1190,7 @@
             display: block;
             width: 100%;
             aspect-ratio: 16/10;
-            object-fit: cover;
+            object-fit: contain;
             border: 1px solid var(--border);
             border-radius: var(--radius);
             background: var(--sunken);
@@ -1219,6 +1219,300 @@
             border-radius: var(--radius);
             color: var(--ink-muted);
             font-size: 12px;
+        }
+
+        .carousel {
+            display: grid;
+            gap: 10px;
+            max-width: 820px;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+
+        .carousel:focus {
+            outline: none;
+        }
+
+        .car-stage,
+        .car-head {
+            display: grid;
+            grid-template-columns: minmax(36px, 1fr) var(--shot-w, minmax(0, 1fr)) minmax(36px, 1fr);
+            align-items: center;
+            gap: 10px;
+        }
+
+        .car-head .car-meta {
+            grid-column: 2;
+        }
+
+        .car-thumbs {
+            width: var(--shot-w, auto);
+            max-width: 100%;
+            margin: 0 auto;
+        }
+
+        .side-btn.prev {
+            justify-self: end;
+        }
+
+        .side-btn.next {
+            justify-self: start;
+        }
+
+        .car-meta .side-btn {
+            width: 28px;
+            height: 28px;
+            margin: -4px -2px -4px 0;
+        }
+
+        .car-frame {
+            position: relative;
+            grid-row: 1;
+            grid-column: 2;
+            overflow: hidden;
+            border-radius: var(--radius);
+        }
+
+        .car-ghost {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+        }
+
+        .car-view {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            padding: 0;
+            border: 0;
+            background: none;
+            touch-action: pan-y pinch-zoom;
+        }
+
+        button.car-view {
+            cursor: zoom-in;
+        }
+
+        .car-view img {
+            display: block;
+            max-width: 100%;
+            max-height: min(460px, 60vh);
+            border-radius: var(--radius);
+            box-shadow: 0 0 0 1px var(--border);
+            transform-origin: 0 0;
+            -webkit-user-drag: none;
+        }
+
+        .carousel.is-expanded {
+            max-width: none;
+        }
+
+        .is-expanded .car-view img {
+            max-height: calc(92dvh - 170px);
+            box-shadow: none;
+        }
+
+        .is-expanded .car-frame.is-zoomed img {
+            cursor: grab;
+        }
+
+        .is-expanded .car-frame.is-panning img {
+            cursor: grabbing;
+        }
+
+        .car-zoom {
+            position: absolute;
+            right: 10px;
+            bottom: 10px;
+            padding: 3px 8px;
+            border-radius: 999px;
+            background: rgb(13 15 17 / 0.65);
+            color: #fff;
+            font: 11.5px var(--font-mono);
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .car-zoom.show {
+            opacity: 1;
+        }
+
+        .car-meta {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            min-width: 0;
+            font-size: 12.5px;
+        }
+
+        .car-count,
+        .car-file {
+            flex: none;
+            font: 11.5px var(--font-mono);
+            color: var(--ink-muted);
+        }
+
+        .car-cap {
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .car-file {
+            margin-left: auto;
+        }
+
+        .car-thumbs {
+            position: relative;
+            display: flex;
+            gap: 8px;
+            overflow-x: auto;
+            padding: 2px 2px 4px;
+        }
+
+        .car-thumb {
+            position: relative;
+            flex: none;
+            padding: 0;
+            border: 0;
+            background: none;
+            opacity: 0.6;
+            cursor: pointer;
+        }
+
+        .car-thumb img {
+            display: block;
+            height: 60px;
+            width: auto;
+            min-width: 40px;
+            max-width: 240px;
+            object-fit: contain;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            background: var(--sunken);
+        }
+
+        .car-thumb:hover,
+        .car-thumb[aria-current] {
+            opacity: 1;
+        }
+
+        .car-thumb[aria-current] img {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 1px var(--accent);
+        }
+
+        .side-btn {
+            grid-row: 1;
+            display: grid;
+            place-items: center;
+            width: 36px;
+            height: 36px;
+            padding: 0;
+            border: 0;
+            border-radius: var(--radius);
+            background: none;
+            color: var(--ink-muted);
+            cursor: pointer;
+        }
+
+        .side-btn .ic {
+            width: 24px;
+            height: 24px;
+            stroke-width: 2;
+        }
+
+        .side-btn:hover {
+            color: var(--ink);
+        }
+
+        .side-btn:active {
+            scale: 0.88;
+        }
+
+        .side-btn.prev {
+            grid-column: 1;
+        }
+
+        .side-btn.next {
+            grid-column: 3;
+        }
+
+        .car-live {
+            display: flex;
+            align-items: baseline;
+            gap: 12px;
+            min-width: 0;
+        }
+
+        .car-thumb.is-fail img {
+            border-color: var(--fail);
+            box-shadow: 0 0 0 1px var(--fail);
+        }
+
+        .car-num {
+            position: absolute;
+            left: 4px;
+            bottom: 4px;
+            min-width: 16px;
+            padding: 0 4px;
+            border-radius: 4px;
+            background: rgb(13 15 17 / 0.7);
+            color: #fff;
+            font: 600 10.5px/16px var(--font-mono);
+            text-align: center;
+        }
+
+        .car-thumb[aria-current] .car-num {
+            background: var(--accent);
+        }
+
+        .car-thumb.is-fail .car-num {
+            background: var(--fail);
+        }
+
+        .car-thumb.is-fail[aria-current] img {
+            box-shadow: 0 0 0 2px var(--fail);
+        }
+
+        .shot-fail {
+            flex: none;
+            font-weight: 600;
+            color: var(--fail);
+        }
+
+        .link-btn {
+            flex: none;
+            padding: 0;
+            border: 0;
+            background: none;
+            color: var(--accent-ink);
+            font: inherit;
+            font-size: 12px;
+            text-decoration: underline;
+            text-underline-offset: 2px;
+            white-space: nowrap;
+            cursor: pointer;
+        }
+
+        .step.flash {
+            background: var(--accent-bg);
+            box-shadow: inset 3px 0 0 var(--accent);
+        }
+
+        .step-shots > summary {
+            font-size: 12px;
+            color: var(--ink-muted);
+        }
+
+        .step-shots[open] > summary {
+            margin-bottom: 8px;
+        }
+
+        .step-shots .shots {
+            grid-template-columns: repeat(auto-fill, minmax(140px, 200px));
         }
 
         .videos {
@@ -1328,34 +1622,59 @@
         }
 
         .lightbox {
-            max-width: min(1200px, 94vw);
+            width: min(1200px, 94vw);
+            max-width: none;
             max-height: 92dvh;
             padding: 0;
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            background: var(--raised);
-            color: var(--ink);
+            overflow: visible;
+            border: 0;
+            background: transparent;
+            color: #e6e8ea;
         }
 
         .lightbox::backdrop {
-            background: rgb(13 15 17 / 0.74);
+            background: rgb(10 12 14 / 0.9);
         }
 
-        .lb-bar {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: 12px;
-            padding: 8px 8px 8px 14px;
-            border-bottom: 1px solid var(--border);
-            font: 12px var(--font-mono);
+        /* Expanded viewer sits directly on the dark backdrop in both themes */
+        .is-expanded .car-count,
+        .is-expanded .car-file {
+            color: rgb(255 255 255 / 0.6);
         }
 
-        .lightbox img {
-            display: block;
-            max-width: 100%;
-            max-height: calc(92dvh - 48px);
-            margin: auto;
+        .is-expanded .side-btn {
+            color: rgb(255 255 255 / 0.7);
+        }
+
+        .is-expanded .side-btn:hover {
+            color: #fff;
+        }
+
+        .is-expanded .link-btn {
+            color: #5cc8ca;
+        }
+
+        .is-expanded .shot-fail {
+            color: #f07171;
+        }
+
+        .is-expanded .car-thumb img {
+            border-color: rgb(255 255 255 / 0.16);
+            background: rgb(255 255 255 / 0.06);
+        }
+
+        .is-expanded .car-thumb[aria-current] img {
+            border-color: #5cc8ca;
+            box-shadow: 0 0 0 1px #5cc8ca;
+        }
+
+        .is-expanded .car-thumb.is-fail img {
+            border-color: #f07171;
+            box-shadow: 0 0 0 1px #f07171;
+        }
+
+        .is-expanded .car-thumb.is-fail[aria-current] img {
+            box-shadow: 0 0 0 2px #f07171;
         }
 
         .print-only {
@@ -1385,6 +1704,51 @@
             ::view-transition-new(root) {
                 animation-duration: 220ms;
                 animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+            }
+
+            .lightbox[open] {
+                animation: pr-pop 180ms cubic-bezier(0.16, 1, 0.3, 1);
+            }
+
+            .lightbox[open]::backdrop {
+                animation: pr-fade 180ms ease-out;
+            }
+
+            .side-btn {
+                transition:
+                    color 120ms,
+                    scale 120ms cubic-bezier(0.16, 1, 0.3, 1);
+            }
+
+            .car-thumb,
+            .car-thumb img {
+                transition:
+                    opacity 150ms,
+                    border-color 150ms,
+                    box-shadow 150ms;
+            }
+
+            .car-zoom {
+                transition: opacity 200ms;
+            }
+
+            .step {
+                transition:
+                    background 600ms ease-out,
+                    box-shadow 600ms ease-out;
+            }
+        }
+
+        @keyframes pr-pop {
+            from {
+                opacity: 0;
+                transform: scale(0.97);
+            }
+        }
+
+        @keyframes pr-fade {
+            from {
+                opacity: 0;
             }
         }
 
@@ -1575,13 +1939,7 @@
         </div>
     </div>
 
-    <dialog class="lightbox" id="lightbox" aria-label="Screenshot">
-        <div class="lb-bar">
-            <span id="lb-name"></span>
-            <button type="button" class="btn" id="lb-close">Close</button>
-        </div>
-        <img id="lb-img" alt="">
-    </dialog>
+    <dialog class="lightbox" id="lightbox" aria-labelledby="lb-cap"></dialog>
 
     <div class="print-only" id="print-failures"></div>
 
@@ -1651,6 +2009,15 @@
             <circle cx="12" cy="12" r="9"/>
             <path d="M12 11v5M12 8h.01"/>
         </svg>
+        <svg data-i="chev-left" class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M15 6l-6 6 6 6"/>
+        </svg>
+        <svg data-i="chev-right" class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M9 6l6 6-6 6"/>
+        </svg>
+        <svg data-i="close" class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M6 6l12 12M18 6L6 18"/>
+        </svg>
     </template>
 
     <script type="application/json" id="pr-data">${runJson?no_esc}</script>
@@ -1660,6 +2027,10 @@
             'use strict';
             const RUN = JSON.parse(document.getElementById('pr-data').textContent);
             const $ = sel => document.querySelector(sel);
+            let gallery = [];
+            let inlineViewer = null;
+            const stepEls = new WeakMap();
+            const wrapIndex = (i, n) => ((i % n) + n) % n;
 
             const STATUS = {
                 PASSED: { key: 'pass', label: 'Passed' },
@@ -2153,24 +2524,36 @@
                 barEls.get(id)?.setAttribute('aria-current', 'true');
                 renderDetail(entry);
                 if (!opts.initial) {
-                    try {
-                        history.replaceState(null, '', `#t=${encodeURIComponent(id)}`);
-                    } catch {
-                        /* file:// in some browsers */
-                    }
+                    setHash();
                     app.dataset.view = 'detail';
                     if (matchMedia('(max-width: 767px)').matches) $('#detail').scrollIntoView();
                 }
             }
 
+            // #t=<test id>[&s=<screenshot number>]
+            function setHash(shot) {
+                if (!state.selected) return;
+                try {
+                    history.replaceState(null, '', `#t=${encodeURIComponent(state.selected)}${shot ? `&s=${shot}` : ''}`);
+                } catch {
+                    /* file:// in some browsers */
+                }
+            }
+
             function idFromHash() {
-                const m = location.hash.match(/^#t=(.+)$/);
+                const m = location.hash.match(/^#t=([^&]+)/);
                 if (!m) return null;
                 try {
                     return decodeURIComponent(m[1]);
                 } catch {
                     return null;
                 }
+            }
+
+            const shotFromHash = () => Number(location.hash.match(/&s=(\d+)$/)?.[1]) || 0;
+
+            function openShotFromHash(shot) {
+                if (shot && gallery[shot - 1]) showLightbox(gallery, shot - 1);
             }
 
             // ---------- Detail ----------
@@ -2196,6 +2579,7 @@
 
                 const failure = renderFailure(tc);
                 if (failure) d.append(section(tc.status === 'SKIPPED' ? 'Skip reason' : 'Failure', failure));
+                gallery = galleryOf(tc);
                 const steps = renderSteps(tc);
                 if (steps)
                     d.append(
@@ -2210,7 +2594,8 @@
                             exchanges.length > 1 ? h('div', { class: 'xlist' }, exchanges.map(exchangeDetails)) : exchangeEl(exchanges[0])
                         )
                     );
-                const shots = renderShots(arts);
+                inlineViewer = gallery.length ? createViewer(gallery, { start: startShot(tc, gallery) }) : null;
+                const shots = inlineViewer ? inlineViewer.root : renderShots(arts);
                 if (shots) d.append(section('Screenshots', shots));
                 const videos = renderVideos(arts);
                 if (videos) d.append(section('Recordings', videos));
@@ -2413,10 +2798,23 @@
                 if (s.dataTable?.length) extra.push(dataTable(s.dataTable));
                 if (s.docString) extra.push(h('pre', { class: 'body' }, s.docString));
                 for (const pair of pairExchanges(arts)) extra.push(exchangeDetails(pair));
-                extra.push(renderShots(arts), renderVideos(arts), renderFiles(arts));
+                extra.push(stepShots(arts), renderVideos(arts), renderFiles(arts));
                 const present = extra.filter(Boolean);
                 if (present.length) li.append(h('div', { class: 'step-extra' }, present));
+                stepEls.set(s, li);
                 return li;
+            }
+
+            function goToStep(step) {
+                const li = stepEls.get(step);
+                if (!li?.isConnected) return;
+                const bg = li.closest('details');
+                if (bg) bg.open = true;
+                li.tabIndex = -1;
+                li.scrollIntoView({ block: 'center' });
+                li.focus({ preventScroll: true });
+                li.classList.add('flash');
+                setTimeout(() => li.classList.remove('flash'), 2000);
             }
 
             function dataTable(rows) {
@@ -2611,10 +3009,351 @@
                             h('img', { src, alt: name, loading: 'lazy' }),
                             h('span', { class: 'cap' }, name)
                         );
-                        btn.addEventListener('click', () => openLightbox(src, name));
+                        btn.addEventListener('click', () => {
+                            const i = gallery.findIndex(g => g.a === a);
+                            if (i >= 0) showLightbox(gallery, i);
+                            else showLightbox([{ src, name }], 0);
+                        });
                         return btn;
                     })
                 );
+            }
+
+            // Collapsed so screenshot-heavy runs keep the step list compact
+            function stepShots(arts) {
+                const shots = renderShots(arts);
+                if (!shots) return null;
+                const n = arts.filter(isImage).length;
+                return h('details', { class: 'dz step-shots' }, h('summary', null, n === 1 ? 'Screenshot' : `Screenshots (${n})`), shots);
+            }
+
+            // ---------- Screenshot gallery: every screenshot of the open test, in capture order ----------
+            function galleryOf(tc) {
+                const items = [];
+                const add = (arts, step) => {
+                    for (const a of (arts || []).filter(isImage)) {
+                        const src = mediaSrc(a, 'image');
+                        if (!src) continue;
+                        const name = a.name || 'screenshot';
+                        items.push({
+                            a,
+                            src,
+                            name,
+                            step: step?.name || null,
+                            stepRef: step,
+                            failed: step ? step.status === 'FAILED' : tc.status === 'FAILED' && /fail/i.test(name),
+                            order: items.length,
+                            ts: Date.parse(a.timestamp || '')
+                        });
+                    }
+                };
+                for (const s of [...(tc.backgroundSteps || []), ...(tc.steps || [])]) add(s.artifacts, s);
+                add(tc.artifacts, null);
+                if (items.every(it => Number.isFinite(it.ts))) items.sort((x, y) => x.ts - y.ts || x.order - y.order);
+                return items;
+            }
+
+            // Failed tests open on the failure evidence rather than the first screenshot
+            function startShot(tc, items) {
+                if (tc.status !== 'FAILED') return 0;
+                const i = items.findIndex(it => it.failed);
+                return i >= 0 ? i : items.length - 1;
+            }
+
+            // Touch/pen swipe; mouse users have the arrows
+            function onSwipe(el, go, enabled = () => true) {
+                let x0 = null;
+                el.addEventListener('pointerdown', e => {
+                    x0 = e.pointerType !== 'mouse' && enabled() ? e.clientX : null;
+                });
+                el.addEventListener('pointerup', e => {
+                    if (x0 == null) return;
+                    const dx = e.clientX - x0;
+                    x0 = null;
+                    if (Math.abs(dx) > 40) go(dx < 0 ? 1 : -1);
+                });
+                el.addEventListener('pointercancel', () => (x0 = null));
+            }
+
+            const navKey = (key, idx, n) => ({ ArrowLeft: idx - 1, ArrowRight: idx + 1, Home: 0, End: n - 1 })[key];
+            const reduceMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+            const EASE = 'cubic-bezier(0.16, 1, 0.3, 1)';
+            const MAX_ZOOM = 8;
+
+            // One viewer: rendered inline under Screenshots and expanded (same component) in the dialog
+            function createViewer(items, { start = 0, expanded = false } = {}) {
+                let idx = -1;
+                const many = items.length > 1;
+                const img = h('img', { alt: '', draggable: 'false' });
+                const view = expanded
+                    ? h('div', { class: 'car-view' }, img)
+                    : h('button', { type: 'button', class: 'car-view', onclick: () => showLightbox(items, idx) }, img);
+                // Mouse presses keep focus on the viewer itself, so no focus ring appears on the button
+                const keepFocus = e => {
+                    e.preventDefault();
+                    root.focus({ preventScroll: true });
+                };
+                const sideBtn = (cls, label, ic, onclick) =>
+                    h('button', { type: 'button', class: `side-btn ${cls}`, 'aria-label': label, onmousedown: keepFocus, onclick }, icon(ic));
+                const prev = many ? sideBtn('prev', 'Previous screenshot', 'chev-left', () => show(idx - 1)) : null;
+                const next = many ? sideBtn('next', 'Next screenshot', 'chev-right', () => show(idx + 1)) : null;
+                const close = expanded ? sideBtn('close', 'Close', 'close', closeLightbox) : null;
+                const zoomBadge = expanded ? h('span', { class: 'car-zoom', 'aria-hidden': 'true' }) : null;
+                const frame = h('div', { class: 'car-frame' }, view, zoomBadge);
+                const stage = h('div', { class: 'car-stage' }, prev, frame, next);
+
+                const count = h('span', { class: 'car-count' });
+                const fail = h('span', { class: 'shot-fail', hidden: true }, 'Failure');
+                const cap = h('span', { class: 'car-cap', id: expanded ? 'lb-cap' : null });
+                const live = h('span', { class: 'car-live', 'aria-live': 'polite' }, count, fail, cap);
+                const file = h('span', { class: 'car-file' });
+                const goStep = h(
+                    'button',
+                    {
+                        type: 'button',
+                        class: 'link-btn',
+                        onclick: () => {
+                            const step = items[idx].stepRef;
+                            if (expanded) closeLightbox();
+                            goToStep(step);
+                        }
+                    },
+                    'Go to step'
+                );
+
+                const thumbs = items.map((it, i) =>
+                    h(
+                        'button',
+                        {
+                            type: 'button',
+                            class: `car-thumb${it.failed ? ' is-fail' : ''}`,
+                            tabindex: '-1',
+                            'aria-label': `Screenshot ${i + 1}: ${it.failed ? 'failure, ' : ''}${it.step || it.name}`,
+                            onmousedown: keepFocus,
+                            onclick: () => show(i)
+                        },
+                        h('img', { src: it.src, alt: '', loading: 'lazy', draggable: 'false' }),
+                        h('span', { class: 'car-num', 'aria-hidden': 'true' }, String(i + 1))
+                    )
+                );
+                // One tab stop for the whole strip; arrow keys move within it
+                const strip = many ? h('div', { class: 'car-thumbs', role: 'group', 'aria-label': 'Choose screenshot' }, thumbs) : null;
+
+                const root = h(
+                    'div',
+                    {
+                        class: `carousel${expanded ? ' is-expanded' : ''}`,
+                        role: 'group',
+                        'aria-roledescription': 'carousel',
+                        'aria-label': 'Screenshots',
+                        tabindex: '-1'
+                    },
+                    // Caption row on top (with close when expanded), aligned to the image and arrow columns
+                    h('div', { class: 'car-head' }, h('div', { class: 'car-meta' }, live, file, goStep, close)),
+                    stage,
+                    strip
+                );
+
+                // ---- Zoom (expanded only): wheel / trackpad pinch at the cursor, drag to pan, double-click to toggle ----
+                let scale = 1,
+                    tx = 0,
+                    ty = 0,
+                    badgeTimer = 0;
+
+                function paint(badge = true) {
+                    img.style.transform = scale > 1 ? `translate(${tx}px, ${ty}px) scale(${scale})` : '';
+                    frame.classList.toggle('is-zoomed', scale > 1);
+                    if (badge && zoomBadge) {
+                        zoomBadge.textContent = `${Math.round(scale * 100)}%`;
+                        zoomBadge.classList.add('show');
+                        clearTimeout(badgeTimer);
+                        badgeTimer = setTimeout(() => zoomBadge.classList.remove('show'), 900);
+                    }
+                }
+
+                function clampPan() {
+                    const w = img.offsetWidth,
+                        ht = img.offsetHeight;
+                    tx = Math.min(0, Math.max(w - w * scale, tx));
+                    ty = Math.min(0, Math.max(ht - ht * scale, ty));
+                }
+
+                function zoomAt(cx, cy, wanted, smooth = false) {
+                    const ns = Math.min(MAX_ZOOM, Math.max(1, wanted));
+                    if (ns === scale) return;
+                    const r = img.getBoundingClientRect();
+                    const lx = (cx - r.left) / scale,
+                        ly = (cy - r.top) / scale;
+                    const ox = r.left - tx,
+                        oy = r.top - ty;
+                    scale = ns;
+                    tx = cx - ox - lx * scale;
+                    ty = cy - oy - ly * scale;
+                    clampPan();
+                    if (smooth && !reduceMotion()) {
+                        img.style.transition = `transform 200ms ${EASE}`;
+                        setTimeout(() => (img.style.transition = ''), 220);
+                    }
+                    paint();
+                }
+
+                function resetZoom() {
+                    scale = 1;
+                    tx = ty = 0;
+                    paint(false);
+                }
+
+                if (expanded) {
+                    view.addEventListener(
+                        'wheel',
+                        e => {
+                            e.preventDefault();
+                            if (!e.ctrlKey && scale > 1 && Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
+                                tx -= e.deltaX;
+                                clampPan();
+                                paint(false);
+                                return;
+                            }
+                            const delta = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY;
+                            // Trackpad pinch arrives as ctrl+wheel with small deltas
+                            zoomAt(e.clientX, e.clientY, scale * Math.exp(-delta * (e.ctrlKey ? 0.01 : 0.002)));
+                        },
+                        { passive: false }
+                    );
+                    let drag = null;
+                    view.addEventListener('pointerdown', e => {
+                        if (scale === 1 || e.button !== 0) return;
+                        drag = { x: e.clientX, y: e.clientY, tx, ty };
+                        view.setPointerCapture(e.pointerId);
+                        frame.classList.add('is-panning');
+                    });
+                    view.addEventListener('pointermove', e => {
+                        if (!drag) return;
+                        tx = drag.tx + e.clientX - drag.x;
+                        ty = drag.ty + e.clientY - drag.y;
+                        clampPan();
+                        paint(false);
+                    });
+                    const endDrag = () => {
+                        drag = null;
+                        frame.classList.remove('is-panning');
+                    };
+                    view.addEventListener('pointerup', endDrag);
+                    view.addEventListener('pointercancel', endDrag);
+                    view.addEventListener('dblclick', e => {
+                        if (scale > 1) zoomAt(e.clientX, e.clientY, 1, true);
+                        else zoomAt(e.clientX, e.clientY, 2.5, true);
+                    });
+                }
+
+                // Outgoing screenshot slides out while the new one slides in from the other side
+                let ghost = null,
+                    slideToken = 0;
+
+                function stopSlide() {
+                    slideToken++;
+                    ghost?.remove();
+                    ghost = null;
+                    view.getAnimations().forEach(a => a.cancel());
+                    view.style.transform = '';
+                }
+
+                function slide(dir) {
+                    const token = slideToken;
+                    const g = view.cloneNode(true);
+                    g.className = 'car-ghost car-view';
+                    g.setAttribute('aria-hidden', 'true');
+                    g.inert = true;
+                    frame.append(g);
+                    ghost = g;
+                    const from = `translateX(${dir * 100}%)`;
+                    view.style.transform = from;
+                    const run = () => {
+                        if (token !== slideToken) return;
+                        view.style.transform = '';
+                        const timing = { duration: 320, easing: EASE };
+                        view.animate([{ transform: from }, { transform: 'none' }], timing);
+                        const out = g.animate([{ transform: 'none' }, { transform: `translateX(${-dir * 100}%)` }], timing);
+                        out.finished.then(
+                            () => g.remove(),
+                            () => g.remove()
+                        );
+                    };
+                    return { run };
+                }
+
+                // Size the image column to the rendered screenshot so header, arrows and thumbnails hug it
+                function fitWidth() {
+                    if (!img.naturalWidth || !root.isConnected) return;
+                    const avail = root.clientWidth - 2 * 46;
+                    const maxH = parseFloat(getComputedStyle(img).maxHeight) || img.naturalHeight;
+                    const scale = Math.min(1, maxH / img.naturalHeight, avail / img.naturalWidth);
+                    root.style.setProperty('--shot-w', `${Math.floor(img.naturalWidth * scale)}px`);
+                }
+
+                function show(i, { animate = true } = {}) {
+                    const dir = idx < 0 ? 0 : Math.sign(i - idx);
+                    const thumbFocused = thumbs.includes(document.activeElement);
+                    stopSlide();
+                    const sliding = animate && dir && !reduceMotion() ? slide(dir) : null;
+                    idx = wrapIndex(i, items.length);
+                    const it = items[idx];
+                    resetZoom();
+                    img.src = it.src;
+                    img.decode().then(fitWidth, () => {});
+                    // Wait for the new image to decode so it never slides in blank
+                    if (sliding) img.decode().then(sliding.run, sliding.run);
+                    img.alt = it.step || it.name;
+                    if (!expanded) view.setAttribute('aria-label', `Open screenshot ${idx + 1} of ${items.length} full size`);
+                    count.textContent = many ? `${idx + 1} / ${items.length}` : '';
+                    fail.hidden = !it.failed;
+                    cap.textContent = it.step || 'Test';
+                    file.textContent = it.name;
+                    goStep.hidden = !it.stepRef;
+                    thumbs.forEach((t, j) => {
+                        t.tabIndex = j === idx ? 0 : -1;
+                        if (j === idx) t.setAttribute('aria-current', 'true');
+                        else t.removeAttribute('aria-current');
+                    });
+                    if (thumbFocused) thumbs[idx].focus({ preventScroll: true });
+                    if (strip)
+                        requestAnimationFrame(() => {
+                            const t = thumbs[idx];
+                            strip.scrollTo({
+                                left: t.offsetLeft - (strip.clientWidth - t.clientWidth) / 2,
+                                behavior: animate && !reduceMotion() ? 'smooth' : 'auto'
+                            });
+                        });
+                    if (expanded && items === gallery) setHash(idx + 1);
+                }
+
+                function handleKey(e) {
+                    if (expanded && ['+', '=', '-', '0'].includes(e.key)) {
+                        e.preventDefault();
+                        const r = view.getBoundingClientRect();
+                        const factor = e.key === '-' ? 1 / 1.5 : e.key === '0' ? 0 : 1.5;
+                        zoomAt(r.left + r.width / 2, r.top + r.height / 2, factor ? scale * factor : 1, true);
+                        return;
+                    }
+                    const target = navKey(e.key, idx, items.length);
+                    if (!many || target === undefined) return;
+                    e.preventDefault();
+                    show(target);
+                }
+
+                root.addEventListener('keydown', handleKey);
+                new ResizeObserver(fitWidth).observe(root);
+                if (many) onSwipe(view, dir => show(idx + dir), () => scale === 1);
+                show(start, { animate: false });
+                return {
+                    root,
+                    items,
+                    show,
+                    handleKey,
+                    get index() {
+                        return idx;
+                    }
+                };
             }
 
             function renderVideos(arts) {
@@ -2745,22 +3484,44 @@
                 );
             }
 
-            // ---------- Lightbox ----------
+            // ---------- Lightbox: the same viewer, expanded ----------
             const lightbox = $('#lightbox');
+            let modalViewer = null;
 
-            function openLightbox(src, name) {
-                const img = $('#lb-img');
-                img.src = src;
-                img.alt = name || 'Screenshot';
-                $('#lb-name').textContent = name || '';
-                lightbox.showModal();
+            function showLightbox(items, i) {
+                modalViewer = createViewer(items, { start: i, expanded: true });
+                lightbox.replaceChildren(modalViewer.root);
+                if (!lightbox.open) lightbox.showModal();
+                modalViewer.root.focus({ preventScroll: true });
             }
 
-            lightbox.addEventListener('click', e => {
-                if (e.target === lightbox) lightbox.close();
-            });
+            // Idempotent: runs for our own close paths and the native dialog close event
+            function finishLightbox() {
+                const v = modalViewer;
+                if (!v) return;
+                modalViewer = null;
+                lightbox.replaceChildren();
+                if (v.items === gallery) {
+                    setHash();
+                    inlineViewer?.show(v.index, { animate: false });
+                }
+            }
 
-            $('#lb-close').addEventListener('click', () => lightbox.close());
+            function closeLightbox() {
+                if (lightbox.open) lightbox.close();
+                finishLightbox();
+            }
+
+            lightbox.addEventListener('close', finishLightbox);
+            lightbox.addEventListener('cancel', e => {
+                e.preventDefault();
+                closeLightbox();
+            });
+            lightbox.addEventListener('click', e => {
+                const r = lightbox.getBoundingClientRect();
+                const outside = e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom;
+                if (outside) closeLightbox();
+            });
 
             // ---------- Theme: follows the system until the user picks one ----------
             const themeBtn = $('#theme-btn');
@@ -2824,8 +3585,8 @@
                 if (lightbox.open) {
                     if (e.key === 'Escape') {
                         e.preventDefault();
-                        lightbox.close();
-                    }
+                        closeLightbox();
+                    } else if (!e.defaultPrevented) modalViewer?.handleKey(e);
                     return;
                 }
                 if (e.metaKey || e.ctrlKey || e.altKey) return;
@@ -2854,7 +3615,9 @@
 
             window.addEventListener('hashchange', () => {
                 const id = idFromHash();
+                const shot = shotFromHash();
                 if (id && id !== state.selected) select(id, { reveal: true });
+                openShotFromHash(shot);
             });
 
             // ---------- Print: every failure with its full trace ----------
@@ -2882,9 +3645,11 @@
             applyFilter();
             if (!tests.length) app.classList.add('is-empty');
             const fromHash = idFromHash();
+            const shot = shotFromHash();
             const initial = fromHash && byId.has(fromHash) ? fromHash : timeline.find(t => t.tc.status === 'FAILED')?.tc.id;
             if (initial) select(initial, { reveal: true, initial: !fromHash });
             else renderOverview();
+            if (fromHash) openShotFromHash(shot);
         })();
     </script>
     </#noparse>
