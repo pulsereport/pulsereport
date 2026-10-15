@@ -85,7 +85,7 @@ public class RenderingVerificationTest {
         assertTrue(html.contains("iPhone 14 Pro"), "HTML should render device metadata");
         assertTrue(html.contains("iOS"), "HTML should render platform metadata");
         // video + crash artifacts rendered
-        assertTrue(html.contains("artifact-video"), "HTML should render inline video player");
+        assertTrue(html.contains("pl-screen"), "HTML should render inline video player");
         assertTrue(html.contains("crash"), "HTML should render crash artifact");
         // JSON model carries them too
         assertTrue(json.contains("launch app"), "JSON should contain step names");

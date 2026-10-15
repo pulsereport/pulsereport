@@ -1,5 +1,6 @@
 package io.github.pulsereport.adapters.selenium;
 
+import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -15,6 +16,8 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
+
+import javax.imageio.ImageIO;
 
 import org.openqa.selenium.OutputType;
 import org.openqa.selenium.TakesScreenshot;
@@ -124,7 +127,7 @@ final class SeleniumVideoRecorder {
             return false;
         }
         try {
-            Path list = writeConcatList(times);
+            Path list = writeConcatList(times, firstContentFrame(times.size()));
             Files.createDirectories(output.getParentFile().toPath());
             List<String> command = List.of(ffmpegPath, "-nostdin", "-y", "-loglevel", "error",
                     "-f", "concat", "-safe", "0", "-i", list.toString(),
@@ -164,10 +167,40 @@ final class SeleniumVideoRecorder {
         }
     }
 
-    private Path writeConcatList(List<Long> times) throws IOException {
+    /** The browser shows a blank tab until the first page paints; the video starts at the first frame with content. */
+    private int firstContentFrame(int count) {
+        for (int i = 0; i < count - 1; i++) {
+            if (!isBlank(frameDir.resolve(frameName(i)))) {
+                return i;
+            }
+        }
+        return count - 1;
+    }
+
+    private static boolean isBlank(Path frame) {
+        try {
+            BufferedImage image = ImageIO.read(frame.toFile());
+            if (image == null) {
+                return false;
+            }
+            int color = image.getRGB(0, 0);
+            for (int y = 0; y < image.getHeight(); y++) {
+                for (int x = 0; x < image.getWidth(); x++) {
+                    if (image.getRGB(x, y) != color) {
+                        return false;
+                    }
+                }
+            }
+            return true;
+        } catch (IOException e) {
+            return false;
+        }
+    }
+
+    private Path writeConcatList(List<Long> times, int first) throws IOException {
         long end = stoppedAt > 0 ? stoppedAt : System.currentTimeMillis();
         StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < times.size(); i++) {
+        for (int i = first; i < times.size(); i++) {
             double seconds = i + 1 < times.size()
                     ? (times.get(i + 1) - times.get(i)) / 1000.0
                     : Math.max(MIN_LAST_FRAME_SECONDS, (end - times.get(i)) / 1000.0);

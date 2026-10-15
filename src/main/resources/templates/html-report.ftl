@@ -35,6 +35,7 @@
             --sunken: #eceef0;
             --border: #dde1e5;
             --border-strong: #c5cbd1;
+            --shot-edge: #c5cbd1;
             --ink: #212529;
             --ink-muted: #59616a;
             --accent: #0f8b8d;
@@ -59,6 +60,7 @@
                 --sunken: #0d0f11;
                 --border: #2a2f34;
                 --border-strong: #3a4046;
+                --shot-edge: #646d76;
                 --ink: #e6e8ea;
                 --ink-muted: #9aa2a9;
                 --accent: #2fb3b5;
@@ -84,6 +86,7 @@
                 --sunken: #0d0f11;
                 --border: #2a2f34;
                 --border-strong: #3a4046;
+                --shot-edge: #646d76;
                 --ink: #e6e8ea;
                 --ink-muted: #9aa2a9;
                 --accent: #2fb3b5;
@@ -999,6 +1002,30 @@
             color: var(--ink-muted);
         }
 
+        .step-end {
+            align-self: start;
+            justify-self: end;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            margin-top: -1px;
+        }
+
+        .step-end .dur {
+            min-width: 6ch;
+            text-align: right;
+        }
+
+        .ghost.step-shot {
+            display: inline-flex;
+            gap: 3px;
+            width: auto;
+            min-width: 22px;
+            height: 22px;
+            padding: 0 3px;
+            font: 11px var(--font-mono);
+        }
+
         .step-desc {
             display: block;
             margin-top: 2px;
@@ -1071,6 +1098,16 @@
             font-weight: 500;
             color: var(--ink-muted);
             border-bottom: 1px solid var(--border);
+        }
+
+        .dt tbody tr + tr td {
+            border-top: 1px solid var(--border);
+        }
+
+        .dt .dt-n {
+            padding-right: 12px;
+            text-align: right;
+            color: var(--ink-muted);
         }
 
         .xchg {
@@ -1265,12 +1302,31 @@
             margin: -4px -2px -4px 0;
         }
 
+        .car-meta .ghost {
+            flex: none;
+            margin: -4px 0;
+        }
+
         .car-frame {
             position: relative;
             grid-row: 1;
             grid-column: 2;
             overflow: hidden;
             border-radius: var(--radius);
+        }
+
+        /* Drawn on the frame, not the image, so it stays put while screenshots slide */
+        .car-frame::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border: 1px solid var(--shot-edge);
+            border-radius: inherit;
+            pointer-events: none;
+        }
+
+        .is-expanded .car-frame::after {
+            border-color: rgb(255 255 255 / 0.22);
         }
 
         .car-ghost {
@@ -1298,8 +1354,8 @@
             display: block;
             max-width: 100%;
             max-height: min(460px, 60vh);
-            border-radius: var(--radius);
-            box-shadow: 0 0 0 1px var(--border);
+            /* Square: the frame rounds the corners, so sliding images meet without a seam */
+            border-radius: 0;
             transform-origin: 0 0;
             -webkit-user-drag: none;
         }
@@ -1310,7 +1366,6 @@
 
         .is-expanded .car-view img {
             max-height: calc(92dvh - 170px);
-            box-shadow: none;
         }
 
         .is-expanded .car-frame.is-zoomed img {
@@ -1362,6 +1417,15 @@
 
         .car-file {
             margin-left: auto;
+        }
+
+        .car-meta .ghost.goto {
+            margin-left: -8px;
+            color: var(--accent-ink);
+        }
+
+        .car-meta .ghost.goto:hover {
+            background: var(--accent-bg);
         }
 
         .car-thumbs {
@@ -1483,20 +1547,6 @@
             color: var(--fail);
         }
 
-        .link-btn {
-            flex: none;
-            padding: 0;
-            border: 0;
-            background: none;
-            color: var(--accent-ink);
-            font: inherit;
-            font-size: 12px;
-            text-decoration: underline;
-            text-underline-offset: 2px;
-            white-space: nowrap;
-            cursor: pointer;
-        }
-
         .step.flash {
             background: var(--accent-bg);
             box-shadow: inset 3px 0 0 var(--accent);
@@ -1517,16 +1567,221 @@
 
         .videos {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            grid-template-columns: repeat(auto-fill, minmax(min(100%, 360px), 1fr));
             gap: 14px;
         }
 
-        .artifact-video {
+        .player {
+            display: grid;
+            overflow: hidden;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            background: var(--raised);
+        }
+
+        .player:focus {
+            outline: none;
+        }
+
+        .player:focus-visible {
+            outline: 2px solid var(--accent-ink);
+            outline-offset: 2px;
+        }
+
+        .pl-screen {
+            position: relative;
+            display: grid;
+            place-items: center;
+            min-height: 0;
+            background: #0d0f11;
+            cursor: pointer;
+        }
+
+        .pl-screen video {
             display: block;
             width: 100%;
             max-height: 480px;
+        }
+
+        .pl-big {
+            position: absolute;
+            inset: 0;
+            display: grid;
+            place-items: center;
+            width: 52px;
+            height: 52px;
+            margin: auto;
+            border-radius: 50%;
+            background: rgb(13 15 17 / 0.62);
+            box-shadow: 0 0 0 1px rgb(255 255 255 / 0.14);
+            color: #fff;
+            -webkit-backdrop-filter: blur(6px);
+            backdrop-filter: blur(6px);
+            pointer-events: none;
+        }
+
+        .pl-big .ic {
+            width: 22px;
+            height: 22px;
+            margin-left: 2px;
+        }
+
+        .pl-screen:hover .pl-big {
+            background: rgb(13 15 17 / 0.8);
+        }
+
+        .player.is-playing .pl-big {
+            opacity: 0;
+            scale: 0.9;
+        }
+
+        .pl-bar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 8px;
+            border-top: 1px solid var(--border);
+        }
+
+        .pl-btn {
+            display: grid;
+            place-items: center;
+            flex: none;
+            min-width: 28px;
+            height: 28px;
+            padding: 0 6px;
+            border: 0;
             border-radius: var(--radius);
+            background: none;
+            color: var(--ink-muted);
+            font: 11.5px var(--font-mono);
+            cursor: pointer;
+        }
+
+        .pl-btn:hover {
             background: var(--sunken);
+            color: var(--ink);
+        }
+
+        .pl-rate-wrap {
+            position: relative;
+            flex: none;
+        }
+
+        /* Wide enough for "1.5×" so the seek bar never shifts */
+        .pl-rate {
+            min-width: 44px;
+        }
+
+        .pl-menu {
+            position: absolute;
+            right: 0;
+            bottom: calc(100% + 6px);
+            left: 0;
+            z-index: 1;
+            display: grid;
+            gap: 2px;
+            padding: 3px;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            background: var(--raised);
+            box-shadow: 0 8px 24px rgb(0 0 0 / 0.18);
+        }
+
+        .pl-menu button {
+            height: 30px;
+            padding: 0;
+            border: 0;
+            border-radius: 4px;
+            background: none;
+            color: var(--ink-muted);
+            font: 11.5px var(--font-mono);
+            cursor: pointer;
+        }
+
+        .pl-menu button:hover,
+        .pl-menu button:focus-visible {
+            outline: none;
+            background: var(--sunken);
+            color: var(--ink);
+        }
+
+        .pl-menu button[aria-checked='true'] {
+            color: var(--accent-ink);
+            font-weight: 600;
+        }
+
+        .pl-time {
+            flex: none;
+            font: 11.5px var(--font-mono);
+            font-variant-numeric: tabular-nums;
+            color: var(--ink-muted);
+        }
+
+        .pl-seek {
+            flex: 1;
+            min-width: 40px;
+            height: 16px;
+            margin: 0 4px;
+            background: none;
+            -webkit-appearance: none;
+            appearance: none;
+            cursor: pointer;
+        }
+
+        .pl-seek::-webkit-slider-runnable-track {
+            height: 4px;
+            border-radius: 2px;
+            /* Fill ends at the thumb's centre, which travels 12px less than the track */
+            background:
+                linear-gradient(var(--accent), var(--accent)) 0 / calc(6px + (100% - 12px) * var(--f, 0)) 100% no-repeat,
+                var(--border);
+        }
+
+        .pl-seek::-moz-range-track {
+            height: 4px;
+            border-radius: 2px;
+            background:
+                linear-gradient(var(--accent), var(--accent)) 0 / calc(6px + (100% - 12px) * var(--f, 0)) 100% no-repeat,
+                var(--border);
+        }
+
+        .pl-seek::-webkit-slider-thumb {
+            width: 12px;
+            height: 12px;
+            margin-top: -4px;
+            border: 0;
+            border-radius: 50%;
+            background: var(--accent);
+            -webkit-appearance: none;
+            appearance: none;
+        }
+
+        .pl-seek::-moz-range-thumb {
+            width: 12px;
+            height: 12px;
+            border: 0;
+            border-radius: 50%;
+            background: var(--accent);
+        }
+
+        /* Full screen is always dark, whatever the report theme */
+        .player:fullscreen {
+            --raised: #181b1e;
+            --sunken: #0d0f11;
+            --border: #2a2f34;
+            --ink: #e6e8ea;
+            --ink-muted: #9aa2a9;
+            --accent: #2fb3b5;
+            --accent-ink: #5cc8ca;
+            grid-template-rows: minmax(0, 1fr) auto;
+            border: 0;
+            border-radius: 0;
+        }
+
+        .player:fullscreen video {
+            height: 100%;
+            max-height: none;
         }
 
         .files {
@@ -1650,8 +1905,22 @@
             color: #fff;
         }
 
-        .is-expanded .link-btn {
+        .is-expanded .ghost {
+            color: rgb(255 255 255 / 0.7);
+        }
+
+        .is-expanded .ghost:hover {
+            background: rgb(255 255 255 / 0.1);
+            color: #fff;
+        }
+
+        .is-expanded .ghost.goto,
+        .is-expanded .ghost.goto:hover {
             color: #5cc8ca;
+        }
+
+        .is-expanded .ghost.goto:hover {
+            background: rgb(255 255 255 / 0.1);
         }
 
         .is-expanded .shot-fail {
@@ -1730,6 +1999,12 @@
 
             .car-zoom {
                 transition: opacity 200ms;
+            }
+
+            .pl-big {
+                transition:
+                    opacity 150ms,
+                    scale 150ms cubic-bezier(0.16, 1, 0.3, 1);
             }
 
             .step {
@@ -2017,6 +2292,27 @@
         </svg>
         <svg data-i="close" class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
             <path d="M6 6l12 12M18 6L6 18"/>
+        </svg>
+        <svg data-i="image" class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <rect x="3" y="4" width="18" height="16" rx="2"/>
+            <circle cx="9" cy="10" r="1.5"/>
+            <path d="M21 16l-5-5-9 9"/>
+        </svg>
+        <svg data-i="jump" class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M19 12H5M11 6l-6 6 6 6"/>
+        </svg>
+        <svg data-i="play" class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path fill="currentColor" d="M8 5.5v13l10.5-6.5z"/>
+        </svg>
+        <svg data-i="pause" class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <rect fill="currentColor" x="6.5" y="5" width="3.5" height="14" rx="1"/>
+            <rect fill="currentColor" x="14" y="5" width="3.5" height="14" rx="1"/>
+        </svg>
+        <svg data-i="expand" class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>
+        </svg>
+        <svg data-i="shrink" class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/>
         </svg>
     </template>
 
@@ -2790,7 +3086,7 @@
                         stepText(s.name || ''),
                         s.description ? h('span', { class: 'step-desc' }, s.description) : null
                     ),
-                    h('span', { class: 'dur' }, s.duration ? fmtDur(s.duration) : '')
+                    h('span', { class: 'step-end' }, stepShotBtn(s.artifacts || []), h('span', { class: 'dur' }, s.duration ? fmtDur(s.duration) : ''))
                 );
                 const arts = s.artifacts || [];
                 const extra = [];
@@ -2819,6 +3115,7 @@
 
             function dataTable(rows) {
                 const [head, ...body] = rows;
+                const numbered = body.length > 1;
                 return h(
                     'div',
                     { class: 'dt-scroll' },
@@ -2831,16 +3128,18 @@
                             h(
                                 'tr',
                                 null,
+                                numbered ? h('th', { scope: 'col', class: 'dt-n' }, '#') : null,
                                 head.map(c => h('th', { scope: 'col' }, c))
                             )
                         ),
                         h(
                             'tbody',
                             null,
-                            body.map(r =>
+                            body.map((r, i) =>
                                 h(
                                     'tr',
                                     null,
+                                    numbered ? h('td', { class: 'dt-n' }, String(i + 1)) : null,
                                     r.map(c => h('td', null, c))
                                 )
                             )
@@ -3019,12 +3318,36 @@
                 );
             }
 
-            // Collapsed so screenshot-heavy runs keep the step list compact
+            // Embedded screenshots open from the step's icon; only non-embedded ones are listed under the step
             function stepShots(arts) {
-                const shots = renderShots(arts);
+                const missing = arts.filter(a => isImage(a) && !mediaSrc(a, 'image'));
+                const shots = renderShots(missing);
                 if (!shots) return null;
-                const n = arts.filter(isImage).length;
+                const n = missing.length;
                 return h('details', { class: 'dz step-shots' }, h('summary', null, n === 1 ? 'Screenshot' : `Screenshots (${n})`), shots);
+            }
+
+            function stepShotBtn(arts) {
+                const shots = arts.filter(a => isImage(a) && mediaSrc(a, 'image'));
+                if (!shots.length) return null;
+                const n = shots.length;
+                const label = n === 1 ? 'Open screenshot' : `Open screenshots (${n})`;
+                return h(
+                    'button',
+                    {
+                        type: 'button',
+                        class: 'ghost step-shot',
+                        'aria-label': label,
+                        'data-tip': label,
+                        onclick: () => {
+                            const i = gallery.findIndex(g => g.a === shots[0]);
+                            if (i >= 0) showLightbox(gallery, i);
+                            else showLightbox(shots.map(a => ({ src: mediaSrc(a, 'image'), name: a.name || 'screenshot' })), 0);
+                        }
+                    },
+                    icon('image'),
+                    n > 1 ? String(n) : null
+                );
             }
 
             // ---------- Screenshot gallery: every screenshot of the open test, in capture order ----------
@@ -3111,14 +3434,16 @@
                     'button',
                     {
                         type: 'button',
-                        class: 'link-btn',
+                        class: 'ghost goto',
+                        'aria-label': 'Go to step',
+                        'data-tip': 'Go to step',
                         onclick: () => {
                             const step = items[idx].stepRef;
                             if (expanded) closeLightbox();
                             goToStep(step);
                         }
                     },
-                    'Go to step'
+                    icon('jump')
                 );
 
                 const thumbs = items.map((it, i) =>
@@ -3149,7 +3474,7 @@
                         tabindex: '-1'
                     },
                     // Caption row on top (with close when expanded), aligned to the image and arrow columns
-                    h('div', { class: 'car-head' }, h('div', { class: 'car-meta' }, live, file, goStep, close)),
+                    h('div', { class: 'car-head' }, h('div', { class: 'car-meta' }, live, goStep, file, close)),
                     stage,
                     strip
                 );
@@ -3266,14 +3591,15 @@
                     g.inert = true;
                     frame.append(g);
                     ghost = g;
-                    const from = `translateX(${dir * 100}%)`;
+                    // 1px overlap so anti-aliased edges never leave a hairline at the seam
+                    const from = `translateX(calc(${dir * 100}% - ${dir}px))`;
                     view.style.transform = from;
                     const run = () => {
                         if (token !== slideToken) return;
                         view.style.transform = '';
                         const timing = { duration: 320, easing: EASE };
                         view.animate([{ transform: from }, { transform: 'none' }], timing);
-                        const out = g.animate([{ transform: 'none' }, { transform: `translateX(${-dir * 100}%)` }], timing);
+                        const out = g.animate([{ transform: 'none' }, { transform: `translateX(calc(${-dir * 100}% + ${dir}px))` }], timing);
                         out.finished.then(
                             () => g.remove(),
                             () => g.remove()
@@ -3356,6 +3682,162 @@
                 };
             }
 
+            const fmtClock = sec => {
+                const s = Math.max(0, Math.floor(sec || 0));
+                return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+            };
+            // Listed top to bottom, so the menu reads 0.5× up to 2× from the button
+            const RATES = [2, 1.5, 1, 0.5];
+
+            function createPlayer(src, name) {
+                const video = h('video', { src, preload: 'metadata', playsinline: true });
+                const screen = h('div', { class: 'pl-screen' }, video, h('span', { class: 'pl-big', 'aria-hidden': 'true' }, icon('play')));
+                const playBtn = h('button', { type: 'button', class: 'pl-btn', 'aria-label': 'Play' }, icon('play'));
+                const time = h('span', { class: 'pl-time' }, '0:00');
+                const seek = h('input', { type: 'range', class: 'pl-seek', min: 0, max: 0, step: 'any', value: 0, 'aria-label': 'Seek' });
+                const rateBtn = h(
+                    'button',
+                    { type: 'button', class: 'pl-btn pl-rate', 'aria-label': 'Playback speed 1×', 'aria-haspopup': 'menu', 'aria-expanded': 'false' },
+                    '1×'
+                );
+                const rateItems = RATES.map(r =>
+                    h(
+                        'button',
+                        { type: 'button', role: 'menuitemradio', 'aria-checked': String(r === 1), tabindex: '-1', onclick: () => setRate(r) },
+                        `${r}×`
+                    )
+                );
+                const rateMenu = h('div', { class: 'pl-menu', role: 'menu', 'aria-label': 'Playback speed', hidden: true }, rateItems);
+                const rateWrap = h('div', { class: 'pl-rate-wrap' }, rateBtn, rateMenu);
+                // Safari moves focus to the player on mouse press, which would close the menu before the click lands
+                rateWrap.addEventListener('mousedown', e => e.preventDefault());
+                const fsBtn = h('button', { type: 'button', class: 'pl-btn', 'aria-label': 'Full screen' }, icon('expand'));
+                const root = h(
+                    'div',
+                    { class: 'player', role: 'group', 'aria-label': `Recording ${name}`, tabindex: '0' },
+                    screen,
+                    h('div', { class: 'pl-bar' }, playBtn, time, seek, rateWrap, fsBtn)
+                );
+
+                const dur = () => (Number.isFinite(video.duration) ? video.duration : 0);
+                const toggle = () => (video.paused ? video.play().catch(() => {}) : video.pause());
+                const seekBy = d => {
+                    video.currentTime = Math.min(dur(), Math.max(0, video.currentTime + d));
+                    paintTime();
+                };
+
+                function paintTime() {
+                    const d = dur();
+                    const t = video.currentTime;
+                    time.textContent = d ? `${fmtClock(t)} / ${fmtClock(d)}` : fmtClock(t);
+                    seek.max = d;
+                    seek.value = t;
+                    seek.style.setProperty('--f', d ? Math.min(1, t / d) : 0);
+                }
+
+                function paintState() {
+                    const playing = !video.paused;
+                    root.classList.toggle('is-playing', playing);
+                    playBtn.replaceChildren(icon(playing ? 'pause' : 'play'));
+                    playBtn.setAttribute('aria-label', playing ? 'Pause' : 'Play');
+                }
+
+                function openRates() {
+                    rateMenu.hidden = false;
+                    rateBtn.setAttribute('aria-expanded', 'true');
+                    rateItems[RATES.indexOf(video.playbackRate)]?.focus();
+                }
+
+                function closeRates(refocus) {
+                    if (rateMenu.hidden) return;
+                    rateMenu.hidden = true;
+                    rateBtn.setAttribute('aria-expanded', 'false');
+                    if (refocus) rateBtn.focus();
+                }
+
+                function setRate(r) {
+                    video.playbackRate = r;
+                    rateBtn.textContent = `${r}×`;
+                    rateBtn.setAttribute('aria-label', `Playback speed ${r}×`);
+                    rateItems.forEach((b, i) => b.setAttribute('aria-checked', String(RATES[i] === r)));
+                    closeRates(true);
+                }
+
+                // timeupdate only fires a few times a second; follow frames so the bar moves smoothly
+                function tick() {
+                    paintTime();
+                    if (!video.paused && root.isConnected) requestAnimationFrame(tick);
+                }
+
+                function toggleFullscreen() {
+                    if (document.fullscreenElement === root) document.exitFullscreen();
+                    else if (root.requestFullscreen) root.requestFullscreen().catch(() => {});
+                    else video.webkitEnterFullscreen?.();
+                }
+
+                video.addEventListener('play', () => {
+                    paintState();
+                    tick();
+                });
+                video.addEventListener('pause', paintState);
+                ['loadedmetadata', 'durationchange', 'timeupdate'].forEach(ev => video.addEventListener(ev, paintTime));
+                video.addEventListener('error', () => root.replaceWith(h('div', { class: 'shot-missing' }, 'Recording could not be played')));
+
+                screen.addEventListener('click', toggle);
+                screen.addEventListener('dblclick', toggleFullscreen);
+                playBtn.addEventListener('click', toggle);
+                fsBtn.hidden = !(root.requestFullscreen || video.webkitEnterFullscreen);
+                fsBtn.addEventListener('click', toggleFullscreen);
+                root.addEventListener('fullscreenchange', () => {
+                    const full = document.fullscreenElement === root;
+                    fsBtn.replaceChildren(icon(full ? 'shrink' : 'expand'));
+                    fsBtn.setAttribute('aria-label', full ? 'Exit full screen' : 'Full screen');
+                });
+                rateBtn.addEventListener('click', () => (rateMenu.hidden ? openRates() : closeRates(true)));
+                // Focus sits on an option while open, so leaving the menu in any way closes it
+                rateWrap.addEventListener('focusout', e => {
+                    if (!rateWrap.contains(e.relatedTarget)) closeRates(false);
+                });
+                rateMenu.addEventListener('keydown', e => {
+                    const i = rateItems.indexOf(document.activeElement);
+                    const to = { ArrowDown: i + 1, ArrowUp: i - 1, Home: 0, End: rateItems.length - 1 }[e.key];
+                    if (to != null) rateItems[wrapIndex(to, rateItems.length)].focus();
+                    else if (e.key === 'Escape' || e.key === 'Tab') closeRates(true);
+                    else return;
+                    if (e.key !== 'Tab') e.preventDefault();
+                    e.stopPropagation();
+                });
+
+                // Hold playback while the thumb is dragged so it doesn't fight the playhead
+                let resume = false;
+                seek.addEventListener('pointerdown', () => {
+                    resume = !video.paused;
+                    video.pause();
+                });
+                seek.addEventListener('input', () => {
+                    video.currentTime = +seek.value;
+                    paintTime();
+                });
+                seek.addEventListener('change', () => {
+                    if (resume) video.play().catch(() => {});
+                    resume = false;
+                });
+
+                root.addEventListener('keydown', e => {
+                    if (e.metaKey || e.ctrlKey || e.altKey) return;
+                    const onButton = e.target.tagName === 'BUTTON';
+                    if (e.key === 'k' || (e.key === ' ' && !onButton)) toggle();
+                    else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') seekBy(e.key === 'ArrowLeft' ? -1 : 1);
+                    else if (e.key === 'f' && !fsBtn.hidden) toggleFullscreen();
+                    else return;
+                    // Keep 'f' and the arrows from reaching the report's own shortcuts
+                    e.preventDefault();
+                    e.stopPropagation();
+                });
+
+                return root;
+            }
+
             function renderVideos(arts) {
                 const videos = arts.filter(isVideo);
                 if (!videos.length) return null;
@@ -3367,9 +3849,7 @@
                         return h(
                             'div',
                             { class: 'video' },
-                            src
-                                ? h('video', { class: 'artifact-video', src, controls: true, preload: 'metadata' })
-                                : h('div', { class: 'shot-missing' }, 'Video not available'),
+                            src ? createPlayer(src, a.name || 'recording') : h('div', { class: 'shot-missing' }, 'Video not available'),
                             h('span', { class: 'cap', 'data-tip': a.path || '' }, a.name || 'recording')
                         );
                     })
@@ -3517,10 +3997,15 @@
                 e.preventDefault();
                 closeLightbox();
             });
+            // The dialog box is wider than the screenshot, so its empty areas behave like the backdrop
+            const isEmptySpace = t => !t.closest('img, button, .car-live, .car-file');
+            let downOnEmpty = false;
+            lightbox.addEventListener('pointerdown', e => {
+                downOnEmpty = isEmptySpace(e.target);
+            });
             lightbox.addEventListener('click', e => {
-                const r = lightbox.getBoundingClientRect();
-                const outside = e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom;
-                if (outside) closeLightbox();
+                // Both ends must be empty so a pan or text selection that ends off the image doesn't close it
+                if (downOnEmpty && isEmptySpace(e.target)) closeLightbox();
             });
 
             // ---------- Theme: follows the system until the user picks one ----------
@@ -3604,7 +4089,7 @@
                     e.preventDefault();
                     search.focus();
                     search.select();
-                } else if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && document.activeElement?.tagName !== 'VIDEO') {
+                } else if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && !document.activeElement?.closest('.player')) {
                     e.preventDefault();
                     move(e.key === 'ArrowDown' ? 1 : -1);
                 } else if (e.key === 'f' && totals.FAILED) {
