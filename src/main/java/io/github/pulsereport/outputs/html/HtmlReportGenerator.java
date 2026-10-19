@@ -10,6 +10,7 @@ import java.io.Writer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Base64;
 import java.util.HashMap;
@@ -38,6 +39,10 @@ import io.github.pulsereport.outputs.OutputGenerator;
 public class HtmlReportGenerator implements OutputGenerator {
 
     private static final String DEFAULT_RUN_NAME = "Test run";
+
+    // Past these, screenshots stay path-only so huge runs still produce a report browsers can open
+    static final long MAX_INLINE_IMAGE_BYTES = 10L * 1024 * 1024;
+    static final long MAX_INLINE_TOTAL_BYTES = 200L * 1024 * 1024;
 
     // Latin subsets of Geist (OFL 1.1, see /fonts/OFL-Geist.txt), inlined so reports render the same offline.
     private static final String FONT_FACES = fontFace("Geist", "Geist-Variable-latin.woff2")
@@ -152,24 +157,24 @@ public class HtmlReportGenerator implements OutputGenerator {
 
     private String toScriptSafeJson(TestRun testRun) throws IOException {
         JsonNode tree = objectMapper.valueToTree(testRun);
-        inlineImageArtifacts(tree);
+        inlineImageArtifacts(tree, new long[] {MAX_INLINE_TOTAL_BYTES});
         return escapeForScriptBlock(objectMapper.writeValueAsString(tree));
     }
 
-    private void inlineImageArtifacts(JsonNode node) {
+    private void inlineImageArtifacts(JsonNode node, long[] budget) {
         JsonNode artifacts = node.isObject() ? node.get("artifacts") : null;
         if (artifacts != null && artifacts.isArray()) {
             for (JsonNode artifact : artifacts) {
                 if (artifact.isObject()) {
-                    inlineImage((ObjectNode) artifact);
+                    inlineImage((ObjectNode) artifact, budget);
                 }
             }
         }
-        node.forEach(this::inlineImageArtifacts);
+        node.forEach(child -> inlineImageArtifacts(child, budget));
     }
 
     /** Reads a path-backed screenshot into base64 content so the report stays viewable when moved. */
-    private void inlineImage(ObjectNode artifact) {
+    private void inlineImage(ObjectNode artifact, long[] budget) {
         if (!artifact.path("content").asText("").isEmpty()) {
             return;
         }
@@ -180,7 +185,13 @@ public class HtmlReportGenerator implements OutputGenerator {
             return;
         }
         try {
-            byte[] bytes = Files.readAllBytes(Paths.get(path));
+            Path file = Paths.get(path);
+            long size = Files.size(file);
+            if (size > MAX_INLINE_IMAGE_BYTES || size > budget[0]) {
+                return;
+            }
+            byte[] bytes = Files.readAllBytes(file);
+            budget[0] -= bytes.length;
             artifact.put("content", Base64.getEncoder().encodeToString(bytes));
             if (mimeType.isEmpty()) {
                 artifact.put("mimeType", "image/png");

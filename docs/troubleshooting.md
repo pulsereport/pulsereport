@@ -156,15 +156,21 @@ ls -lh target/pulsereport/test-report.html
 
 **Problem**: Tests run but screenshots missing from report.
 
-**Cause**: Screenshots are not captured automatically. The Selenium adapter only attaches screenshots you capture explicitly in your test code.
+**Cause**: The Selenium adapter captures screenshots automatically only for drivers wrapped with `adapter.track(driver)`, and by default only for failures (`reporter.screenshots.mode=failed`).
 
 **Solution**:
 
-Capture screenshots explicitly via the adapter:
+Wrap the driver, and use `reporter.screenshots.mode=all` if you want a screenshot after every step:
 
 ```java
-SeleniumAdapter adapter = new SeleniumAdapter(driver);
-adapter.captureBrowserScreenshot(); // attaches a screenshot to the current test
+driver = adapter.track(new ChromeDriver());
+```
+
+For a driver you don't wrap, attach screenshots yourself:
+
+```java
+File file = ((TakesScreenshot) driver).getScreenshotAs(OutputType.FILE);
+adapter.captureBrowserScreenshot(testName, "page.png", file.getAbsolutePath(), file.length());
 ```
 
 **Check WebDriver is TakesScreenshot**:

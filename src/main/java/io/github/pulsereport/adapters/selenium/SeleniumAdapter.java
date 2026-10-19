@@ -4,6 +4,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.time.Instant;
 import java.util.ArrayDeque;
@@ -15,10 +16,12 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.locks.ReentrantLock;
 
 import org.openqa.selenium.OutputType;
 import org.openqa.selenium.TakesScreenshot;
 import org.openqa.selenium.WebDriver;
+import org.openqa.selenium.remote.RemoteWebDriver;
 import org.openqa.selenium.support.events.EventFiringDecorator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -146,10 +149,15 @@ public class SeleniumAdapter extends TestNGAdapter {
     private static final Map<String, String> runBrowserMetadata = Collections.synchronizedMap(new LinkedHashMap<>());
 
     private static final ThreadLocal<WebDriver> trackedDriver = new ThreadLocal<>();
+    // Serializes the test's commands and the video recorder's screenshots on one browser session
+    private static final ThreadLocal<ReentrantLock> driverLock = new ThreadLocal<>();
     private static final ThreadLocal<Deque<StepScope>> openSteps = ThreadLocal.withInitial(ArrayDeque::new);
     private static final List<String> STEP_TABLE_HEADER = List.of("Action", "Details", "Status", "Duration");
     private static final ThreadLocal<TestCapture> testCapture = new ThreadLocal<>();
     private static volatile CaptureSettings captureSettings;
+
+    static final long MAX_EMBEDDED_VIDEO_BYTES = 50L * 1024 * 1024;
+    static final int MAX_INLINE_TEXT_BYTES = 1024 * 1024;
 
     private static final String MODE_ALL = "all";
     private static final String MODE_FAILED = "failed";
@@ -309,7 +317,8 @@ public class SeleniumAdapter extends TestNGAdapter {
      *
      * <p>
      * Use this method to capture browser-level logs (network errors, security
-     * warnings, etc.) from the WebDriver logging API.</p>
+     * warnings, etc.) from the WebDriver logging API. The log is written to the
+     * report directory and shown inline in the report.</p>
      *
      * @param testName the name of the test to attach the logs to
      * @param logFileName the name of the log file (e.g., "browser.log")
@@ -322,16 +331,7 @@ public class SeleniumAdapter extends TestNGAdapter {
         validateParameter(logFileName, "logFileName");
         validateParameter(logContent, "logContent");
 
-        Artifact browserLog = Artifact.builder()
-                .name(logFileName)
-                .type("browser-log")
-                .path("/artifacts/browser-logs/" + logFileName)
-                .mimeType("text/plain")
-                .size((long) logContent.length())
-                .timestamp(Instant.now())
-                .build();
-
-        addArtifact(testName, browserLog);
+        addArtifact(testName, textArtifact(testName, logFileName, "browser-log", "text/plain", logContent));
         logger.debug("Captured browser logs '{}' for test '{}'", logFileName, testName);
     }
 
@@ -340,7 +340,8 @@ public class SeleniumAdapter extends TestNGAdapter {
      *
      * <p>
      * Use this method to capture console.log, console.warn, console.error, etc.
-     * output from the browser's JavaScript console.</p>
+     * output from the browser's JavaScript console. The log is written to the
+     * report directory and shown inline in the report.</p>
      *
      * @param testName the name of the test to attach the console logs to
      * @param logFileName the name of the log file (e.g., "console.log")
@@ -353,16 +354,7 @@ public class SeleniumAdapter extends TestNGAdapter {
         validateParameter(logFileName, "logFileName");
         validateParameter(logContent, "logContent");
 
-        Artifact consoleLog = Artifact.builder()
-                .name(logFileName)
-                .type("console-log")
-                .path("/artifacts/console-logs/" + logFileName)
-                .mimeType("text/plain")
-                .size((long) logContent.length())
-                .timestamp(Instant.now())
-                .build();
-
-        addArtifact(testName, consoleLog);
+        addArtifact(testName, textArtifact(testName, logFileName, "console-log", "text/plain", logContent));
         logger.debug("Captured console logs '{}' for test '{}'", logFileName, testName);
     }
 
@@ -372,7 +364,9 @@ public class SeleniumAdapter extends TestNGAdapter {
      * <p>
      * HAR files contain detailed network traffic information including all HTTP
      * requests/responses, headers, timing data, etc. Use browser extensions or
-     * proxy tools (like BrowserMob Proxy) to generate HAR files.</p>
+     * proxy tools (like BrowserMob Proxy) to generate HAR files. The file is
+     * written to the report directory; HAR files up to 1 MB are also shown
+     * inline.</p>
      *
      * @param testName the name of the test to attach the HAR file to
      * @param harFileName the name of the HAR file (e.g., "network.har")
@@ -385,17 +379,36 @@ public class SeleniumAdapter extends TestNGAdapter {
         validateParameter(harFileName, "harFileName");
         validateParameter(harContent, "harContent");
 
-        Artifact harFile = Artifact.builder()
-                .name(harFileName)
-                .type("har")
-                .path("/artifacts/har/" + harFileName)
-                .mimeType("application/json")
-                .size((long) harContent.length())
-                .timestamp(Instant.now())
-                .build();
-
-        addArtifact(testName, harFile);
+        addArtifact(testName, textArtifact(testName, harFileName, "har", "application/json", harContent));
         logger.debug("Captured HAR file '{}' for test '{}'", harFileName, testName);
+    }
+
+    /**
+     * Writes text evidence under {@code <report dir>/artifacts/<type>/} and inlines it
+     * when small enough, so the report shows it without the file and links it otherwise.
+     */
+    private static Artifact textArtifact(String testName, String fileName, String type, String mimeType,
+            String content) {
+        byte[] bytes = content.getBytes(StandardCharsets.UTF_8);
+        // The hash keeps same-named files from different tests apart; the name can't climb out of the folder
+        String relativePath = "artifacts/" + type + "/" + Integer.toHexString(testName.hashCode()) + "-"
+                + fileName.replaceAll("[^A-Za-z0-9._-]", "_");
+        try {
+            File file = new File(reportDirectory(), relativePath);
+            Files.createDirectories(file.getParentFile().toPath());
+            Files.write(file.toPath(), bytes);
+        } catch (IOException e) {
+            logger.warn("PulseReport: could not write {} for '{}': {}", fileName, testName, e.getMessage());
+        }
+        return Artifact.builder()
+                .name(fileName)
+                .type(type)
+                .path(relativePath)
+                .mimeType(mimeType)
+                .size((long) bytes.length)
+                .timestamp(Instant.now())
+                .content(bytes.length <= MAX_INLINE_TEXT_BYTES ? content : null)
+                .build();
     }
 
     /**
@@ -491,8 +504,10 @@ public class SeleniumAdapter extends TestNGAdapter {
             throw new IllegalArgumentException("driver cannot be null");
         }
         trackedDriver.set(driver);
+        ReentrantLock lock = new ReentrantLock();
+        driverLock.set(lock);
         startVideo();
-        return new EventFiringDecorator<WebDriver>(new SeleniumStepListener(this, driver)).decorate(driver);
+        return new EventFiringDecorator<WebDriver>(new SeleniumStepListener(this, driver, lock)).decorate(driver);
     }
 
     /**
@@ -553,7 +568,19 @@ public class SeleniumAdapter extends TestNGAdapter {
     void untrack(WebDriver driver) {
         if (trackedDriver.get() == driver) {
             trackedDriver.remove();
+            driverLock.remove();
         }
+    }
+
+    /** The tracked driver, or null once its session has ended (including a quit on the unwrapped driver). */
+    private static WebDriver activeDriver() {
+        WebDriver driver = trackedDriver.get();
+        if (driver instanceof RemoteWebDriver && ((RemoteWebDriver) driver).getSessionId() == null) {
+            trackedDriver.remove();
+            driverLock.remove();
+            return null;
+        }
+        return driver;
     }
 
     /** Captures end-of-test evidence while the browser is still open, for drivers quit mid-test. */
@@ -571,6 +598,8 @@ public class SeleniumAdapter extends TestNGAdapter {
     @Override
     public void onTestStart(ITestResult result) {
         super.onTestStart(result);
+        // A test whose finish event never arrived must not leave its recorder running
+        releaseCapture(testCapture.get());
         testCapture.set(new TestCapture());
         startVideo();
     }
@@ -610,7 +639,7 @@ public class SeleniumAdapter extends TestNGAdapter {
 
     private void startVideo() {
         TestCapture capture = testCapture.get();
-        WebDriver driver = trackedDriver.get();
+        WebDriver driver = activeDriver();
         CaptureSettings settings = settings();
         if (capture == null || capture.recorder != null || !(driver instanceof TakesScreenshot)
                 || MODE_NONE.equals(settings.video())
@@ -618,7 +647,7 @@ public class SeleniumAdapter extends TestNGAdapter {
             return;
         }
         try {
-            capture.recorder = new SeleniumVideoRecorder((TakesScreenshot) driver, settings.fps());
+            capture.recorder = new SeleniumVideoRecorder((TakesScreenshot) driver, settings.fps(), driverLock.get());
         } catch (IOException e) {
             logger.warn("PulseReport: could not start video recording: {}", e.getMessage());
         }
@@ -627,28 +656,46 @@ public class SeleniumAdapter extends TestNGAdapter {
     private void finishTestCapture(ITestResult result, boolean failed) {
         TestCapture capture = testCapture.get();
         testCapture.remove();
-        String testKey = getCurrentTestKey();
-        if (capture == null || testKey == null) {
+        if (openSteps.get().isEmpty()) {
+            openSteps.remove();
+        }
+        if (capture == null) {
             return;
         }
-        WebDriver driver = trackedDriver.get();
+        String testKey = getCurrentTestKey();
         try {
-            attachFinalScreenshot(capture, driver);
-            if (capture.heldStep != null) {
-                addStep(testKey, capture.heldStep.build());
-                capture.failureScreenshotTaken |= failed && capture.heldStepHasScreenshot;
-            }
-            if (failed && !capture.failureScreenshotTaken && !MODE_NONE.equals(settings().screenshots())) {
-                Artifact screenshot = screenshot(driver, "test-failure.png");
-                if (screenshot != null) {
-                    addArtifact(testKey, screenshot);
-                }
-            }
-            if (capture.recorder != null) {
-                finishVideo(testKey, videoFileName(result, testKey), capture.recorder, failed);
+            if (testKey != null) {
+                recordCapture(capture, result, testKey, failed);
             }
         } catch (RuntimeException e) {
             logger.warn("PulseReport: could not finish screenshot/video capture for '{}'", testKey, e);
+        } finally {
+            releaseCapture(capture);
+        }
+    }
+
+    private void recordCapture(TestCapture capture, ITestResult result, String testKey, boolean failed) {
+        WebDriver driver = activeDriver();
+        attachFinalScreenshot(capture, driver);
+        if (capture.heldStep != null) {
+            addStep(testKey, capture.heldStep.build());
+            capture.failureScreenshotTaken |= failed && capture.heldStepHasScreenshot;
+        }
+        if (failed && !capture.failureScreenshotTaken && !MODE_NONE.equals(settings().screenshots())) {
+            Artifact screenshot = screenshot(driver, "test-failure.png");
+            if (screenshot != null) {
+                addArtifact(testKey, screenshot);
+            }
+        }
+        if (capture.recorder != null) {
+            finishVideo(testKey, videoFileName(result, testKey), capture.recorder, failed);
+        }
+    }
+
+    private static void releaseCapture(TestCapture capture) {
+        if (capture != null && capture.recorder != null) {
+            capture.recorder.stop();
+            capture.recorder.discard();
         }
     }
 
@@ -683,7 +730,12 @@ public class SeleniumAdapter extends TestNGAdapter {
                     .size(output.length())
                     .timestamp(Instant.now());
             if ("embed".equals(settings.videoStorage())) {
-                video.content(Base64.getEncoder().encodeToString(Files.readAllBytes(output.toPath())));
+                if (output.length() <= MAX_EMBEDDED_VIDEO_BYTES) {
+                    video.content(Base64.getEncoder().encodeToString(Files.readAllBytes(output.toPath())));
+                } else {
+                    logger.warn("PulseReport: {} is over the {} MB embed limit; the report links the file instead",
+                            fileName, MAX_EMBEDDED_VIDEO_BYTES >> 20);
+                }
             }
             addArtifact(testKey, video.build());
         } catch (IOException e) {
@@ -752,7 +804,7 @@ public class SeleniumAdapter extends TestNGAdapter {
             parent.add(name, description, failure, durationMs);
             return;
         }
-        recordStep(name, description, table, failure, startedAt, durationMs, trackedDriver.get());
+        recordStep(name, description, table, failure, startedAt, durationMs, activeDriver());
     }
 
     private void recordStep(String name, String description, List<List<String>> table, Throwable failure,
@@ -807,6 +859,10 @@ public class SeleniumAdapter extends TestNGAdapter {
         if (!(driver instanceof TakesScreenshot)) {
             return null;
         }
+        ReentrantLock lock = driverLock.get();
+        if (lock != null) {
+            lock.lock();
+        }
         try {
             File file = ((TakesScreenshot) driver).getScreenshotAs(OutputType.FILE);
             return Artifact.builder()
@@ -820,6 +876,10 @@ public class SeleniumAdapter extends TestNGAdapter {
         } catch (RuntimeException e) {
             logger.debug("Could not capture screenshot", e);
             return null;
+        } finally {
+            if (lock != null) {
+                lock.unlock();
+            }
         }
     }
 

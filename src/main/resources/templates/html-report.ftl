@@ -2420,9 +2420,15 @@
             function safeUrl(u) {
                 if (!u) return null;
                 const s = String(u).trim();
+                if (/[\x00-\x1f\x7f]/.test(s)) return null;
                 if (/^data:image\/(png|jpe?g|gif|webp|svg\+xml)[;,]/i.test(s)) return s;
-                if (/^(https?|file):/i.test(s)) return s;
-                return /^[a-z][a-z0-9+.-]*:/i.test(s) ? null : s;
+                let url;
+                try {
+                    url = new URL(s, location.href);
+                } catch {
+                    return null;
+                }
+                return ['http:', 'https:', 'file:'].includes(url.protocol) ? s : null;
             }
 
             function fmtDur(ms) {
@@ -2491,6 +2497,7 @@
 
             const byId = new Map(tests.map(t => [t.tc.id, t]));
             const timeline = [...tests].sort((a, b) => (Date.parse(a.tc.startTime) || 0) - (Date.parse(b.tc.startTime) || 0));
+            const MAX_BARS = 400;
             const countOf = s => tests.filter(t => t.tc.status === s).length;
             const totals = {
                 all: tests.length,
@@ -2507,6 +2514,7 @@
             const itemEls = new Map();
             const barEls = new Map();
             const groups = [];
+            const groupOf = new Map();
             const chipEls = [];
             let emptyEl;
 
@@ -2631,24 +2639,34 @@
             }
 
             function renderPulse() {
-                const max = Math.max(1, ...timeline.map(t => t.tc.duration || 0));
+                const max = timeline.reduce((m, t) => Math.max(m, t.tc.duration || 0), 1);
                 const track = h('div', {
                     class: 'pulse-track',
                     role: 'img',
                     'aria-label': `Run timeline: ${totals.all} ${totals.all === 1 ? 'test' : 'tests'} in execution order, bar height shows duration. ${totals.FAILED} failed, ${totals.SKIPPED} skipped.`
                 });
                 if (timeline.length < 15) track.classList.add('sparse');
-                if (timeline.length > 160) track.style.setProperty('--bar-gap', '1px');
-                for (const t of timeline) {
-                    const d = t.tc.duration || 0;
+                // Large runs share bars: each shows its slowest test and its worst status, and opens that test
+                const per = Math.ceil(timeline.length / MAX_BARS);
+                if (timeline.length / per > 160) track.style.setProperty('--bar-gap', '1px');
+                for (let i = 0; i < timeline.length; i += per) {
+                    const chunk = timeline.slice(i, i + per);
+                    const worst =
+                        chunk.find(t => t.tc.status === 'FAILED') || chunk.find(t => t.tc.status === 'SKIPPED') || chunk[0];
+                    const d = chunk.reduce((m, t) => Math.max(m, t.tc.duration || 0), 0);
+                    const failed = chunk.filter(t => t.tc.status === 'FAILED').length;
+                    const tip =
+                        chunk.length === 1
+                            ? `${worst.tc.name}\n${st(worst.tc.status).label}, ${fmtDur(d)}`
+                            : `Tests ${i + 1}–${i + chunk.length}\n${failed ? `${failed} failed, ` : ''}slowest ${fmtDur(d)}`;
                     const bar = h('div', {
                         class: 'bar',
-                        'data-s': st(t.tc.status).key,
-                        'data-id': t.tc.id,
-                        'data-tip': `${t.tc.name}\n${st(t.tc.status).label}, ${fmtDur(d)}`
+                        'data-s': st(worst.tc.status).key,
+                        'data-id': worst.tc.id,
+                        'data-tip': tip
                     });
                     bar.style.height = `${14 + 86 * Math.sqrt(d / max)}%`;
-                    barEls.set(t.tc.id, bar);
+                    for (const t of chunk) barEls.set(t.tc.id, bar);
                     track.append(bar);
                 }
                 track.addEventListener('click', e => {
@@ -2713,6 +2731,7 @@
                 $('#chips').append(...chipEls);
             }
 
+            // Rows are built when a suite is first opened, so runs with thousands of tests load quickly
             function renderTree() {
                 const nodes = [];
                 for (const suite of RUN.suites || []) {
@@ -2722,7 +2741,7 @@
                     const ul = h('ul', { class: 'items' });
                     const det = h(
                         'details',
-                        { class: 'group dz', open: failed > 0 },
+                        { class: 'group dz' },
                         h(
                             'summary',
                             { 'data-tip': suite.secondaryText || suite.name || '' },
@@ -2733,24 +2752,43 @@
                         ),
                         ul
                     );
-                    for (const tc of cases) {
-                        const btn = h(
-                            'button',
-                            { type: 'button', class: 'item', 'data-id': tc.id },
-                            glyph(tc.status),
-                            h('span', { class: 'name' }, srStatus(tc.status), tc.name),
-                            h('span', { class: 'dur' }, fmtDur(tc.duration))
-                        );
-                        btn.addEventListener('click', () => select(tc.id));
-                        const li = h('li', null, btn);
-                        ul.append(li);
-                        itemEls.set(tc.id, { li, btn, det, entry: byId.get(tc.id) });
-                    }
-                    groups.push(det);
+                    const g = { det, ul, cases, items: [], built: false };
+                    det.addEventListener('toggle', () => {
+                        if (det.open) buildRows(g);
+                    });
+                    if (failed) openGroup(g);
+                    for (const tc of cases) groupOf.set(tc.id, g);
+                    groups.push(g);
                     nodes.push(det);
                 }
                 emptyEl = h('div', { class: 'tree-empty', hidden: true });
                 $('#tree').replaceChildren(...nodes, emptyEl);
+            }
+
+            function openGroup(g) {
+                buildRows(g);
+                g.det.open = true;
+            }
+
+            function buildRows(g) {
+                if (g.built) return;
+                g.built = true;
+                for (const tc of g.cases) {
+                    const entry = byId.get(tc.id);
+                    const btn = h(
+                        'button',
+                        { type: 'button', class: 'item', 'data-id': tc.id },
+                        glyph(tc.status),
+                        h('span', { class: 'name' }, srStatus(tc.status), tc.name),
+                        h('span', { class: 'dur' }, fmtDur(tc.duration))
+                    );
+                    btn.addEventListener('click', () => select(tc.id));
+                    if (tc.id === state.selected) btn.setAttribute('aria-current', 'true');
+                    const li = h('li', { hidden: !matches(entry) }, btn);
+                    g.ul.append(li);
+                    g.items.push({ li, entry });
+                    itemEls.set(tc.id, { li, btn });
+                }
             }
 
             function matches(t) {
@@ -2760,19 +2798,14 @@
 
             function applyFilter() {
                 const filtering = state.status !== 'all' || state.q;
-                const hits = new Set();
                 let any = 0;
-                for (const it of itemEls.values()) {
-                    const ok = matches(it.entry);
-                    it.li.hidden = !ok;
-                    if (ok) {
-                        any++;
-                        hits.add(it.det);
-                    }
-                }
-                for (const det of groups) {
-                    det.hidden = !hits.has(det);
-                    if (filtering && hits.has(det)) det.open = true;
+                for (const g of groups) {
+                    let hits = 0;
+                    for (const tc of g.cases) if (matches(byId.get(tc.id))) hits++;
+                    any += hits;
+                    g.det.hidden = !hits;
+                    if (filtering && hits) openGroup(g);
+                    for (const it of g.items) it.li.hidden = !matches(it.entry);
                 }
                 for (const chip of chipEls) chip.setAttribute('aria-pressed', String(chip.dataset.status === state.status));
                 emptyEl.hidden = any > 0;
@@ -2793,10 +2826,14 @@
                 applyFilter();
             }
 
+            let searchTimer = 0;
             search.addEventListener('input', () => {
                 state.rawQ = search.value.trim();
                 state.q = state.rawQ.toLowerCase();
-                applyFilter();
+                clearTimeout(searchTimer);
+                // Small runs filter on every keystroke; large ones wait for a pause in typing
+                if (tests.length < 2000) applyFilter();
+                else searchTimer = setTimeout(applyFilter, 150);
             });
 
             // ---------- Selection ----------
@@ -2808,12 +2845,15 @@
                     barEls.get(state.selected)?.removeAttribute('aria-current');
                 }
                 state.selected = id;
+                if (opts.reveal) {
+                    const g = groupOf.get(id);
+                    if (g) openGroup(g);
+                }
                 const it = itemEls.get(id);
                 if (it) {
                     it.btn.setAttribute('aria-current', 'true');
                     if (opts.reveal) {
                         if (it.li.hidden) clearFilters();
-                        it.det.open = true;
                         it.btn.scrollIntoView({ block: 'nearest' });
                     }
                 }
@@ -4055,13 +4095,16 @@
 
             // ---------- Keyboard ----------
             function move(dir) {
-                const visible = [...itemEls.values()].filter(it => !it.li.hidden && !it.det.hidden);
+                const visible = groups
+                    .filter(g => !g.det.hidden)
+                    .flatMap(g => g.cases.filter(tc => matches(byId.get(tc.id))).map(tc => ({ g, id: tc.id })));
                 if (!visible.length) return;
-                let i = visible.findIndex(it => it.btn.dataset.id === state.selected);
+                let i = visible.findIndex(v => v.id === state.selected);
                 i = i < 0 ? (dir > 0 ? 0 : visible.length - 1) : Math.min(visible.length - 1, Math.max(0, i + dir));
-                const it = visible[i];
-                it.det.open = true;
-                select(it.btn.dataset.id);
+                const { g, id } = visible[i];
+                openGroup(g);
+                select(id);
+                const it = itemEls.get(id);
                 if (document.activeElement?.closest('.tree')) it.btn.focus();
                 it.btn.scrollIntoView({ block: 'nearest' });
             }

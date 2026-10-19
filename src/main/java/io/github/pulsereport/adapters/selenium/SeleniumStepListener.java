@@ -9,6 +9,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.locks.ReentrantLock;
 
 import org.openqa.selenium.By;
 import org.openqa.selenium.JavascriptExecutor;
@@ -56,10 +57,12 @@ final class SeleniumStepListener implements WebDriverListener {
         }
     });
     private final ThreadLocal<Pending> pending = new ThreadLocal<>();
+    private final ReentrantLock driverLock;
 
-    SeleniumStepListener(SeleniumAdapter adapter, WebDriver driver) {
+    SeleniumStepListener(SeleniumAdapter adapter, WebDriver driver, ReentrantLock driverLock) {
         this.adapter = adapter;
         this.driver = driver;
+        this.driverLock = driverLock;
     }
 
     private static final class Pending {
@@ -82,6 +85,8 @@ final class SeleniumStepListener implements WebDriverListener {
 
     @Override
     public void beforeAnyCall(Object target, Method method, Object[] args) {
+        // Held until afterAnyCall/onError so recorder screenshots never interleave with this command
+        driverLock.lock();
         String name = method.getName();
         if ("quit".equals(name) && target instanceof WebDriver) {
             adapter.beforeQuit(driver);
@@ -105,19 +110,39 @@ final class SeleniumStepListener implements WebDriverListener {
 
     @Override
     public void afterAnyCall(Object target, Method method, Object[] args, Object result) {
-        String name = method.getName();
-        if ("findElement".equals(name) || "findElements".equals(name)) {
-            rememberLocator(target, args, result);
-        } else if ("quit".equals(name) && target instanceof WebDriver) {
-            adapter.untrack(driver);
-        } else {
-            complete(name, null);
+        try {
+            String name = method.getName();
+            if ("findElement".equals(name) || "findElements".equals(name)) {
+                rememberLocator(target, args, result);
+            } else if ("quit".equals(name) && target instanceof WebDriver) {
+                adapter.untrack(driver);
+            } else {
+                complete(name, null);
+            }
+        } finally {
+            releaseDriver();
         }
     }
 
     @Override
     public void onError(Object target, Method method, Object[] args, InvocationTargetException e) {
-        complete(method.getName(), e.getTargetException());
+        try {
+            if ("quit".equals(method.getName()) && target instanceof WebDriver) {
+                // The session is gone or unusable either way
+                adapter.untrack(driver);
+            } else {
+                complete(method.getName(), e.getTargetException());
+            }
+        } finally {
+            releaseDriver();
+        }
+    }
+
+    /** Fully releases, so a before-call without a matching after-call can't keep the recorder out for good. */
+    private void releaseDriver() {
+        while (driverLock.isHeldByCurrentThread()) {
+            driverLock.unlock();
+        }
     }
 
     private void complete(String method, Throwable failure) {

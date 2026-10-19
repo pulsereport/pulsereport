@@ -255,6 +255,15 @@ class HtmlReportGeneratorTest {
     }
 
     @Test
+    void leavesOversizedScreenshotsPathOnly() throws IOException {
+        File shot = new File(tempDir, "huge.png");
+        Files.write(shot.toPath(), new byte[(int) HtmlReportGenerator.MAX_INLINE_IMAGE_BYTES + 1]);
+        Artifact artifact = artifact("huge.png", "screenshot", shot.getAbsolutePath()).mimeType("image/png").build();
+
+        assertTrue(firstArtifact(generateHtml(runWithArtifact(artifact))).path("content").isMissingNode());
+    }
+
+    @Test
     void doesNotInlineNonImageFiles() throws IOException {
         File log = new File(tempDir, "console.log");
         Files.writeString(log.toPath(), "secret log line");
@@ -280,7 +289,7 @@ class HtmlReportGeneratorTest {
 
     @Test
     void escapesAngleBracketsAmpersandsAndLineSeparatorsInJson() throws IOException {
-        TestCase testCase = baseCase("tc-chars", TestStatus.PASSED).name("a<b>&c\u2028d").build();
+        TestCase testCase = baseCase("tc-chars", TestStatus.PASSED).name("a<b>&c\u2028d\u2029e<!--f").build();
 
         String html = generateHtml(createTestRunWithTestCase(testCase));
         String data = dataBlock(html);
@@ -289,7 +298,9 @@ class HtmlReportGeneratorTest {
         assertFalse(data.contains(">"));
         assertFalse(data.contains("&"));
         assertFalse(data.contains("\u2028"));
-        assertEquals("a<b>&c\u2028d", embeddedRun(html).path("suites").get(0).path("testCases").get(0).path("name").asText());
+        assertFalse(data.contains("\u2029"));
+        assertEquals("a<b>&c\u2028d\u2029e<!--f",
+                embeddedRun(html).path("suites").get(0).path("testCases").get(0).path("name").asText());
     }
 
     @Test
