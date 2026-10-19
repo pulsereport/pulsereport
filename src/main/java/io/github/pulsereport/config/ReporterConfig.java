@@ -19,6 +19,7 @@ public class ReporterConfig {
     private static final List<String> VALID_FORMATS = Arrays.asList("html", "json", "junit");
     private static final Pattern ENV_VAR_PATTERN = Pattern.compile("\\$\\{([^}]+)\\}");
     private static final String REPORT_TITLE_KEY = "reporter.report.title";
+    private static final String ASSERTION_CAPTURE_KEY = "reporter.assertions.capture";
     private static final List<String> VALID_SCREENSHOT_MODES = Arrays.asList("all", "failed", "last", "none");
     private static final List<String> VALID_VIDEO_MODES = Arrays.asList("always", "failed", "none");
 
@@ -42,6 +43,7 @@ public class ReporterConfig {
     private String videoMode;
     private int videoFps;
     private String ffmpegPath;
+    private boolean assertionCapture;
 
     /**
      * Private constructor - use builder or load methods.
@@ -66,6 +68,7 @@ public class ReporterConfig {
         this.videoMode = "none";
         this.videoFps = 2;
         this.ffmpegPath = "ffmpeg";
+        this.assertionCapture = true;
     }
 
     /**
@@ -242,6 +245,8 @@ public class ReporterConfig {
         config.videoMode = interpolate(props.getProperty("reporter.video.mode", "none")).trim().toLowerCase();
         config.videoFps = Integer.parseInt(props.getProperty("reporter.video.fps", "2").trim());
         config.ffmpegPath = interpolate(props.getProperty("reporter.video.ffmpegPath", "ffmpeg")).trim();
+        config.assertionCapture = Boolean.parseBoolean(
+                interpolate(props.getProperty(ASSERTION_CAPTURE_KEY, "true")).trim());
 
         return config;
     }
@@ -487,6 +492,37 @@ public class ReporterConfig {
         return ffmpegPath;
     }
 
+    /**
+     * Whether assertions evaluated inside steps are captured into the report.
+     * Defaults to true.
+     *
+     * @return true if assertion capture is enabled
+     */
+    public boolean isAssertionCaptureEnabled() {
+        return assertionCapture;
+    }
+
+    /**
+     * Resolves whether assertion capture is enabled: the
+     * {@code reporter.assertions.capture} system property first, then the same key
+     * in an auto-detected {@code reporter.properties}, defaulting to true. Never
+     * throws.
+     *
+     * @return true unless capture has been explicitly disabled
+     */
+    public static boolean resolveAssertionCapture() {
+        String sysProp = System.getProperty(ASSERTION_CAPTURE_KEY);
+        if (sysProp != null && !sysProp.isBlank()) {
+            return Boolean.parseBoolean(sysProp.trim());
+        }
+        try {
+            ReporterConfig config = autoDetect();
+            return config == null || config.isAssertionCaptureEnabled();
+        } catch (RuntimeException e) {
+            return true;
+        }
+    }
+
     @Override
     public String toString() {
         return "ReporterConfig{"
@@ -510,6 +546,7 @@ public class ReporterConfig {
                 + ", videoMode='" + videoMode + '\''
                 + ", videoFps=" + videoFps
                 + ", ffmpegPath='" + ffmpegPath + '\''
+                + ", assertionCapture=" + assertionCapture
                 + '}';
     }
 
@@ -621,6 +658,11 @@ public class ReporterConfig {
 
         public Builder ffmpegPath(String ffmpegPath) {
             config.ffmpegPath = ffmpegPath;
+            return this;
+        }
+
+        public Builder assertionCapture(boolean assertionCapture) {
+            config.assertionCapture = assertionCapture;
             return this;
         }
 

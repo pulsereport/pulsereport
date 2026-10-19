@@ -979,10 +979,6 @@
             padding: 6px 16px;
         }
 
-        .step.is-fail {
-            background: var(--fail-bg);
-        }
-
         .step .kw {
             font-weight: 600;
             color: var(--ink-muted);
@@ -1047,6 +1043,68 @@
             color: var(--fail);
             white-space: pre-wrap;
             overflow-wrap: anywhere;
+        }
+
+        .awrap > summary {
+            font: 12px var(--font-mono);
+            color: var(--ink-muted);
+        }
+
+        .awrap[open] > summary {
+            margin-bottom: 6px;
+        }
+
+        .asserts {
+            display: grid;
+            gap: 6px;
+            margin: 0;
+            padding: 0;
+            list-style: none;
+        }
+
+        .assert {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 2px 10px;
+            align-items: baseline;
+            font-size: 12.5px;
+        }
+
+        .assert .a-text {
+            overflow-wrap: anywhere;
+        }
+
+        .assert .a-fn {
+            font: 11px var(--font-mono);
+            color: var(--ink-muted);
+        }
+
+        .assert .a-vals {
+            grid-column: 1/-1;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 2px 18px;
+            font: 12px/1.5 var(--font-mono);
+            color: var(--ink-muted);
+        }
+
+        .assert .a-vals code {
+            font: inherit;
+            color: var(--pass);
+            white-space: pre-wrap;
+            overflow-wrap: anywhere;
+        }
+
+        .assert.is-fail .a-vals .a-actual {
+            color: var(--fail);
+        }
+
+        .assert.is-fail .a-text {
+            color: var(--fail);
+        }
+
+        .assert .step-err {
+            grid-column: 1/-1;
         }
 
         .bg {
@@ -3129,16 +3187,60 @@
                     h('span', { class: 'step-end' }, stepShotBtn(s.artifacts || []), h('span', { class: 'dur' }, s.duration ? fmtDur(s.duration) : ''))
                 );
                 const arts = s.artifacts || [];
+                const asserts = s.assertions || [];
                 const extra = [];
-                if (s.errorMessage && s.errorMessage !== ctx.testError) extra.push(h('pre', { class: 'step-err' }, s.errorMessage));
+                const errShown = s.errorMessage === ctx.testError || asserts.some(a => a.errorMessage === s.errorMessage);
+                if (s.errorMessage && !errShown) extra.push(h('pre', { class: 'step-err' }, s.errorMessage));
                 if (s.dataTable?.length) extra.push(dataTable(s.dataTable));
                 if (s.docString) extra.push(h('pre', { class: 'body' }, s.docString));
+                extra.push(assertionList(asserts));
                 for (const pair of pairExchanges(arts)) extra.push(exchangeDetails(pair));
                 extra.push(stepShots(arts), renderVideos(arts), renderFiles(arts));
                 const present = extra.filter(Boolean);
                 if (present.length) li.append(h('div', { class: 'step-extra' }, present));
                 stepEls.set(s, li);
                 return li;
+            }
+
+            // Libraries prefix the user's message and append expected/actual (JUnit "msg ==> expected: <7> but was: <8>",
+            // TestNG "msg expected [7] but found [8]", Hamcrest "msg\nExpected: … but: was …"). The row already shows
+            // both, so only text that adds something (e.g. "nothing was thrown") is kept.
+            function errorDetail(a) {
+                let rest = a.errorMessage || '';
+                if (a.message && rest.startsWith(a.message)) rest = rest.slice(a.message.length);
+                rest = rest.replace(/^[\s:=>]+/, '').trim();
+                if (!rest) return null;
+                if (a.expected != null && a.actual != null && /^expected\b[\s\S]*\bbut\b/i.test(rest)) return null;
+                return h('pre', { class: 'step-err' }, rest);
+            }
+
+            function assertionList(list) {
+                if (!list.length) return null;
+                const failed = list.filter(a => a.status === 'FAILED').length;
+                const noun = list.length === 1 ? 'assertion' : 'assertions';
+                const label = failed
+                    ? `${list.length} ${noun}, ${failed} failed`
+                    : `${list.length} ${noun} passed`;
+                const row = a => {
+                    const fail = a.status === 'FAILED';
+                    const vals = [];
+                    if (a.expected != null) vals.push(h('span', null, 'expected ', h('code', null, a.expected)));
+                    if (a.actual != null) vals.push(h('span', null, 'actual ', h('code', { class: 'a-actual' }, a.actual)));
+                    return h(
+                        'li',
+                        { class: `assert${fail ? ' is-fail' : ''}` },
+                        h('span', { class: 'a-text' }, srStatus(a.status), a.message || a.method),
+                        h('span', { class: 'a-fn', 'data-tip': a.framework || null }, a.method),
+                        vals.length ? h('div', { class: 'a-vals' }, vals) : null,
+                        fail ? errorDetail(a) : null
+                    );
+                };
+                return h(
+                    'details',
+                    { class: 'dz awrap', open: failed > 0 },
+                    h('summary', null, label),
+                    h('ul', { class: 'asserts' }, list.map(row))
+                );
             }
 
             function goToStep(step) {

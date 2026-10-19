@@ -845,6 +845,7 @@ public class CucumberRunner { }
 | Scenario | `TestCase` | `bddType = "scenario"` |
 | Scenario Outline | `TestCase` | `bddType = "scenario_outline"` |
 | Step | `TestStep` | Includes keyword, name, status, duration |
+| Assertion in a step | `TestStep.assertions` | `AssertionResult` with message, expected, actual, status |
 | Background | `TestCase.backgroundSteps` | Background steps are attached to each scenario |
 | Tags | `TestCase.tags` / `TestSuite.tags` | Feature tags propagate to suite; scenario tags to test case |
 
@@ -857,6 +858,65 @@ public class CucumberRunner { }
 - **Data tables and doc strings** — Step arguments are captured and displayed in reports
 - **Parallel execution support** — Thread-safe via `ThreadLocal` scenario context
 - **Step-level artifacts** — HTTP artifacts captured by `RestAssuredAdapter` are automatically routed to the currently executing step (see below)
+- **Assertion capture** — Every JUnit, TestNG and Hamcrest assertion in a step is listed under that step, passing or failing, with no change to your step code (see below)
+
+### Assertion Capture
+
+You don't need to change your step definitions. Plain assertion calls are recorded on the step that runs them:
+
+```java
+@Then("the response status should be {int}")
+public void statusShouldBe(int expected) {
+    assertEquals(expected, response.statusCode(), "Login API status code");
+}
+```
+
+The report lists each assertion under its step. Each entry shows the message, the method, the expected and actual values, and, for a failure, the library's error text. If any assertion in a step failed, its list opens automatically.
+
+**Supported libraries** (the static entry points are instrumented):
+
+| Library | Class | Notes |
+| --- | --- | --- |
+| JUnit 5 | `org.junit.jupiter.api.Assertions` | Assertions inside `assertAll` are listed individually |
+| JUnit 4 | `org.junit.Assert` | |
+| TestNG | `org.testng.Assert` | Also covers `SoftAssert`, which delegates to `Assert` |
+| Hamcrest | `org.hamcrest.MatcherAssert.assertThat` | The matcher description is shown as the expected value |
+
+**How it works.** When the adapter starts, it attaches a small Byte Buddy Java agent. The agent adds tracking code to the classes above so that each assertion call is recorded with its arguments and its result. Only the outermost call is recorded: a library calling its own overloads doesn't produce extra entries. Assertions in hooks are ignored. If recording fails for any reason, the assertion itself behaves exactly as before.
+
+**Recommended: load the agent at JVM startup.** If you don't, the adapter attaches the agent while tests are already running. On JDK 21 and later that makes the JVM print `WARNING: A Java agent has been loaded dynamically`. A library can't hide this warning, because the JVM prints it itself ([JEP 451](https://openjdk.org/jeps/451)). OpenJDK also plans to block attaching agents at runtime by default ([draft JEP 8388877](https://openjdk.org/jeps/8388877)). No release has done so yet, and no target release has been set. When it does happen, capture switches itself off: the adapter logs a warning, your tests still run, and the report has no assertion lists. Loading the agent at startup avoids both problems. Mockito asks for the same setup:
+
+```xml
+<!-- Exposes the jar's location as ${io.github.pulsereport:pulsereport:jar} -->
+<plugin>
+    <groupId>org.apache.maven.plugins</groupId>
+    <artifactId>maven-dependency-plugin</artifactId>
+    <executions>
+        <execution>
+            <goals>
+                <goal>properties</goal>
+            </goals>
+        </execution>
+    </executions>
+</plugin>
+<plugin>
+    <groupId>org.apache.maven.plugins</groupId>
+    <artifactId>maven-surefire-plugin</artifactId>
+    <configuration>
+        <argLine>-javaagent:${io.github.pulsereport:pulsereport:jar}</argLine>
+    </configuration>
+</plugin>
+```
+
+If you'd rather keep runtime attach and only hide the warning, use `<argLine>-XX:+EnableDynamicAgentLoading</argLine>` instead.
+
+**Limitations:**
+
+- **Values, not source code.** The report shows the values that were passed. For example, `assertTrue(user.isActive())` is shown as expected `true`, actual `true`. A message such as `assertTrue(user.isActive(), "user is active")` makes the entry readable.
+- **Not yet covered:** AssertJ's fluent `assertThat(...)` chains, and checks inside other libraries such as REST-assured's `.then().statusCode(200)`.
+- **Same thread only.** Only assertions that run on the step's thread are captured.
+
+To turn capture off, set `reporter.assertions.capture=false` in `reporter.properties`, or pass `-Dreporter.assertions.capture=false`.
 
 ### Attaching Artifacts to Steps
 

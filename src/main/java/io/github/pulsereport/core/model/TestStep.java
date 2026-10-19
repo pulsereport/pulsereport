@@ -33,6 +33,7 @@ public final class TestStep {
     private final String errorMessage;
     private final String stackTrace;
     private final List<Artifact> artifacts;
+    private final List<AssertionResult> assertions;
 
     @JsonCreator
     private TestStep(
@@ -47,7 +48,8 @@ public final class TestStep {
             @JsonProperty("dataTable") List<List<String>> dataTable,
             @JsonProperty("errorMessage") String errorMessage,
             @JsonProperty("stackTrace") String stackTrace,
-            @JsonProperty("artifacts") List<Artifact> artifacts) {
+            @JsonProperty("artifacts") List<Artifact> artifacts,
+            @JsonProperty("assertions") List<AssertionResult> assertions) {
         this.name = name;
         this.status = status;
         this.startTime = startTime;
@@ -60,6 +62,7 @@ public final class TestStep {
         this.errorMessage = errorMessage;
         this.stackTrace = stackTrace;
         this.artifacts = artifacts != null ? new ArrayList<>(artifacts) : new ArrayList<>();
+        this.assertions = assertions != null ? new ArrayList<>(assertions) : new ArrayList<>();
     }
 
     /**
@@ -159,6 +162,15 @@ public final class TestStep {
     }
 
     /**
+     * Gets the assertions evaluated while this step ran, in execution order.
+     * @return an unmodifiable list of assertions (empty when none were captured)
+     */
+    @JsonInclude(JsonInclude.Include.NON_EMPTY)
+    public List<AssertionResult> getAssertions() {
+        return Collections.unmodifiableList(assertions);
+    }
+
+    /**
      * Creates a new builder for TestStep.
      * @return a new builder instance
      */
@@ -187,7 +199,8 @@ public final class TestStep {
                 Objects.equals(dataTable, testStep.dataTable) &&
                 Objects.equals(errorMessage, testStep.errorMessage) &&
                 Objects.equals(stackTrace, testStep.stackTrace) &&
-                Objects.equals(artifacts, testStep.artifacts);
+                Objects.equals(artifacts, testStep.artifacts) &&
+                Objects.equals(assertions, testStep.assertions);
     }
 
     /**
@@ -197,7 +210,7 @@ public final class TestStep {
     @Override
     public int hashCode() {
         return Objects.hash(name, status, startTime, endTime, duration, description,
-                keyword, docString, dataTable, errorMessage, stackTrace, artifacts);
+                keyword, docString, dataTable, errorMessage, stackTrace, artifacts, assertions);
     }
 
     /**
@@ -234,6 +247,7 @@ public final class TestStep {
         private String errorMessage;
         private String stackTrace;
         private List<Artifact> artifacts;
+        private List<AssertionResult> assertions;
 
         private Builder() {
         }
@@ -359,6 +373,16 @@ public final class TestStep {
         }
 
         /**
+         * Sets the assertions evaluated while this step ran.
+         * @param assertions the assertions (optional)
+         * @return this builder
+         */
+        public Builder assertions(List<AssertionResult> assertions) {
+            this.assertions = assertions;
+            return this;
+        }
+
+        /**
          * Builds the TestStep instance.
          * @return a new TestStep
          * @throws IllegalArgumentException if required fields are missing
@@ -371,7 +395,7 @@ public final class TestStep {
                 throw new IllegalArgumentException("status is required");
             }
             return new TestStep(name, status, startTime, endTime, duration, description,
-                    keyword, docString, dataTable, errorMessage, stackTrace, artifacts);
+                    keyword, docString, dataTable, errorMessage, stackTrace, artifacts, assertions);
         }
     }
 }

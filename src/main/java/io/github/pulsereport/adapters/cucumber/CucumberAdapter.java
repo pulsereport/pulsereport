@@ -35,7 +35,10 @@ import io.cucumber.plugin.event.TestSourceParsed;
 import io.cucumber.plugin.event.TestSourceRead;
 import io.cucumber.plugin.event.TestStepFinished;
 import io.cucumber.plugin.event.TestStepStarted;
+import io.github.pulsereport.assertions.AssertionCapture;
+import io.github.pulsereport.assertions.AssertionCollector;
 import io.github.pulsereport.core.model.Artifact;
+import io.github.pulsereport.core.model.AssertionResult;
 import io.github.pulsereport.core.model.TestCase;
 import io.github.pulsereport.core.model.TestRun;
 import io.github.pulsereport.core.model.TestStatus;
@@ -56,6 +59,7 @@ import io.github.pulsereport.outputs.json.JsonReportGenerator;
  *   Background steps     → TestCase.backgroundSteps (inlined per scenario)
  *   Scenario steps       → TestCase.steps
  *   HTTP artifacts       → TestStep.artifacts  (via CucumberAdapter.currentStepArtifacts ThreadLocal)
+ *   Assertions           → TestStep.assertions (captured automatically, see AssertionCapture)
  * </pre>
  *
  * <h2>Usage</h2>
@@ -121,6 +125,9 @@ public class CucumberAdapter implements EventListener {
     // EventListener
     @Override
     public void setEventPublisher(EventPublisher publisher) {
+        if (ReporterConfig.resolveAssertionCapture()) {
+            AssertionCapture.install();
+        }
         publisher.registerHandlerFor(TestRunStarted.class, this::onTestRunStarted);
         publisher.registerHandlerFor(TestSourceRead.class, this::onTestSourceRead);
         publisher.registerHandlerFor(TestSourceParsed.class, this::onTestSourceParsed);
@@ -231,6 +238,8 @@ public class CucumberAdapter implements EventListener {
 
     private void onTestStepStarted(TestStepStarted event) {
         if (!(event.getTestStep() instanceof PickleStepTestStep)) {
+            // Hooks are not report steps; drop anything they assert.
+            AssertionCollector.stop();
             return;
         }
         PickleStepTestStep pStep = (PickleStepTestStep) event.getTestStep();
@@ -256,6 +265,7 @@ public class CucumberAdapter implements EventListener {
         if (buf != null) {
             buf.clear();
         }
+        AssertionCollector.start();
         logger.debug("Step started: {} {}", keyword, name);
     }
 
@@ -293,6 +303,7 @@ public class CucumberAdapter implements EventListener {
             stepArtifacts.addAll(buf);
             buf.clear();
         }
+        List<AssertionResult> assertions = AssertionCollector.stop();
 
         TestStep step = TestStep.builder()
                 .name(ctx.getCurrentStepName())
@@ -306,6 +317,7 @@ public class CucumberAdapter implements EventListener {
                 .docString(docString)
                 .dataTable(dataTable)
                 .artifacts(stepArtifacts.isEmpty() ? null : stepArtifacts)
+                .assertions(assertions)
                 .build();
 
         if (ctx.isCurrentStepBackground()) {
@@ -361,6 +373,7 @@ public class CucumberAdapter implements EventListener {
             buf2.clear();
         }
         CucumberStepContext.currentStepArtifacts.remove();
+        AssertionCollector.stop();
 
         logger.debug("Scenario finished: {} -> {}", ctx.getScenarioName(), status);
     }
