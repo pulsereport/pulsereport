@@ -56,6 +56,10 @@ The current `ReporterConfig` implementation actively reads these keys:
 - `reporter.slack.reportUrl`
 - `reporter.maxArtifactContentSize`
 - `reporter.video.storage`
+- `reporter.screenshots.mode`
+- `reporter.video.mode`
+- `reporter.video.fps`
+- `reporter.video.ffmpegPath`
 - `reporter.maskSensitiveData`
 - `reporter.maskHeaders.enabled`
 - `reporter.maskHeaders.fields`
@@ -67,7 +71,20 @@ The current `ReporterConfig` implementation actively reads these keys:
 
 The masking keys are described in detail in [Sensitive Data Masking](#sensitive-data-masking).
 
-`reporter.video.storage` controls how Appium video evidence is stored: `path` (default), `embed`, or `url`.
+`reporter.video.storage` controls how video evidence (Appium, and Selenium drivers wrapped with `track(...)`) is stored: `path` (default), `embed`, or `url`. Selenium videos larger than 50 MB are linked instead of embedded.
+
+For drivers wrapped with `SeleniumAdapter.track(...)`:
+
+| Key | Values | Default |
+| --- | --- | --- |
+| `reporter.screenshots.mode` | `all` (every step), `failed` (failed steps and failed tests), `last` (last step of each test, plus failures), `none` | `failed` |
+| `reporter.video.mode` | `always`, `failed` (kept only for failed tests), `none` | `none` |
+| `reporter.video.fps` | Frames captured per second, 1–30 | `2` |
+| `reporter.video.ffmpegPath` | ffmpeg executable used to encode MP4 | `ffmpeg` |
+
+Videos are written to `<output directory>/videos/` and need [ffmpeg](https://ffmpeg.org) with libx264; if ffmpeg is missing, a warning is logged and tests run without video. All four keys can also be passed as `-D` system properties.
+
+Size limits: screenshots over 10 MB, or beyond 200 MB of screenshots in one report, are not embedded in the HTML (the report links their file path instead). A single test records at most 1 GB of video frames, and encoding is abandoned after 3 minutes.
 
 Other property examples in this document preserve the current PulseReport naming, but they are not all mapped by `ReporterConfig` yet.
 

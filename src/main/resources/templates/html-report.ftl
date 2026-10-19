@@ -35,6 +35,7 @@
             --sunken: #eceef0;
             --border: #dde1e5;
             --border-strong: #c5cbd1;
+            --shot-edge: #c5cbd1;
             --ink: #212529;
             --ink-muted: #59616a;
             --accent: #0f8b8d;
@@ -59,6 +60,7 @@
                 --sunken: #0d0f11;
                 --border: #2a2f34;
                 --border-strong: #3a4046;
+                --shot-edge: #646d76;
                 --ink: #e6e8ea;
                 --ink-muted: #9aa2a9;
                 --accent: #2fb3b5;
@@ -84,6 +86,7 @@
                 --sunken: #0d0f11;
                 --border: #2a2f34;
                 --border-strong: #3a4046;
+                --shot-edge: #646d76;
                 --ink: #e6e8ea;
                 --ink-muted: #9aa2a9;
                 --accent: #2fb3b5;
@@ -999,6 +1002,30 @@
             color: var(--ink-muted);
         }
 
+        .step-end {
+            align-self: start;
+            justify-self: end;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            margin-top: -1px;
+        }
+
+        .step-end .dur {
+            min-width: 6ch;
+            text-align: right;
+        }
+
+        .ghost.step-shot {
+            display: inline-flex;
+            gap: 3px;
+            width: auto;
+            min-width: 22px;
+            height: 22px;
+            padding: 0 3px;
+            font: 11px var(--font-mono);
+        }
+
         .step-desc {
             display: block;
             margin-top: 2px;
@@ -1071,6 +1098,16 @@
             font-weight: 500;
             color: var(--ink-muted);
             border-bottom: 1px solid var(--border);
+        }
+
+        .dt tbody tr + tr td {
+            border-top: 1px solid var(--border);
+        }
+
+        .dt .dt-n {
+            padding-right: 12px;
+            text-align: right;
+            color: var(--ink-muted);
         }
 
         .xchg {
@@ -1190,7 +1227,7 @@
             display: block;
             width: 100%;
             aspect-ratio: 16/10;
-            object-fit: cover;
+            object-fit: contain;
             border: 1px solid var(--border);
             border-radius: var(--radius);
             background: var(--sunken);
@@ -1221,18 +1258,530 @@
             font-size: 12px;
         }
 
+        .carousel {
+            display: grid;
+            gap: 10px;
+            max-width: 820px;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+
+        .carousel:focus {
+            outline: none;
+        }
+
+        .car-stage,
+        .car-head {
+            display: grid;
+            grid-template-columns: minmax(36px, 1fr) var(--shot-w, minmax(0, 1fr)) minmax(36px, 1fr);
+            align-items: center;
+            gap: 10px;
+        }
+
+        .car-head .car-meta {
+            grid-column: 2;
+        }
+
+        .car-thumbs {
+            width: var(--shot-w, auto);
+            max-width: 100%;
+            margin: 0 auto;
+        }
+
+        .side-btn.prev {
+            justify-self: end;
+        }
+
+        .side-btn.next {
+            justify-self: start;
+        }
+
+        .car-meta .side-btn {
+            width: 28px;
+            height: 28px;
+            margin: -4px -2px -4px 0;
+        }
+
+        .car-meta .ghost {
+            flex: none;
+            margin: -4px 0;
+        }
+
+        .car-frame {
+            position: relative;
+            grid-row: 1;
+            grid-column: 2;
+            overflow: hidden;
+            border-radius: var(--radius);
+        }
+
+        /* Drawn on the frame, not the image, so it stays put while screenshots slide */
+        .car-frame::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border: 1px solid var(--shot-edge);
+            border-radius: inherit;
+            pointer-events: none;
+        }
+
+        .is-expanded .car-frame::after {
+            border-color: rgb(255 255 255 / 0.22);
+        }
+
+        .car-ghost {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+        }
+
+        .car-view {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            padding: 0;
+            border: 0;
+            background: none;
+            touch-action: pan-y pinch-zoom;
+        }
+
+        button.car-view {
+            cursor: zoom-in;
+        }
+
+        .car-view img {
+            display: block;
+            max-width: 100%;
+            max-height: min(460px, 60vh);
+            /* Square: the frame rounds the corners, so sliding images meet without a seam */
+            border-radius: 0;
+            transform-origin: 0 0;
+            -webkit-user-drag: none;
+        }
+
+        .carousel.is-expanded {
+            max-width: none;
+        }
+
+        .is-expanded .car-view img {
+            max-height: calc(92dvh - 170px);
+        }
+
+        .is-expanded .car-frame.is-zoomed img {
+            cursor: grab;
+        }
+
+        .is-expanded .car-frame.is-panning img {
+            cursor: grabbing;
+        }
+
+        .car-zoom {
+            position: absolute;
+            right: 10px;
+            bottom: 10px;
+            padding: 3px 8px;
+            border-radius: 999px;
+            background: rgb(13 15 17 / 0.65);
+            color: #fff;
+            font: 11.5px var(--font-mono);
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .car-zoom.show {
+            opacity: 1;
+        }
+
+        .car-meta {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            min-width: 0;
+            font-size: 12.5px;
+        }
+
+        .car-count,
+        .car-file {
+            flex: none;
+            font: 11.5px var(--font-mono);
+            color: var(--ink-muted);
+        }
+
+        .car-cap {
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .car-file {
+            margin-left: auto;
+        }
+
+        .car-meta .ghost.goto {
+            margin-left: -8px;
+            color: var(--accent-ink);
+        }
+
+        .car-meta .ghost.goto:hover {
+            background: var(--accent-bg);
+        }
+
+        .car-thumbs {
+            position: relative;
+            display: flex;
+            gap: 8px;
+            overflow-x: auto;
+            padding: 2px 2px 4px;
+        }
+
+        .car-thumb {
+            position: relative;
+            flex: none;
+            padding: 0;
+            border: 0;
+            background: none;
+            opacity: 0.6;
+            cursor: pointer;
+        }
+
+        .car-thumb img {
+            display: block;
+            height: 60px;
+            width: auto;
+            min-width: 40px;
+            max-width: 240px;
+            object-fit: contain;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            background: var(--sunken);
+        }
+
+        .car-thumb:hover,
+        .car-thumb[aria-current] {
+            opacity: 1;
+        }
+
+        .car-thumb[aria-current] img {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 1px var(--accent);
+        }
+
+        .side-btn {
+            grid-row: 1;
+            display: grid;
+            place-items: center;
+            width: 36px;
+            height: 36px;
+            padding: 0;
+            border: 0;
+            border-radius: var(--radius);
+            background: none;
+            color: var(--ink-muted);
+            cursor: pointer;
+        }
+
+        .side-btn .ic {
+            width: 24px;
+            height: 24px;
+            stroke-width: 2;
+        }
+
+        .side-btn:hover {
+            color: var(--ink);
+        }
+
+        .side-btn:active {
+            scale: 0.88;
+        }
+
+        .side-btn.prev {
+            grid-column: 1;
+        }
+
+        .side-btn.next {
+            grid-column: 3;
+        }
+
+        .car-live {
+            display: flex;
+            align-items: baseline;
+            gap: 12px;
+            min-width: 0;
+        }
+
+        .car-thumb.is-fail img {
+            border-color: var(--fail);
+            box-shadow: 0 0 0 1px var(--fail);
+        }
+
+        .car-num {
+            position: absolute;
+            left: 4px;
+            bottom: 4px;
+            min-width: 16px;
+            padding: 0 4px;
+            border-radius: 4px;
+            background: rgb(13 15 17 / 0.7);
+            color: #fff;
+            font: 600 10.5px/16px var(--font-mono);
+            text-align: center;
+        }
+
+        .car-thumb[aria-current] .car-num {
+            background: var(--accent);
+        }
+
+        .car-thumb.is-fail .car-num {
+            background: var(--fail);
+        }
+
+        .car-thumb.is-fail[aria-current] img {
+            box-shadow: 0 0 0 2px var(--fail);
+        }
+
+        .shot-fail {
+            flex: none;
+            font-weight: 600;
+            color: var(--fail);
+        }
+
+        .step.flash {
+            background: var(--accent-bg);
+            box-shadow: inset 3px 0 0 var(--accent);
+        }
+
+        .step-shots > summary {
+            font-size: 12px;
+            color: var(--ink-muted);
+        }
+
+        .step-shots[open] > summary {
+            margin-bottom: 8px;
+        }
+
+        .step-shots .shots {
+            grid-template-columns: repeat(auto-fill, minmax(140px, 200px));
+        }
+
         .videos {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            grid-template-columns: repeat(auto-fill, minmax(min(100%, 360px), 1fr));
             gap: 14px;
         }
 
-        .artifact-video {
+        .player {
+            display: grid;
+            overflow: hidden;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            background: var(--raised);
+        }
+
+        .player:focus {
+            outline: none;
+        }
+
+        .player:focus-visible {
+            outline: 2px solid var(--accent-ink);
+            outline-offset: 2px;
+        }
+
+        .pl-screen {
+            position: relative;
+            display: grid;
+            place-items: center;
+            min-height: 0;
+            background: #0d0f11;
+            cursor: pointer;
+        }
+
+        .pl-screen video {
             display: block;
             width: 100%;
             max-height: 480px;
+        }
+
+        .pl-big {
+            position: absolute;
+            inset: 0;
+            display: grid;
+            place-items: center;
+            width: 52px;
+            height: 52px;
+            margin: auto;
+            border-radius: 50%;
+            background: rgb(13 15 17 / 0.62);
+            box-shadow: 0 0 0 1px rgb(255 255 255 / 0.14);
+            color: #fff;
+            -webkit-backdrop-filter: blur(6px);
+            backdrop-filter: blur(6px);
+            pointer-events: none;
+        }
+
+        .pl-big .ic {
+            width: 22px;
+            height: 22px;
+            margin-left: 2px;
+        }
+
+        .pl-screen:hover .pl-big {
+            background: rgb(13 15 17 / 0.8);
+        }
+
+        .player.is-playing .pl-big {
+            opacity: 0;
+            scale: 0.9;
+        }
+
+        .pl-bar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 8px;
+            border-top: 1px solid var(--border);
+        }
+
+        .pl-btn {
+            display: grid;
+            place-items: center;
+            flex: none;
+            min-width: 28px;
+            height: 28px;
+            padding: 0 6px;
+            border: 0;
             border-radius: var(--radius);
+            background: none;
+            color: var(--ink-muted);
+            font: 11.5px var(--font-mono);
+            cursor: pointer;
+        }
+
+        .pl-btn:hover {
             background: var(--sunken);
+            color: var(--ink);
+        }
+
+        .pl-rate-wrap {
+            position: relative;
+            flex: none;
+        }
+
+        /* Wide enough for "1.5×" so the seek bar never shifts */
+        .pl-rate {
+            min-width: 44px;
+        }
+
+        .pl-menu {
+            position: absolute;
+            right: 0;
+            bottom: calc(100% + 6px);
+            left: 0;
+            z-index: 1;
+            display: grid;
+            gap: 2px;
+            padding: 3px;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            background: var(--raised);
+            box-shadow: 0 8px 24px rgb(0 0 0 / 0.18);
+        }
+
+        .pl-menu button {
+            height: 30px;
+            padding: 0;
+            border: 0;
+            border-radius: 4px;
+            background: none;
+            color: var(--ink-muted);
+            font: 11.5px var(--font-mono);
+            cursor: pointer;
+        }
+
+        .pl-menu button:hover,
+        .pl-menu button:focus-visible {
+            outline: none;
+            background: var(--sunken);
+            color: var(--ink);
+        }
+
+        .pl-menu button[aria-checked='true'] {
+            color: var(--accent-ink);
+            font-weight: 600;
+        }
+
+        .pl-time {
+            flex: none;
+            font: 11.5px var(--font-mono);
+            font-variant-numeric: tabular-nums;
+            color: var(--ink-muted);
+        }
+
+        .pl-seek {
+            flex: 1;
+            min-width: 40px;
+            height: 16px;
+            margin: 0 4px;
+            background: none;
+            -webkit-appearance: none;
+            appearance: none;
+            cursor: pointer;
+        }
+
+        .pl-seek::-webkit-slider-runnable-track {
+            height: 4px;
+            border-radius: 2px;
+            /* Fill ends at the thumb's centre, which travels 12px less than the track */
+            background:
+                linear-gradient(var(--accent), var(--accent)) 0 / calc(6px + (100% - 12px) * var(--f, 0)) 100% no-repeat,
+                var(--border);
+        }
+
+        .pl-seek::-moz-range-track {
+            height: 4px;
+            border-radius: 2px;
+            background:
+                linear-gradient(var(--accent), var(--accent)) 0 / calc(6px + (100% - 12px) * var(--f, 0)) 100% no-repeat,
+                var(--border);
+        }
+
+        .pl-seek::-webkit-slider-thumb {
+            width: 12px;
+            height: 12px;
+            margin-top: -4px;
+            border: 0;
+            border-radius: 50%;
+            background: var(--accent);
+            -webkit-appearance: none;
+            appearance: none;
+        }
+
+        .pl-seek::-moz-range-thumb {
+            width: 12px;
+            height: 12px;
+            border: 0;
+            border-radius: 50%;
+            background: var(--accent);
+        }
+
+        /* Full screen is always dark, whatever the report theme */
+        .player:fullscreen {
+            --raised: #181b1e;
+            --sunken: #0d0f11;
+            --border: #2a2f34;
+            --ink: #e6e8ea;
+            --ink-muted: #9aa2a9;
+            --accent: #2fb3b5;
+            --accent-ink: #5cc8ca;
+            grid-template-rows: minmax(0, 1fr) auto;
+            border: 0;
+            border-radius: 0;
+        }
+
+        .player:fullscreen video {
+            height: 100%;
+            max-height: none;
         }
 
         .files {
@@ -1328,34 +1877,73 @@
         }
 
         .lightbox {
-            max-width: min(1200px, 94vw);
+            width: min(1200px, 94vw);
+            max-width: none;
             max-height: 92dvh;
             padding: 0;
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            background: var(--raised);
-            color: var(--ink);
+            overflow: visible;
+            border: 0;
+            background: transparent;
+            color: #e6e8ea;
         }
 
         .lightbox::backdrop {
-            background: rgb(13 15 17 / 0.74);
+            background: rgb(10 12 14 / 0.9);
         }
 
-        .lb-bar {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: 12px;
-            padding: 8px 8px 8px 14px;
-            border-bottom: 1px solid var(--border);
-            font: 12px var(--font-mono);
+        /* Expanded viewer sits directly on the dark backdrop in both themes */
+        .is-expanded .car-count,
+        .is-expanded .car-file {
+            color: rgb(255 255 255 / 0.6);
         }
 
-        .lightbox img {
-            display: block;
-            max-width: 100%;
-            max-height: calc(92dvh - 48px);
-            margin: auto;
+        .is-expanded .side-btn {
+            color: rgb(255 255 255 / 0.7);
+        }
+
+        .is-expanded .side-btn:hover {
+            color: #fff;
+        }
+
+        .is-expanded .ghost {
+            color: rgb(255 255 255 / 0.7);
+        }
+
+        .is-expanded .ghost:hover {
+            background: rgb(255 255 255 / 0.1);
+            color: #fff;
+        }
+
+        .is-expanded .ghost.goto,
+        .is-expanded .ghost.goto:hover {
+            color: #5cc8ca;
+        }
+
+        .is-expanded .ghost.goto:hover {
+            background: rgb(255 255 255 / 0.1);
+        }
+
+        .is-expanded .shot-fail {
+            color: #f07171;
+        }
+
+        .is-expanded .car-thumb img {
+            border-color: rgb(255 255 255 / 0.16);
+            background: rgb(255 255 255 / 0.06);
+        }
+
+        .is-expanded .car-thumb[aria-current] img {
+            border-color: #5cc8ca;
+            box-shadow: 0 0 0 1px #5cc8ca;
+        }
+
+        .is-expanded .car-thumb.is-fail img {
+            border-color: #f07171;
+            box-shadow: 0 0 0 1px #f07171;
+        }
+
+        .is-expanded .car-thumb.is-fail[aria-current] img {
+            box-shadow: 0 0 0 2px #f07171;
         }
 
         .print-only {
@@ -1385,6 +1973,57 @@
             ::view-transition-new(root) {
                 animation-duration: 220ms;
                 animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+            }
+
+            .lightbox[open] {
+                animation: pr-pop 180ms cubic-bezier(0.16, 1, 0.3, 1);
+            }
+
+            .lightbox[open]::backdrop {
+                animation: pr-fade 180ms ease-out;
+            }
+
+            .side-btn {
+                transition:
+                    color 120ms,
+                    scale 120ms cubic-bezier(0.16, 1, 0.3, 1);
+            }
+
+            .car-thumb,
+            .car-thumb img {
+                transition:
+                    opacity 150ms,
+                    border-color 150ms,
+                    box-shadow 150ms;
+            }
+
+            .car-zoom {
+                transition: opacity 200ms;
+            }
+
+            .pl-big {
+                transition:
+                    opacity 150ms,
+                    scale 150ms cubic-bezier(0.16, 1, 0.3, 1);
+            }
+
+            .step {
+                transition:
+                    background 600ms ease-out,
+                    box-shadow 600ms ease-out;
+            }
+        }
+
+        @keyframes pr-pop {
+            from {
+                opacity: 0;
+                transform: scale(0.97);
+            }
+        }
+
+        @keyframes pr-fade {
+            from {
+                opacity: 0;
             }
         }
 
@@ -1575,13 +2214,7 @@
         </div>
     </div>
 
-    <dialog class="lightbox" id="lightbox" aria-label="Screenshot">
-        <div class="lb-bar">
-            <span id="lb-name"></span>
-            <button type="button" class="btn" id="lb-close">Close</button>
-        </div>
-        <img id="lb-img" alt="">
-    </dialog>
+    <dialog class="lightbox" id="lightbox" aria-labelledby="lb-cap"></dialog>
 
     <div class="print-only" id="print-failures"></div>
 
@@ -1651,6 +2284,36 @@
             <circle cx="12" cy="12" r="9"/>
             <path d="M12 11v5M12 8h.01"/>
         </svg>
+        <svg data-i="chev-left" class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M15 6l-6 6 6 6"/>
+        </svg>
+        <svg data-i="chev-right" class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M9 6l6 6-6 6"/>
+        </svg>
+        <svg data-i="close" class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M6 6l12 12M18 6L6 18"/>
+        </svg>
+        <svg data-i="image" class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <rect x="3" y="4" width="18" height="16" rx="2"/>
+            <circle cx="9" cy="10" r="1.5"/>
+            <path d="M21 16l-5-5-9 9"/>
+        </svg>
+        <svg data-i="jump" class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M19 12H5M11 6l-6 6 6 6"/>
+        </svg>
+        <svg data-i="play" class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path fill="currentColor" d="M8 5.5v13l10.5-6.5z"/>
+        </svg>
+        <svg data-i="pause" class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <rect fill="currentColor" x="6.5" y="5" width="3.5" height="14" rx="1"/>
+            <rect fill="currentColor" x="14" y="5" width="3.5" height="14" rx="1"/>
+        </svg>
+        <svg data-i="expand" class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>
+        </svg>
+        <svg data-i="shrink" class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/>
+        </svg>
     </template>
 
     <script type="application/json" id="pr-data">${runJson?no_esc}</script>
@@ -1660,6 +2323,10 @@
             'use strict';
             const RUN = JSON.parse(document.getElementById('pr-data').textContent);
             const $ = sel => document.querySelector(sel);
+            let gallery = [];
+            let inlineViewer = null;
+            const stepEls = new WeakMap();
+            const wrapIndex = (i, n) => ((i % n) + n) % n;
 
             const STATUS = {
                 PASSED: { key: 'pass', label: 'Passed' },
@@ -1753,9 +2420,15 @@
             function safeUrl(u) {
                 if (!u) return null;
                 const s = String(u).trim();
+                if (/[\x00-\x1f\x7f]/.test(s)) return null;
                 if (/^data:image\/(png|jpe?g|gif|webp|svg\+xml)[;,]/i.test(s)) return s;
-                if (/^(https?|file):/i.test(s)) return s;
-                return /^[a-z][a-z0-9+.-]*:/i.test(s) ? null : s;
+                let url;
+                try {
+                    url = new URL(s, location.href);
+                } catch {
+                    return null;
+                }
+                return ['http:', 'https:', 'file:'].includes(url.protocol) ? s : null;
             }
 
             function fmtDur(ms) {
@@ -1824,6 +2497,7 @@
 
             const byId = new Map(tests.map(t => [t.tc.id, t]));
             const timeline = [...tests].sort((a, b) => (Date.parse(a.tc.startTime) || 0) - (Date.parse(b.tc.startTime) || 0));
+            const MAX_BARS = 400;
             const countOf = s => tests.filter(t => t.tc.status === s).length;
             const totals = {
                 all: tests.length,
@@ -1840,6 +2514,7 @@
             const itemEls = new Map();
             const barEls = new Map();
             const groups = [];
+            const groupOf = new Map();
             const chipEls = [];
             let emptyEl;
 
@@ -1964,24 +2639,34 @@
             }
 
             function renderPulse() {
-                const max = Math.max(1, ...timeline.map(t => t.tc.duration || 0));
+                const max = timeline.reduce((m, t) => Math.max(m, t.tc.duration || 0), 1);
                 const track = h('div', {
                     class: 'pulse-track',
                     role: 'img',
                     'aria-label': `Run timeline: ${totals.all} ${totals.all === 1 ? 'test' : 'tests'} in execution order, bar height shows duration. ${totals.FAILED} failed, ${totals.SKIPPED} skipped.`
                 });
                 if (timeline.length < 15) track.classList.add('sparse');
-                if (timeline.length > 160) track.style.setProperty('--bar-gap', '1px');
-                for (const t of timeline) {
-                    const d = t.tc.duration || 0;
+                // Large runs share bars: each shows its slowest test and its worst status, and opens that test
+                const per = Math.ceil(timeline.length / MAX_BARS);
+                if (timeline.length / per > 160) track.style.setProperty('--bar-gap', '1px');
+                for (let i = 0; i < timeline.length; i += per) {
+                    const chunk = timeline.slice(i, i + per);
+                    const worst =
+                        chunk.find(t => t.tc.status === 'FAILED') || chunk.find(t => t.tc.status === 'SKIPPED') || chunk[0];
+                    const d = chunk.reduce((m, t) => Math.max(m, t.tc.duration || 0), 0);
+                    const failed = chunk.filter(t => t.tc.status === 'FAILED').length;
+                    const tip =
+                        chunk.length === 1
+                            ? `${worst.tc.name}\n${st(worst.tc.status).label}, ${fmtDur(d)}`
+                            : `Tests ${i + 1}–${i + chunk.length}\n${failed ? `${failed} failed, ` : ''}slowest ${fmtDur(d)}`;
                     const bar = h('div', {
                         class: 'bar',
-                        'data-s': st(t.tc.status).key,
-                        'data-id': t.tc.id,
-                        'data-tip': `${t.tc.name}\n${st(t.tc.status).label}, ${fmtDur(d)}`
+                        'data-s': st(worst.tc.status).key,
+                        'data-id': worst.tc.id,
+                        'data-tip': tip
                     });
                     bar.style.height = `${14 + 86 * Math.sqrt(d / max)}%`;
-                    barEls.set(t.tc.id, bar);
+                    for (const t of chunk) barEls.set(t.tc.id, bar);
                     track.append(bar);
                 }
                 track.addEventListener('click', e => {
@@ -2046,6 +2731,7 @@
                 $('#chips').append(...chipEls);
             }
 
+            // Rows are built when a suite is first opened, so runs with thousands of tests load quickly
             function renderTree() {
                 const nodes = [];
                 for (const suite of RUN.suites || []) {
@@ -2055,7 +2741,7 @@
                     const ul = h('ul', { class: 'items' });
                     const det = h(
                         'details',
-                        { class: 'group dz', open: failed > 0 },
+                        { class: 'group dz' },
                         h(
                             'summary',
                             { 'data-tip': suite.secondaryText || suite.name || '' },
@@ -2066,24 +2752,43 @@
                         ),
                         ul
                     );
-                    for (const tc of cases) {
-                        const btn = h(
-                            'button',
-                            { type: 'button', class: 'item', 'data-id': tc.id },
-                            glyph(tc.status),
-                            h('span', { class: 'name' }, srStatus(tc.status), tc.name),
-                            h('span', { class: 'dur' }, fmtDur(tc.duration))
-                        );
-                        btn.addEventListener('click', () => select(tc.id));
-                        const li = h('li', null, btn);
-                        ul.append(li);
-                        itemEls.set(tc.id, { li, btn, det, entry: byId.get(tc.id) });
-                    }
-                    groups.push(det);
+                    const g = { det, ul, cases, items: [], built: false };
+                    det.addEventListener('toggle', () => {
+                        if (det.open) buildRows(g);
+                    });
+                    if (failed) openGroup(g);
+                    for (const tc of cases) groupOf.set(tc.id, g);
+                    groups.push(g);
                     nodes.push(det);
                 }
                 emptyEl = h('div', { class: 'tree-empty', hidden: true });
                 $('#tree').replaceChildren(...nodes, emptyEl);
+            }
+
+            function openGroup(g) {
+                buildRows(g);
+                g.det.open = true;
+            }
+
+            function buildRows(g) {
+                if (g.built) return;
+                g.built = true;
+                for (const tc of g.cases) {
+                    const entry = byId.get(tc.id);
+                    const btn = h(
+                        'button',
+                        { type: 'button', class: 'item', 'data-id': tc.id },
+                        glyph(tc.status),
+                        h('span', { class: 'name' }, srStatus(tc.status), tc.name),
+                        h('span', { class: 'dur' }, fmtDur(tc.duration))
+                    );
+                    btn.addEventListener('click', () => select(tc.id));
+                    if (tc.id === state.selected) btn.setAttribute('aria-current', 'true');
+                    const li = h('li', { hidden: !matches(entry) }, btn);
+                    g.ul.append(li);
+                    g.items.push({ li, entry });
+                    itemEls.set(tc.id, { li, btn });
+                }
             }
 
             function matches(t) {
@@ -2093,19 +2798,14 @@
 
             function applyFilter() {
                 const filtering = state.status !== 'all' || state.q;
-                const hits = new Set();
                 let any = 0;
-                for (const it of itemEls.values()) {
-                    const ok = matches(it.entry);
-                    it.li.hidden = !ok;
-                    if (ok) {
-                        any++;
-                        hits.add(it.det);
-                    }
-                }
-                for (const det of groups) {
-                    det.hidden = !hits.has(det);
-                    if (filtering && hits.has(det)) det.open = true;
+                for (const g of groups) {
+                    let hits = 0;
+                    for (const tc of g.cases) if (matches(byId.get(tc.id))) hits++;
+                    any += hits;
+                    g.det.hidden = !hits;
+                    if (filtering && hits) openGroup(g);
+                    for (const it of g.items) it.li.hidden = !matches(it.entry);
                 }
                 for (const chip of chipEls) chip.setAttribute('aria-pressed', String(chip.dataset.status === state.status));
                 emptyEl.hidden = any > 0;
@@ -2126,10 +2826,14 @@
                 applyFilter();
             }
 
+            let searchTimer = 0;
             search.addEventListener('input', () => {
                 state.rawQ = search.value.trim();
                 state.q = state.rawQ.toLowerCase();
-                applyFilter();
+                clearTimeout(searchTimer);
+                // Small runs filter on every keystroke; large ones wait for a pause in typing
+                if (tests.length < 2000) applyFilter();
+                else searchTimer = setTimeout(applyFilter, 150);
             });
 
             // ---------- Selection ----------
@@ -2141,36 +2845,51 @@
                     barEls.get(state.selected)?.removeAttribute('aria-current');
                 }
                 state.selected = id;
+                if (opts.reveal) {
+                    const g = groupOf.get(id);
+                    if (g) openGroup(g);
+                }
                 const it = itemEls.get(id);
                 if (it) {
                     it.btn.setAttribute('aria-current', 'true');
                     if (opts.reveal) {
                         if (it.li.hidden) clearFilters();
-                        it.det.open = true;
                         it.btn.scrollIntoView({ block: 'nearest' });
                     }
                 }
                 barEls.get(id)?.setAttribute('aria-current', 'true');
                 renderDetail(entry);
                 if (!opts.initial) {
-                    try {
-                        history.replaceState(null, '', `#t=${encodeURIComponent(id)}`);
-                    } catch {
-                        /* file:// in some browsers */
-                    }
+                    setHash();
                     app.dataset.view = 'detail';
                     if (matchMedia('(max-width: 767px)').matches) $('#detail').scrollIntoView();
                 }
             }
 
+            // #t=<test id>[&s=<screenshot number>]
+            function setHash(shot) {
+                if (!state.selected) return;
+                try {
+                    history.replaceState(null, '', `#t=${encodeURIComponent(state.selected)}${shot ? `&s=${shot}` : ''}`);
+                } catch {
+                    /* file:// in some browsers */
+                }
+            }
+
             function idFromHash() {
-                const m = location.hash.match(/^#t=(.+)$/);
+                const m = location.hash.match(/^#t=([^&]+)/);
                 if (!m) return null;
                 try {
                     return decodeURIComponent(m[1]);
                 } catch {
                     return null;
                 }
+            }
+
+            const shotFromHash = () => Number(location.hash.match(/&s=(\d+)$/)?.[1]) || 0;
+
+            function openShotFromHash(shot) {
+                if (shot && gallery[shot - 1]) showLightbox(gallery, shot - 1);
             }
 
             // ---------- Detail ----------
@@ -2196,6 +2915,7 @@
 
                 const failure = renderFailure(tc);
                 if (failure) d.append(section(tc.status === 'SKIPPED' ? 'Skip reason' : 'Failure', failure));
+                gallery = galleryOf(tc);
                 const steps = renderSteps(tc);
                 if (steps)
                     d.append(
@@ -2210,7 +2930,8 @@
                             exchanges.length > 1 ? h('div', { class: 'xlist' }, exchanges.map(exchangeDetails)) : exchangeEl(exchanges[0])
                         )
                     );
-                const shots = renderShots(arts);
+                inlineViewer = gallery.length ? createViewer(gallery, { start: startShot(tc, gallery) }) : null;
+                const shots = inlineViewer ? inlineViewer.root : renderShots(arts);
                 if (shots) d.append(section('Screenshots', shots));
                 const videos = renderVideos(arts);
                 if (videos) d.append(section('Recordings', videos));
@@ -2405,7 +3126,7 @@
                         stepText(s.name || ''),
                         s.description ? h('span', { class: 'step-desc' }, s.description) : null
                     ),
-                    h('span', { class: 'dur' }, s.duration ? fmtDur(s.duration) : '')
+                    h('span', { class: 'step-end' }, stepShotBtn(s.artifacts || []), h('span', { class: 'dur' }, s.duration ? fmtDur(s.duration) : ''))
                 );
                 const arts = s.artifacts || [];
                 const extra = [];
@@ -2413,14 +3134,28 @@
                 if (s.dataTable?.length) extra.push(dataTable(s.dataTable));
                 if (s.docString) extra.push(h('pre', { class: 'body' }, s.docString));
                 for (const pair of pairExchanges(arts)) extra.push(exchangeDetails(pair));
-                extra.push(renderShots(arts), renderVideos(arts), renderFiles(arts));
+                extra.push(stepShots(arts), renderVideos(arts), renderFiles(arts));
                 const present = extra.filter(Boolean);
                 if (present.length) li.append(h('div', { class: 'step-extra' }, present));
+                stepEls.set(s, li);
                 return li;
+            }
+
+            function goToStep(step) {
+                const li = stepEls.get(step);
+                if (!li?.isConnected) return;
+                const bg = li.closest('details');
+                if (bg) bg.open = true;
+                li.tabIndex = -1;
+                li.scrollIntoView({ block: 'center' });
+                li.focus({ preventScroll: true });
+                li.classList.add('flash');
+                setTimeout(() => li.classList.remove('flash'), 2000);
             }
 
             function dataTable(rows) {
                 const [head, ...body] = rows;
+                const numbered = body.length > 1;
                 return h(
                     'div',
                     { class: 'dt-scroll' },
@@ -2433,16 +3168,18 @@
                             h(
                                 'tr',
                                 null,
+                                numbered ? h('th', { scope: 'col', class: 'dt-n' }, '#') : null,
                                 head.map(c => h('th', { scope: 'col' }, c))
                             )
                         ),
                         h(
                             'tbody',
                             null,
-                            body.map(r =>
+                            body.map((r, i) =>
                                 h(
                                     'tr',
                                     null,
+                                    numbered ? h('td', { class: 'dt-n' }, String(i + 1)) : null,
                                     r.map(c => h('td', null, c))
                                 )
                             )
@@ -2611,10 +3348,534 @@
                             h('img', { src, alt: name, loading: 'lazy' }),
                             h('span', { class: 'cap' }, name)
                         );
-                        btn.addEventListener('click', () => openLightbox(src, name));
+                        btn.addEventListener('click', () => {
+                            const i = gallery.findIndex(g => g.a === a);
+                            if (i >= 0) showLightbox(gallery, i);
+                            else showLightbox([{ src, name }], 0);
+                        });
                         return btn;
                     })
                 );
+            }
+
+            // Embedded screenshots open from the step's icon; only non-embedded ones are listed under the step
+            function stepShots(arts) {
+                const missing = arts.filter(a => isImage(a) && !mediaSrc(a, 'image'));
+                const shots = renderShots(missing);
+                if (!shots) return null;
+                const n = missing.length;
+                return h('details', { class: 'dz step-shots' }, h('summary', null, n === 1 ? 'Screenshot' : `Screenshots (${n})`), shots);
+            }
+
+            function stepShotBtn(arts) {
+                const shots = arts.filter(a => isImage(a) && mediaSrc(a, 'image'));
+                if (!shots.length) return null;
+                const n = shots.length;
+                const label = n === 1 ? 'Open screenshot' : `Open screenshots (${n})`;
+                return h(
+                    'button',
+                    {
+                        type: 'button',
+                        class: 'ghost step-shot',
+                        'aria-label': label,
+                        'data-tip': label,
+                        onclick: () => {
+                            const i = gallery.findIndex(g => g.a === shots[0]);
+                            if (i >= 0) showLightbox(gallery, i);
+                            else showLightbox(shots.map(a => ({ src: mediaSrc(a, 'image'), name: a.name || 'screenshot' })), 0);
+                        }
+                    },
+                    icon('image'),
+                    n > 1 ? String(n) : null
+                );
+            }
+
+            // ---------- Screenshot gallery: every screenshot of the open test, in capture order ----------
+            function galleryOf(tc) {
+                const items = [];
+                const add = (arts, step) => {
+                    for (const a of (arts || []).filter(isImage)) {
+                        const src = mediaSrc(a, 'image');
+                        if (!src) continue;
+                        const name = a.name || 'screenshot';
+                        items.push({
+                            a,
+                            src,
+                            name,
+                            step: step?.name || null,
+                            stepRef: step,
+                            failed: step ? step.status === 'FAILED' : tc.status === 'FAILED' && /fail/i.test(name),
+                            order: items.length,
+                            ts: Date.parse(a.timestamp || '')
+                        });
+                    }
+                };
+                for (const s of [...(tc.backgroundSteps || []), ...(tc.steps || [])]) add(s.artifacts, s);
+                add(tc.artifacts, null);
+                if (items.every(it => Number.isFinite(it.ts))) items.sort((x, y) => x.ts - y.ts || x.order - y.order);
+                return items;
+            }
+
+            // Failed tests open on the failure evidence rather than the first screenshot
+            function startShot(tc, items) {
+                if (tc.status !== 'FAILED') return 0;
+                const i = items.findIndex(it => it.failed);
+                return i >= 0 ? i : items.length - 1;
+            }
+
+            // Touch/pen swipe; mouse users have the arrows
+            function onSwipe(el, go, enabled = () => true) {
+                let x0 = null;
+                el.addEventListener('pointerdown', e => {
+                    x0 = e.pointerType !== 'mouse' && enabled() ? e.clientX : null;
+                });
+                el.addEventListener('pointerup', e => {
+                    if (x0 == null) return;
+                    const dx = e.clientX - x0;
+                    x0 = null;
+                    if (Math.abs(dx) > 40) go(dx < 0 ? 1 : -1);
+                });
+                el.addEventListener('pointercancel', () => (x0 = null));
+            }
+
+            const navKey = (key, idx, n) => ({ ArrowLeft: idx - 1, ArrowRight: idx + 1, Home: 0, End: n - 1 })[key];
+            const reduceMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+            const EASE = 'cubic-bezier(0.16, 1, 0.3, 1)';
+            const MAX_ZOOM = 8;
+
+            // One viewer: rendered inline under Screenshots and expanded (same component) in the dialog
+            function createViewer(items, { start = 0, expanded = false } = {}) {
+                let idx = -1;
+                const many = items.length > 1;
+                const img = h('img', { alt: '', draggable: 'false' });
+                const view = expanded
+                    ? h('div', { class: 'car-view' }, img)
+                    : h('button', { type: 'button', class: 'car-view', onclick: () => showLightbox(items, idx) }, img);
+                // Mouse presses keep focus on the viewer itself, so no focus ring appears on the button
+                const keepFocus = e => {
+                    e.preventDefault();
+                    root.focus({ preventScroll: true });
+                };
+                const sideBtn = (cls, label, ic, onclick) =>
+                    h('button', { type: 'button', class: `side-btn ${cls}`, 'aria-label': label, onmousedown: keepFocus, onclick }, icon(ic));
+                const prev = many ? sideBtn('prev', 'Previous screenshot', 'chev-left', () => show(idx - 1)) : null;
+                const next = many ? sideBtn('next', 'Next screenshot', 'chev-right', () => show(idx + 1)) : null;
+                const close = expanded ? sideBtn('close', 'Close', 'close', closeLightbox) : null;
+                const zoomBadge = expanded ? h('span', { class: 'car-zoom', 'aria-hidden': 'true' }) : null;
+                const frame = h('div', { class: 'car-frame' }, view, zoomBadge);
+                const stage = h('div', { class: 'car-stage' }, prev, frame, next);
+
+                const count = h('span', { class: 'car-count' });
+                const fail = h('span', { class: 'shot-fail', hidden: true }, 'Failure');
+                const cap = h('span', { class: 'car-cap', id: expanded ? 'lb-cap' : null });
+                const live = h('span', { class: 'car-live', 'aria-live': 'polite' }, count, fail, cap);
+                const file = h('span', { class: 'car-file' });
+                const goStep = h(
+                    'button',
+                    {
+                        type: 'button',
+                        class: 'ghost goto',
+                        'aria-label': 'Go to step',
+                        'data-tip': 'Go to step',
+                        onclick: () => {
+                            const step = items[idx].stepRef;
+                            if (expanded) closeLightbox();
+                            goToStep(step);
+                        }
+                    },
+                    icon('jump')
+                );
+
+                const thumbs = items.map((it, i) =>
+                    h(
+                        'button',
+                        {
+                            type: 'button',
+                            class: `car-thumb${it.failed ? ' is-fail' : ''}`,
+                            tabindex: '-1',
+                            'aria-label': `Screenshot ${i + 1}: ${it.failed ? 'failure, ' : ''}${it.step || it.name}`,
+                            onmousedown: keepFocus,
+                            onclick: () => show(i)
+                        },
+                        h('img', { src: it.src, alt: '', loading: 'lazy', draggable: 'false' }),
+                        h('span', { class: 'car-num', 'aria-hidden': 'true' }, String(i + 1))
+                    )
+                );
+                // One tab stop for the whole strip; arrow keys move within it
+                const strip = many ? h('div', { class: 'car-thumbs', role: 'group', 'aria-label': 'Choose screenshot' }, thumbs) : null;
+
+                const root = h(
+                    'div',
+                    {
+                        class: `carousel${expanded ? ' is-expanded' : ''}`,
+                        role: 'group',
+                        'aria-roledescription': 'carousel',
+                        'aria-label': 'Screenshots',
+                        tabindex: '-1'
+                    },
+                    // Caption row on top (with close when expanded), aligned to the image and arrow columns
+                    h('div', { class: 'car-head' }, h('div', { class: 'car-meta' }, live, goStep, file, close)),
+                    stage,
+                    strip
+                );
+
+                // ---- Zoom (expanded only): wheel / trackpad pinch at the cursor, drag to pan, double-click to toggle ----
+                let scale = 1,
+                    tx = 0,
+                    ty = 0,
+                    badgeTimer = 0;
+
+                function paint(badge = true) {
+                    img.style.transform = scale > 1 ? `translate(${tx}px, ${ty}px) scale(${scale})` : '';
+                    frame.classList.toggle('is-zoomed', scale > 1);
+                    if (badge && zoomBadge) {
+                        zoomBadge.textContent = `${Math.round(scale * 100)}%`;
+                        zoomBadge.classList.add('show');
+                        clearTimeout(badgeTimer);
+                        badgeTimer = setTimeout(() => zoomBadge.classList.remove('show'), 900);
+                    }
+                }
+
+                function clampPan() {
+                    const w = img.offsetWidth,
+                        ht = img.offsetHeight;
+                    tx = Math.min(0, Math.max(w - w * scale, tx));
+                    ty = Math.min(0, Math.max(ht - ht * scale, ty));
+                }
+
+                function zoomAt(cx, cy, wanted, smooth = false) {
+                    const ns = Math.min(MAX_ZOOM, Math.max(1, wanted));
+                    if (ns === scale) return;
+                    const r = img.getBoundingClientRect();
+                    const lx = (cx - r.left) / scale,
+                        ly = (cy - r.top) / scale;
+                    const ox = r.left - tx,
+                        oy = r.top - ty;
+                    scale = ns;
+                    tx = cx - ox - lx * scale;
+                    ty = cy - oy - ly * scale;
+                    clampPan();
+                    if (smooth && !reduceMotion()) {
+                        img.style.transition = `transform 200ms ${EASE}`;
+                        setTimeout(() => (img.style.transition = ''), 220);
+                    }
+                    paint();
+                }
+
+                function resetZoom() {
+                    scale = 1;
+                    tx = ty = 0;
+                    paint(false);
+                }
+
+                if (expanded) {
+                    view.addEventListener(
+                        'wheel',
+                        e => {
+                            e.preventDefault();
+                            if (!e.ctrlKey && scale > 1 && Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
+                                tx -= e.deltaX;
+                                clampPan();
+                                paint(false);
+                                return;
+                            }
+                            const delta = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY;
+                            // Trackpad pinch arrives as ctrl+wheel with small deltas
+                            zoomAt(e.clientX, e.clientY, scale * Math.exp(-delta * (e.ctrlKey ? 0.01 : 0.002)));
+                        },
+                        { passive: false }
+                    );
+                    let drag = null;
+                    view.addEventListener('pointerdown', e => {
+                        if (scale === 1 || e.button !== 0) return;
+                        drag = { x: e.clientX, y: e.clientY, tx, ty };
+                        view.setPointerCapture(e.pointerId);
+                        frame.classList.add('is-panning');
+                    });
+                    view.addEventListener('pointermove', e => {
+                        if (!drag) return;
+                        tx = drag.tx + e.clientX - drag.x;
+                        ty = drag.ty + e.clientY - drag.y;
+                        clampPan();
+                        paint(false);
+                    });
+                    const endDrag = () => {
+                        drag = null;
+                        frame.classList.remove('is-panning');
+                    };
+                    view.addEventListener('pointerup', endDrag);
+                    view.addEventListener('pointercancel', endDrag);
+                    view.addEventListener('dblclick', e => {
+                        if (scale > 1) zoomAt(e.clientX, e.clientY, 1, true);
+                        else zoomAt(e.clientX, e.clientY, 2.5, true);
+                    });
+                }
+
+                // Outgoing screenshot slides out while the new one slides in from the other side
+                let ghost = null,
+                    slideToken = 0;
+
+                function stopSlide() {
+                    slideToken++;
+                    ghost?.remove();
+                    ghost = null;
+                    view.getAnimations().forEach(a => a.cancel());
+                    view.style.transform = '';
+                }
+
+                function slide(dir) {
+                    const token = slideToken;
+                    const g = view.cloneNode(true);
+                    g.className = 'car-ghost car-view';
+                    g.setAttribute('aria-hidden', 'true');
+                    g.inert = true;
+                    frame.append(g);
+                    ghost = g;
+                    // 1px overlap so anti-aliased edges never leave a hairline at the seam
+                    const from = `translateX(calc(${dir * 100}% - ${dir}px))`;
+                    view.style.transform = from;
+                    const run = () => {
+                        if (token !== slideToken) return;
+                        view.style.transform = '';
+                        const timing = { duration: 320, easing: EASE };
+                        view.animate([{ transform: from }, { transform: 'none' }], timing);
+                        const out = g.animate([{ transform: 'none' }, { transform: `translateX(calc(${-dir * 100}% + ${dir}px))` }], timing);
+                        out.finished.then(
+                            () => g.remove(),
+                            () => g.remove()
+                        );
+                    };
+                    return { run };
+                }
+
+                // Size the image column to the rendered screenshot so header, arrows and thumbnails hug it
+                function fitWidth() {
+                    if (!img.naturalWidth || !root.isConnected) return;
+                    const avail = root.clientWidth - 2 * 46;
+                    const maxH = parseFloat(getComputedStyle(img).maxHeight) || img.naturalHeight;
+                    const scale = Math.min(1, maxH / img.naturalHeight, avail / img.naturalWidth);
+                    root.style.setProperty('--shot-w', `${Math.floor(img.naturalWidth * scale)}px`);
+                }
+
+                function show(i, { animate = true } = {}) {
+                    const dir = idx < 0 ? 0 : Math.sign(i - idx);
+                    const thumbFocused = thumbs.includes(document.activeElement);
+                    stopSlide();
+                    const sliding = animate && dir && !reduceMotion() ? slide(dir) : null;
+                    idx = wrapIndex(i, items.length);
+                    const it = items[idx];
+                    resetZoom();
+                    img.src = it.src;
+                    img.decode().then(fitWidth, () => {});
+                    // Wait for the new image to decode so it never slides in blank
+                    if (sliding) img.decode().then(sliding.run, sliding.run);
+                    img.alt = it.step || it.name;
+                    if (!expanded) view.setAttribute('aria-label', `Open screenshot ${idx + 1} of ${items.length} full size`);
+                    count.textContent = many ? `${idx + 1} / ${items.length}` : '';
+                    fail.hidden = !it.failed;
+                    cap.textContent = it.step || 'Test';
+                    file.textContent = it.name;
+                    goStep.hidden = !it.stepRef;
+                    thumbs.forEach((t, j) => {
+                        t.tabIndex = j === idx ? 0 : -1;
+                        if (j === idx) t.setAttribute('aria-current', 'true');
+                        else t.removeAttribute('aria-current');
+                    });
+                    if (thumbFocused) thumbs[idx].focus({ preventScroll: true });
+                    if (strip)
+                        requestAnimationFrame(() => {
+                            const t = thumbs[idx];
+                            strip.scrollTo({
+                                left: t.offsetLeft - (strip.clientWidth - t.clientWidth) / 2,
+                                behavior: animate && !reduceMotion() ? 'smooth' : 'auto'
+                            });
+                        });
+                    if (expanded && items === gallery) setHash(idx + 1);
+                }
+
+                function handleKey(e) {
+                    if (expanded && ['+', '=', '-', '0'].includes(e.key)) {
+                        e.preventDefault();
+                        const r = view.getBoundingClientRect();
+                        const factor = e.key === '-' ? 1 / 1.5 : e.key === '0' ? 0 : 1.5;
+                        zoomAt(r.left + r.width / 2, r.top + r.height / 2, factor ? scale * factor : 1, true);
+                        return;
+                    }
+                    const target = navKey(e.key, idx, items.length);
+                    if (!many || target === undefined) return;
+                    e.preventDefault();
+                    show(target);
+                }
+
+                root.addEventListener('keydown', handleKey);
+                new ResizeObserver(fitWidth).observe(root);
+                if (many) onSwipe(view, dir => show(idx + dir), () => scale === 1);
+                show(start, { animate: false });
+                return {
+                    root,
+                    items,
+                    show,
+                    handleKey,
+                    get index() {
+                        return idx;
+                    }
+                };
+            }
+
+            const fmtClock = sec => {
+                const s = Math.max(0, Math.floor(sec || 0));
+                return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+            };
+            // Listed top to bottom, so the menu reads 0.5× up to 2× from the button
+            const RATES = [2, 1.5, 1, 0.5];
+
+            function createPlayer(src, name) {
+                const video = h('video', { src, preload: 'metadata', playsinline: true });
+                const screen = h('div', { class: 'pl-screen' }, video, h('span', { class: 'pl-big', 'aria-hidden': 'true' }, icon('play')));
+                const playBtn = h('button', { type: 'button', class: 'pl-btn', 'aria-label': 'Play' }, icon('play'));
+                const time = h('span', { class: 'pl-time' }, '0:00');
+                const seek = h('input', { type: 'range', class: 'pl-seek', min: 0, max: 0, step: 'any', value: 0, 'aria-label': 'Seek' });
+                const rateBtn = h(
+                    'button',
+                    { type: 'button', class: 'pl-btn pl-rate', 'aria-label': 'Playback speed 1×', 'aria-haspopup': 'menu', 'aria-expanded': 'false' },
+                    '1×'
+                );
+                const rateItems = RATES.map(r =>
+                    h(
+                        'button',
+                        { type: 'button', role: 'menuitemradio', 'aria-checked': String(r === 1), tabindex: '-1', onclick: () => setRate(r) },
+                        `${r}×`
+                    )
+                );
+                const rateMenu = h('div', { class: 'pl-menu', role: 'menu', 'aria-label': 'Playback speed', hidden: true }, rateItems);
+                const rateWrap = h('div', { class: 'pl-rate-wrap' }, rateBtn, rateMenu);
+                // Safari moves focus to the player on mouse press, which would close the menu before the click lands
+                rateWrap.addEventListener('mousedown', e => e.preventDefault());
+                const fsBtn = h('button', { type: 'button', class: 'pl-btn', 'aria-label': 'Full screen' }, icon('expand'));
+                const root = h(
+                    'div',
+                    { class: 'player', role: 'group', 'aria-label': `Recording ${name}`, tabindex: '0' },
+                    screen,
+                    h('div', { class: 'pl-bar' }, playBtn, time, seek, rateWrap, fsBtn)
+                );
+
+                const dur = () => (Number.isFinite(video.duration) ? video.duration : 0);
+                const toggle = () => (video.paused ? video.play().catch(() => {}) : video.pause());
+                const seekBy = d => {
+                    video.currentTime = Math.min(dur(), Math.max(0, video.currentTime + d));
+                    paintTime();
+                };
+
+                function paintTime() {
+                    const d = dur();
+                    const t = video.currentTime;
+                    time.textContent = d ? `${fmtClock(t)} / ${fmtClock(d)}` : fmtClock(t);
+                    seek.max = d;
+                    seek.value = t;
+                    seek.style.setProperty('--f', d ? Math.min(1, t / d) : 0);
+                }
+
+                function paintState() {
+                    const playing = !video.paused;
+                    root.classList.toggle('is-playing', playing);
+                    playBtn.replaceChildren(icon(playing ? 'pause' : 'play'));
+                    playBtn.setAttribute('aria-label', playing ? 'Pause' : 'Play');
+                }
+
+                function openRates() {
+                    rateMenu.hidden = false;
+                    rateBtn.setAttribute('aria-expanded', 'true');
+                    rateItems[RATES.indexOf(video.playbackRate)]?.focus();
+                }
+
+                function closeRates(refocus) {
+                    if (rateMenu.hidden) return;
+                    rateMenu.hidden = true;
+                    rateBtn.setAttribute('aria-expanded', 'false');
+                    if (refocus) rateBtn.focus();
+                }
+
+                function setRate(r) {
+                    video.playbackRate = r;
+                    rateBtn.textContent = `${r}×`;
+                    rateBtn.setAttribute('aria-label', `Playback speed ${r}×`);
+                    rateItems.forEach((b, i) => b.setAttribute('aria-checked', String(RATES[i] === r)));
+                    closeRates(true);
+                }
+
+                // timeupdate only fires a few times a second; follow frames so the bar moves smoothly
+                function tick() {
+                    paintTime();
+                    if (!video.paused && root.isConnected) requestAnimationFrame(tick);
+                }
+
+                function toggleFullscreen() {
+                    if (document.fullscreenElement === root) document.exitFullscreen();
+                    else if (root.requestFullscreen) root.requestFullscreen().catch(() => {});
+                    else video.webkitEnterFullscreen?.();
+                }
+
+                video.addEventListener('play', () => {
+                    paintState();
+                    tick();
+                });
+                video.addEventListener('pause', paintState);
+                ['loadedmetadata', 'durationchange', 'timeupdate'].forEach(ev => video.addEventListener(ev, paintTime));
+                video.addEventListener('error', () => root.replaceWith(h('div', { class: 'shot-missing' }, 'Recording could not be played')));
+
+                screen.addEventListener('click', toggle);
+                screen.addEventListener('dblclick', toggleFullscreen);
+                playBtn.addEventListener('click', toggle);
+                fsBtn.hidden = !(root.requestFullscreen || video.webkitEnterFullscreen);
+                fsBtn.addEventListener('click', toggleFullscreen);
+                root.addEventListener('fullscreenchange', () => {
+                    const full = document.fullscreenElement === root;
+                    fsBtn.replaceChildren(icon(full ? 'shrink' : 'expand'));
+                    fsBtn.setAttribute('aria-label', full ? 'Exit full screen' : 'Full screen');
+                });
+                rateBtn.addEventListener('click', () => (rateMenu.hidden ? openRates() : closeRates(true)));
+                // Focus sits on an option while open, so leaving the menu in any way closes it
+                rateWrap.addEventListener('focusout', e => {
+                    if (!rateWrap.contains(e.relatedTarget)) closeRates(false);
+                });
+                rateMenu.addEventListener('keydown', e => {
+                    const i = rateItems.indexOf(document.activeElement);
+                    const to = { ArrowDown: i + 1, ArrowUp: i - 1, Home: 0, End: rateItems.length - 1 }[e.key];
+                    if (to != null) rateItems[wrapIndex(to, rateItems.length)].focus();
+                    else if (e.key === 'Escape' || e.key === 'Tab') closeRates(true);
+                    else return;
+                    if (e.key !== 'Tab') e.preventDefault();
+                    e.stopPropagation();
+                });
+
+                // Hold playback while the thumb is dragged so it doesn't fight the playhead
+                let resume = false;
+                seek.addEventListener('pointerdown', () => {
+                    resume = !video.paused;
+                    video.pause();
+                });
+                seek.addEventListener('input', () => {
+                    video.currentTime = +seek.value;
+                    paintTime();
+                });
+                seek.addEventListener('change', () => {
+                    if (resume) video.play().catch(() => {});
+                    resume = false;
+                });
+
+                root.addEventListener('keydown', e => {
+                    if (e.metaKey || e.ctrlKey || e.altKey) return;
+                    const onButton = e.target.tagName === 'BUTTON';
+                    if (e.key === 'k' || (e.key === ' ' && !onButton)) toggle();
+                    else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') seekBy(e.key === 'ArrowLeft' ? -1 : 1);
+                    else if (e.key === 'f' && !fsBtn.hidden) toggleFullscreen();
+                    else return;
+                    // Keep 'f' and the arrows from reaching the report's own shortcuts
+                    e.preventDefault();
+                    e.stopPropagation();
+                });
+
+                return root;
             }
 
             function renderVideos(arts) {
@@ -2628,9 +3889,7 @@
                         return h(
                             'div',
                             { class: 'video' },
-                            src
-                                ? h('video', { class: 'artifact-video', src, controls: true, preload: 'metadata' })
-                                : h('div', { class: 'shot-missing' }, 'Video not available'),
+                            src ? createPlayer(src, a.name || 'recording') : h('div', { class: 'shot-missing' }, 'Video not available'),
                             h('span', { class: 'cap', 'data-tip': a.path || '' }, a.name || 'recording')
                         );
                     })
@@ -2745,22 +4004,49 @@
                 );
             }
 
-            // ---------- Lightbox ----------
+            // ---------- Lightbox: the same viewer, expanded ----------
             const lightbox = $('#lightbox');
+            let modalViewer = null;
 
-            function openLightbox(src, name) {
-                const img = $('#lb-img');
-                img.src = src;
-                img.alt = name || 'Screenshot';
-                $('#lb-name').textContent = name || '';
-                lightbox.showModal();
+            function showLightbox(items, i) {
+                modalViewer = createViewer(items, { start: i, expanded: true });
+                lightbox.replaceChildren(modalViewer.root);
+                if (!lightbox.open) lightbox.showModal();
+                modalViewer.root.focus({ preventScroll: true });
             }
 
-            lightbox.addEventListener('click', e => {
-                if (e.target === lightbox) lightbox.close();
-            });
+            // Idempotent: runs for our own close paths and the native dialog close event
+            function finishLightbox() {
+                const v = modalViewer;
+                if (!v) return;
+                modalViewer = null;
+                lightbox.replaceChildren();
+                if (v.items === gallery) {
+                    setHash();
+                    inlineViewer?.show(v.index, { animate: false });
+                }
+            }
 
-            $('#lb-close').addEventListener('click', () => lightbox.close());
+            function closeLightbox() {
+                if (lightbox.open) lightbox.close();
+                finishLightbox();
+            }
+
+            lightbox.addEventListener('close', finishLightbox);
+            lightbox.addEventListener('cancel', e => {
+                e.preventDefault();
+                closeLightbox();
+            });
+            // The dialog box is wider than the screenshot, so its empty areas behave like the backdrop
+            const isEmptySpace = t => !t.closest('img, button, .car-live, .car-file');
+            let downOnEmpty = false;
+            lightbox.addEventListener('pointerdown', e => {
+                downOnEmpty = isEmptySpace(e.target);
+            });
+            lightbox.addEventListener('click', e => {
+                // Both ends must be empty so a pan or text selection that ends off the image doesn't close it
+                if (downOnEmpty && isEmptySpace(e.target)) closeLightbox();
+            });
 
             // ---------- Theme: follows the system until the user picks one ----------
             const themeBtn = $('#theme-btn');
@@ -2809,13 +4095,16 @@
 
             // ---------- Keyboard ----------
             function move(dir) {
-                const visible = [...itemEls.values()].filter(it => !it.li.hidden && !it.det.hidden);
+                const visible = groups
+                    .filter(g => !g.det.hidden)
+                    .flatMap(g => g.cases.filter(tc => matches(byId.get(tc.id))).map(tc => ({ g, id: tc.id })));
                 if (!visible.length) return;
-                let i = visible.findIndex(it => it.btn.dataset.id === state.selected);
+                let i = visible.findIndex(v => v.id === state.selected);
                 i = i < 0 ? (dir > 0 ? 0 : visible.length - 1) : Math.min(visible.length - 1, Math.max(0, i + dir));
-                const it = visible[i];
-                it.det.open = true;
-                select(it.btn.dataset.id);
+                const { g, id } = visible[i];
+                openGroup(g);
+                select(id);
+                const it = itemEls.get(id);
                 if (document.activeElement?.closest('.tree')) it.btn.focus();
                 it.btn.scrollIntoView({ block: 'nearest' });
             }
@@ -2824,8 +4113,8 @@
                 if (lightbox.open) {
                     if (e.key === 'Escape') {
                         e.preventDefault();
-                        lightbox.close();
-                    }
+                        closeLightbox();
+                    } else if (!e.defaultPrevented) modalViewer?.handleKey(e);
                     return;
                 }
                 if (e.metaKey || e.ctrlKey || e.altKey) return;
@@ -2843,7 +4132,7 @@
                     e.preventDefault();
                     search.focus();
                     search.select();
-                } else if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && document.activeElement?.tagName !== 'VIDEO') {
+                } else if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && !document.activeElement?.closest('.player')) {
                     e.preventDefault();
                     move(e.key === 'ArrowDown' ? 1 : -1);
                 } else if (e.key === 'f' && totals.FAILED) {
@@ -2854,7 +4143,9 @@
 
             window.addEventListener('hashchange', () => {
                 const id = idFromHash();
+                const shot = shotFromHash();
                 if (id && id !== state.selected) select(id, { reveal: true });
+                openShotFromHash(shot);
             });
 
             // ---------- Print: every failure with its full trace ----------
@@ -2882,9 +4173,11 @@
             applyFilter();
             if (!tests.length) app.classList.add('is-empty');
             const fromHash = idFromHash();
+            const shot = shotFromHash();
             const initial = fromHash && byId.has(fromHash) ? fromHash : timeline.find(t => t.tc.status === 'FAILED')?.tc.id;
             if (initial) select(initial, { reveal: true, initial: !fromHash });
             else renderOverview();
+            if (fromHash) openShotFromHash(shot);
         })();
     </script>
     </#noparse>

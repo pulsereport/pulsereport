@@ -18,7 +18,7 @@ Adapters bridge the gap between testing frameworks and PulseReport's reporting l
 | `CucumberAdapter` | Cucumber | BDD step tracking | Background steps, scenario outlines, feature-to-suite mapping | Stable |
 | `RestAssuredAdapter` | REST-assured | API testing | Request/response, timing | Stable |
 | `TestNGAdapter` | TestNG | Basic test reporting | Test results, timing | In development |
-| `SeleniumAdapter` | Selenium WebDriver | Web UI testing | — (manual capture methods) | In development |
+| `SeleniumAdapter` | Selenium WebDriver | Web UI testing | Steps, screenshots and video for drivers wrapped with `track(...)` | In development |
 | `AppiumAdapter` | Appium | Mobile app testing | Screenshots, app metrics | In development |
 
 > **Note:** Adapters marked *In development* may not behave as expected.
@@ -195,13 +195,14 @@ Extends TestNGAdapter with Selenium WebDriver-specific features.
 
 ### Installation
 
-Same as TestNGAdapter, plus Selenium dependency:
+Same as TestNGAdapter, plus Selenium dependency. Selenium is optional in PulseReport,
+so add your own; 4.15.0 or newer is supported (built against 4.15.0, tested up to 4.51.0):
 
 ```xml
 <dependency>
     <groupId>org.seleniumhq.selenium</groupId>
     <artifactId>selenium-java</artifactId>
-    <version>4.16.1</version>
+    <version>4.51.0</version>
 </dependency>
 ```
 
@@ -218,10 +219,54 @@ Same as TestNGAdapter, plus Selenium dependency:
 
 ### Features
 
-`SeleniumAdapter` provides **manual capture methods only** — it has no built-in
-screenshot or metric hooks. Call the capture methods from your test code, or
-centrally from a base test's `@AfterMethod`. (The [Appium Adapter](#appium-adapter)
-does support failure capture via `MobileDriverHolder`; Selenium does not.)
+#### Automatic Capture with `track(...)`
+
+Wrap the driver once and use the returned driver everywhere. Every open, click,
+type, clear and submit becomes a report step (element, locator, URL change, page
+load time, outcome; password fields are masked), and screenshots and video are
+captured according to configuration:
+
+```java
+@Listeners(SeleniumAdapter.class)
+public class WebTest {
+    private final SeleniumAdapter adapter = new SeleniumAdapter();
+    private WebDriver driver;
+
+    @BeforeMethod
+    public void setUp() {
+        driver = adapter.track(new ChromeDriver());
+    }
+
+    @Test
+    public void login() {
+        driver.get("https://example.com/login");
+        adapter.step("Log in", () -> {             // optional: groups actions under one step
+            driver.findElement(By.id("user")).sendKeys("demo");
+            driver.findElement(By.id("login")).click();
+        });
+    }
+
+    @AfterMethod(alwaysRun = true)
+    public void tearDown() {
+        driver.quit();
+    }
+}
+```
+
+| Key | Values | Default |
+| --- | --- | --- |
+| `reporter.screenshots.mode` | `all`, `failed`, `last`, `none` | `failed` |
+| `reporter.video.mode` | `always`, `failed`, `none` (needs [ffmpeg](https://ffmpeg.org)) | `none` |
+| `reporter.video.fps` | 1–30 | `2` |
+| `reporter.video.storage` | `path` (file under `<output>/videos/`), `embed` (Base64 in the HTML, up to 50 MB per video) | `path` |
+
+See [Configuration](configuration.md) for details. Videos stored as `path`
+must be kept next to the report (copy the whole output directory). Video frames
+are captured from the same browser session; the adapter serializes them with
+your test's commands, and recording stops at 1 GB of frames per test.
+
+The manual capture methods below remain available for anything `track(...)`
+doesn't cover, or for drivers you don't wrap.
 
 > **Note:** The adapter's artifact/metric stores are **static**, so any
 > `SeleniumAdapter` instance you create in test code shares data with the
@@ -272,7 +317,9 @@ public class WebTest {
 
 #### Browser and Console Logs
 
-Attach browser-level logs, JavaScript console output, or HAR network captures:
+Attach browser-level logs, JavaScript console output, or HAR network captures.
+Each is written to `<output>/artifacts/<type>/` and shown inline in the report
+when it is 1 MB or smaller (larger files are linked):
 
 ```java
 adapter.captureBrowserLogs("testLogin", "browser.log", logContent);
@@ -908,9 +955,9 @@ Precedence: `-Dreporter.output.directory` system property > `reporter.properties
 | --------- | -------- | ---------- | -------- | -------------- |
 | Test Results | ✅ | ✅ | ✅ | ✅ |
 | Timing Metrics | ✅ | ✅ | ✅ | ✅ |
-| Screenshots | ❌ | ✅ Manual | ✅ Auto (on failure) | ❌ |
-| Steps | ✅ Manual | ✅ Manual | ✅ Manual | ❌ |
-| Video Recording | ❌ | ❌ | ✅ | ❌ |
+| Screenshots | ❌ | ✅ Auto (`track`) + Manual | ✅ Auto (on failure) | ❌ |
+| Steps | ✅ Manual | ✅ Auto (`track`) + Manual | ✅ Manual | ❌ |
+| Video Recording | ❌ | ✅ (`track` + ffmpeg) | ✅ | ❌ |
 | Crash / ANR Reports | ❌ | ❌ | ✅ | ❌ |
 | Page Source | ❌ | ❌ | ✅ Auto (on failure) | ❌ |
 | Session Metadata | ❌ | ✅ Browser | ✅ Device/App | ❌ |
@@ -998,9 +1045,10 @@ Artifact video = captureFullVideo(); // Avoid unless necessary
 
 **Solution**:
 
-- **Selenium** — there is no automatic capture; call `captureBrowserScreenshot(...)`
-  from your test code or a base test's `@AfterMethod` (see
-  [Screenshot Capture](#screenshot-capture)).
+- **Selenium** — screenshots are automatic only for drivers wrapped with
+  `adapter.track(driver)`, and only as `reporter.screenshots.mode` allows
+  (default: failures). For unwrapped drivers, call `captureBrowserScreenshot(...)`
+  (see [Screenshot Capture](#screenshot-capture)).
 - **Appium** — automatic failure capture requires registering the driver with
   `MobileDriverHolder.set(driver)` in setup (and `MobileDriverHolder.remove()`
   in teardown).
