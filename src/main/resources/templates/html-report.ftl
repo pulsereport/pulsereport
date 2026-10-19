@@ -1051,60 +1051,67 @@
         }
 
         .awrap[open] > summary {
-            margin-bottom: 6px;
+            margin-bottom: 4px;
         }
 
-        .asserts {
-            display: grid;
-            gap: 6px;
-            margin: 0;
-            padding: 0;
-            list-style: none;
+        /* Fixed layout with percentage columns keeps Expected/Actual aligned across every step of a test. */
+        .dt.at {
+            width: 100%;
+            table-layout: fixed;
         }
 
-        .assert {
-            display: grid;
-            grid-template-columns: minmax(0, 1fr) auto;
-            gap: 2px 10px;
-            align-items: baseline;
-            font-size: 12.5px;
+        .at .c-msg {
+            width: 32%;
         }
 
-        .assert .a-text {
-            overflow-wrap: anywhere;
+        .at .c-exp,
+        .at .c-act {
+            width: 26%;
         }
 
-        .assert .a-fn {
-            font: 11px var(--font-mono);
-            color: var(--ink-muted);
+        .at .c-fn {
+            width: 16%;
         }
 
-        .assert .a-vals {
-            grid-column: 1/-1;
-            display: flex;
-            flex-wrap: wrap;
-            gap: 2px 18px;
-            font: 12px/1.5 var(--font-mono);
-            color: var(--ink-muted);
-        }
-
-        .assert .a-vals code {
-            font: inherit;
-            color: var(--pass);
+        .at td {
+            padding-top: 5px;
+            padding-bottom: 5px;
             white-space: pre-wrap;
             overflow-wrap: anywhere;
         }
 
-        .assert.is-fail .a-vals .a-actual {
+        .at .a-text {
+            font: 12.5px/1.45 var(--font-sans);
+            color: var(--ink);
+        }
+
+        .at .a-exp,
+        .at .a-act {
+            color: var(--pass);
+        }
+
+        .at .is-fail .a-text,
+        .at .is-fail .a-act {
             color: var(--fail);
         }
 
-        .assert.is-fail .a-text {
-            color: var(--fail);
+        .at th:last-child,
+        .at .a-fn {
+            padding-right: 0;
+            text-align: right;
         }
 
-        .assert .step-err {
-            grid-column: 1/-1;
+        .at .a-fn {
+            overflow: hidden;
+            font-size: 11px;
+            color: var(--ink-muted);
+            white-space: nowrap;
+            text-overflow: ellipsis;
+        }
+
+        .dt.at tbody tr.a-err td {
+            padding-top: 0;
+            border-top: 0;
         }
 
         .bg {
@@ -1263,6 +1270,56 @@
             .xside + .xside {
                 border-left: 0;
                 border-top: 1px solid var(--border);
+            }
+
+            /* Narrow panes stack each assertion: message, then labelled values. */
+            .dt.at,
+            .at tbody,
+            .at tr,
+            .at td {
+                display: block;
+                width: auto;
+            }
+
+            .at thead,
+            .at colgroup,
+            .at .a-fn {
+                display: none;
+            }
+
+            .at tr {
+                padding: 5px 0;
+            }
+
+            .at tr.a-err {
+                padding-top: 0;
+            }
+
+            .dt.at tbody tr + tr {
+                border-top: 1px solid var(--border);
+            }
+
+            .dt.at tbody tr + tr td,
+            .dt.at tbody tr.a-err {
+                border-top: 0;
+            }
+
+            .at td {
+                padding: 0;
+            }
+
+            .at .a-exp,
+            .at .a-act {
+                display: inline-block;
+                max-width: 100%;
+                margin-right: 16px;
+                vertical-align: top;
+            }
+
+            .at .a-exp::before,
+            .at .a-act::before {
+                content: attr(data-label) ' ';
+                color: var(--ink-muted);
             }
         }
 
@@ -3221,25 +3278,41 @@
                 const label = failed
                     ? `${list.length} ${noun}, ${failed} failed`
                     : `${list.length} ${noun} passed`;
-                const row = a => {
+                const rows = a => {
                     const fail = a.status === 'FAILED';
-                    const vals = [];
-                    if (a.expected != null) vals.push(h('span', null, 'expected ', h('code', null, a.expected)));
-                    if (a.actual != null) vals.push(h('span', null, 'actual ', h('code', { class: 'a-actual' }, a.actual)));
-                    return h(
-                        'li',
-                        { class: `assert${fail ? ' is-fail' : ''}` },
-                        h('span', { class: 'a-text' }, srStatus(a.status), a.message || a.method),
-                        h('span', { class: 'a-fn', 'data-tip': a.framework || null }, a.method),
-                        vals.length ? h('div', { class: 'a-vals' }, vals) : null,
-                        fail ? errorDetail(a) : null
-                    );
+                    const err = fail ? errorDetail(a) : null;
+                    return [
+                        h(
+                            'tr',
+                            { class: fail ? 'is-fail' : null },
+                            h('td', { class: 'a-text' }, srStatus(a.status), a.message || a.method),
+                            h('td', { class: 'a-exp', 'data-label': 'expected' }, a.expected),
+                            h('td', { class: 'a-act', 'data-label': 'actual' }, a.actual),
+                            h('td', { class: 'a-fn', 'data-tip': [a.method, a.framework].filter(Boolean).join('\n') }, a.method)
+                        ),
+                        err ? h('tr', { class: 'a-err' }, h('td', { colspan: 4 }, err)) : null
+                    ];
                 };
                 return h(
                     'details',
                     { class: 'dz awrap', open: failed > 0 },
                     h('summary', null, label),
-                    h('ul', { class: 'asserts' }, list.map(row))
+                    h(
+                        'table',
+                        { class: 'dt at' },
+                        h('colgroup', null, ['c-msg', 'c-exp', 'c-act', 'c-fn'].map(c => h('col', { class: c }))),
+                        h(
+                            'thead',
+                            null,
+                            h(
+                                'tr',
+                                null,
+                                ['Assertion', 'Expected', 'Actual'].map(t => h('th', { scope: 'col' }, t)),
+                                h('th', { scope: 'col' }, h('span', { class: 'sr-only' }, 'Method'))
+                            )
+                        ),
+                        h('tbody', null, list.map(rows))
+                    )
                 );
             }
 
