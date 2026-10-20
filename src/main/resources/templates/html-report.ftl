@@ -1090,7 +1090,6 @@
             color: var(--pass);
         }
 
-        .at .is-fail .a-text,
         .at .is-fail .a-act {
             color: var(--fail);
         }
@@ -1107,11 +1106,6 @@
             color: var(--ink-muted);
             white-space: nowrap;
             text-overflow: ellipsis;
-        }
-
-        .dt.at tbody tr.a-err td {
-            padding-top: 0;
-            border-top: 0;
         }
 
         .bg {
@@ -1291,16 +1285,11 @@
                 padding: 5px 0;
             }
 
-            .at tr.a-err {
-                padding-top: 0;
-            }
-
             .dt.at tbody tr + tr {
                 border-top: 1px solid var(--border);
             }
 
-            .dt.at tbody tr + tr td,
-            .dt.at tbody tr.a-err {
+            .dt.at tbody tr + tr td {
                 border-top: 0;
             }
 
@@ -3259,18 +3248,6 @@
                 return li;
             }
 
-            // Libraries prefix the user's message and append expected/actual (JUnit "msg ==> expected: <7> but was: <8>",
-            // TestNG "msg expected [7] but found [8]", Hamcrest "msg\nExpected: … but: was …"). The row already shows
-            // both, so only text that adds something (e.g. "nothing was thrown") is kept.
-            function errorDetail(a) {
-                let rest = a.errorMessage || '';
-                if (a.message && rest.startsWith(a.message)) rest = rest.slice(a.message.length);
-                rest = rest.replace(/^[\s:=>]+/, '').trim();
-                if (!rest) return null;
-                if (a.expected != null && a.actual != null && /^expected\b[\s\S]*\bbut\b/i.test(rest)) return null;
-                return h('pre', { class: 'step-err' }, rest);
-            }
-
             function assertionList(list) {
                 if (!list.length) return null;
                 const failed = list.filter(a => a.status === 'FAILED').length;
@@ -3278,21 +3255,15 @@
                 const label = failed
                     ? `${list.length} ${noun}, ${failed} failed`
                     : `${list.length} ${noun} passed`;
-                const rows = a => {
-                    const fail = a.status === 'FAILED';
-                    const err = fail ? errorDetail(a) : null;
-                    return [
-                        h(
-                            'tr',
-                            { class: fail ? 'is-fail' : null },
-                            h('td', { class: 'a-text' }, srStatus(a.status), a.message || a.method),
-                            h('td', { class: 'a-exp', 'data-label': 'expected' }, a.expected),
-                            h('td', { class: 'a-act', 'data-label': 'actual' }, a.actual),
-                            h('td', { class: 'a-fn', 'data-tip': [a.method, a.framework].filter(Boolean).join('\n') }, a.method)
-                        ),
-                        err ? h('tr', { class: 'a-err' }, h('td', { colspan: 4 }, err)) : null
-                    ];
-                };
+                const row = a =>
+                    h(
+                        'tr',
+                        { class: a.status === 'FAILED' ? 'is-fail' : null },
+                        h('td', { class: 'a-text' }, srStatus(a.status), a.message || a.method),
+                        h('td', { class: 'a-exp', 'data-label': 'expected' }, a.expected),
+                        h('td', { class: 'a-act', 'data-label': 'actual' }, a.actual),
+                        h('td', { class: 'a-fn', 'data-tip': [a.method, a.framework].filter(Boolean).join('\n') }, a.method)
+                    );
                 return h(
                     'details',
                     { class: 'dz awrap', open: failed > 0 },
@@ -3311,7 +3282,7 @@
                                 h('th', { scope: 'col' }, h('span', { class: 'sr-only' }, 'Method'))
                             )
                         ),
-                        h('tbody', null, list.map(rows))
+                        h('tbody', null, list.map(row))
                     )
                 );
             }
