@@ -1033,7 +1033,6 @@
             grid-column: 3/-1;
             display: grid;
             gap: 10px;
-            margin: 6px 0 4px;
             min-width: 0;
         }
 
