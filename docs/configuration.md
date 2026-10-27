@@ -68,8 +68,11 @@ The current `ReporterConfig` implementation actively reads these keys:
 - `reporter.maskBody.maskTokens`
 - `reporter.maskXml.enabled`
 - `reporter.maskXml.fields`
+- `reporter.assertions.capture`
 
 The masking keys are described in detail in [Sensitive Data Masking](#sensitive-data-masking).
+
+`reporter.assertions.capture` (default `true`) controls automatic assertion capture in Cucumber steps. When it's on, every JUnit, TestNG and Hamcrest assertion that runs inside a step appears under that step in the report, whether it passed or failed. It can also be set as a system property (`-Dreporter.assertions.capture=false`), which takes precedence. See [Assertion Capture](adapters-guide.md#assertion-capture) for details.
 
 `reporter.video.storage` controls how video evidence (Appium, and Selenium drivers wrapped with `track(...)`) is stored: `path` (default), `embed`, or `url`. Selenium videos larger than 50 MB are linked instead of embedded.
 

@@ -114,6 +114,33 @@ class TestStepTest {
     }
 
     @Test
+    void assertionsRoundTripThroughJsonAndAreOmittedWhenEmpty() throws Exception {
+        AssertionResult assertion = AssertionResult.builder()
+                .framework("JUnit 5")
+                .method("assertEquals")
+                .message("Login API status code")
+                .expected("200")
+                .actual("404")
+                .status(TestStatus.FAILED)
+                .errorMessage("Login API status code ==> expected: <200> but was: <404>")
+                .timestamp(Instant.parse("2026-02-16T10:00:00Z"))
+                .build();
+        TestStep step = TestStep.builder()
+                .name("the status should be 200")
+                .status(TestStatus.FAILED)
+                .assertions(java.util.List.of(assertion))
+                .build();
+
+        TestStep restored = objectMapper.readValue(objectMapper.writeValueAsString(step), TestStep.class);
+
+        assertEquals(step, restored);
+        assertEquals(assertion, restored.getAssertions().get(0));
+
+        String bare = objectMapper.writeValueAsString(TestStep.builder().name("x").status(TestStatus.PASSED).build());
+        assertFalse(bare.contains("assertions"), "empty assertion lists should not bloat the JSON: " + bare);
+    }
+
+    @Test
     void failedStep() {
         TestStep step = TestStep.builder()
                 .name("Validate element")

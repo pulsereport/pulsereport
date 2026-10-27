@@ -979,10 +979,6 @@
             padding: 6px 16px;
         }
 
-        .step.is-fail {
-            background: var(--fail-bg);
-        }
-
         .step .kw {
             font-weight: 600;
             color: var(--ink-muted);
@@ -1037,7 +1033,6 @@
             grid-column: 3/-1;
             display: grid;
             gap: 10px;
-            margin: 6px 0 4px;
             min-width: 0;
         }
 
@@ -1047,6 +1042,69 @@
             color: var(--fail);
             white-space: pre-wrap;
             overflow-wrap: anywhere;
+        }
+
+        .awrap > summary {
+            font: 12px var(--font-mono);
+            color: var(--ink-muted);
+        }
+
+        .awrap[open] > summary {
+            margin-bottom: 4px;
+        }
+
+        /* Fixed layout with percentage columns keeps Expected/Actual aligned across every step of a test. */
+        .dt.at {
+            width: 100%;
+            table-layout: fixed;
+        }
+
+        .at .c-msg {
+            width: 32%;
+        }
+
+        .at .c-exp,
+        .at .c-act {
+            width: 26%;
+        }
+
+        .at .c-fn {
+            width: 16%;
+        }
+
+        .at td {
+            padding-top: 5px;
+            padding-bottom: 5px;
+            white-space: pre-wrap;
+            overflow-wrap: anywhere;
+        }
+
+        .at .a-text {
+            font: 12.5px/1.45 var(--font-sans);
+            color: var(--ink);
+        }
+
+        .at .a-exp,
+        .at .a-act {
+            color: var(--pass);
+        }
+
+        .at .is-fail .a-act {
+            color: var(--fail);
+        }
+
+        .at th:last-child,
+        .at .a-fn {
+            padding-right: 0;
+            text-align: right;
+        }
+
+        .at .a-fn {
+            overflow: hidden;
+            font-size: 11px;
+            color: var(--ink-muted);
+            white-space: nowrap;
+            text-overflow: ellipsis;
         }
 
         .bg {
@@ -1205,6 +1263,51 @@
             .xside + .xside {
                 border-left: 0;
                 border-top: 1px solid var(--border);
+            }
+
+            /* Narrow panes stack each assertion: message, then labelled values. */
+            .dt.at,
+            .at tbody,
+            .at tr,
+            .at td {
+                display: block;
+                width: auto;
+            }
+
+            .at thead,
+            .at colgroup,
+            .at .a-fn {
+                display: none;
+            }
+
+            .at tr {
+                padding: 5px 0;
+            }
+
+            .dt.at tbody tr + tr {
+                border-top: 1px solid var(--border);
+            }
+
+            .dt.at tbody tr + tr td {
+                border-top: 0;
+            }
+
+            .at td {
+                padding: 0;
+            }
+
+            .at .a-exp,
+            .at .a-act {
+                display: inline-block;
+                max-width: 100%;
+                margin-right: 16px;
+                vertical-align: top;
+            }
+
+            .at .a-exp::before,
+            .at .a-act::before {
+                content: attr(data-label) ' ';
+                color: var(--ink-muted);
             }
         }
 
@@ -3129,16 +3232,58 @@
                     h('span', { class: 'step-end' }, stepShotBtn(s.artifacts || []), h('span', { class: 'dur' }, s.duration ? fmtDur(s.duration) : ''))
                 );
                 const arts = s.artifacts || [];
+                const asserts = s.assertions || [];
                 const extra = [];
-                if (s.errorMessage && s.errorMessage !== ctx.testError) extra.push(h('pre', { class: 'step-err' }, s.errorMessage));
+                const errShown = s.errorMessage === ctx.testError || asserts.some(a => a.errorMessage === s.errorMessage);
+                if (s.errorMessage && !errShown) extra.push(h('pre', { class: 'step-err' }, s.errorMessage));
                 if (s.dataTable?.length) extra.push(dataTable(s.dataTable));
                 if (s.docString) extra.push(h('pre', { class: 'body' }, s.docString));
+                extra.push(assertionList(asserts));
                 for (const pair of pairExchanges(arts)) extra.push(exchangeDetails(pair));
                 extra.push(stepShots(arts), renderVideos(arts), renderFiles(arts));
                 const present = extra.filter(Boolean);
                 if (present.length) li.append(h('div', { class: 'step-extra' }, present));
                 stepEls.set(s, li);
                 return li;
+            }
+
+            function assertionList(list) {
+                if (!list.length) return null;
+                const failed = list.filter(a => a.status === 'FAILED').length;
+                const noun = list.length === 1 ? 'assertion' : 'assertions';
+                const label = failed
+                    ? `${list.length} ${noun}, ${failed} failed`
+                    : `${list.length} ${noun} passed`;
+                const row = a =>
+                    h(
+                        'tr',
+                        { class: a.status === 'FAILED' ? 'is-fail' : null },
+                        h('td', { class: 'a-text' }, srStatus(a.status), a.message || a.method),
+                        h('td', { class: 'a-exp', 'data-label': 'expected' }, a.expected),
+                        h('td', { class: 'a-act', 'data-label': 'actual' }, a.actual),
+                        h('td', { class: 'a-fn', 'data-tip': [a.method, a.framework].filter(Boolean).join('\n') }, a.method)
+                    );
+                return h(
+                    'details',
+                    { class: 'dz awrap', open: failed > 0 },
+                    h('summary', null, label),
+                    h(
+                        'table',
+                        { class: 'dt at' },
+                        h('colgroup', null, ['c-msg', 'c-exp', 'c-act', 'c-fn'].map(c => h('col', { class: c }))),
+                        h(
+                            'thead',
+                            null,
+                            h(
+                                'tr',
+                                null,
+                                ['Assertion', 'Expected', 'Actual'].map(t => h('th', { scope: 'col' }, t)),
+                                h('th', { scope: 'col' }, h('span', { class: 'sr-only' }, 'Method'))
+                            )
+                        ),
+                        h('tbody', null, list.map(row))
+                    )
+                );
             }
 
             function goToStep(step) {

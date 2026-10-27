@@ -43,6 +43,7 @@
         <junit.version>5.10.1</junit.version>
         <slf4j.version>2.0.9</slf4j.version>
         <jackson.version>2.16.0</jackson.version>
+        <bytebuddy.version>1.18.15</bytebuddy.version>
         <!-- Release plugin versions -->
         <maven.source.plugin.version>3.3.1</maven.source.plugin.version>
         <maven.javadoc.plugin.version>3.6.3</maven.javadoc.plugin.version>
@@ -111,12 +112,16 @@
             <scope>test</scope>
         </dependency>
 
-        <!-- Byte Buddy for Mockito compatibility with Java 23 -->
+        <!-- Byte Buddy - instruments assertion libraries so passing/failing assertions reach the report -->
         <dependency>
             <groupId>net.bytebuddy</groupId>
             <artifactId>byte-buddy</artifactId>
-            <version>1.15.11</version>
-            <scope>test</scope>
+            <version>${bytebuddy.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>net.bytebuddy</groupId>
+            <artifactId>byte-buddy-agent</artifactId>
+            <version>${bytebuddy.version}</version>
         </dependency>
 
         <!-- Google Guice - Required for mocking TestNG ISuite -->
@@ -245,6 +250,11 @@
                             <addClasspath>true</addClasspath>
                             <addDefaultImplementationEntries>true</addDefaultImplementationEntries>
                         </manifest>
+                        <manifestEntries>
+                            <Premain-Class>io.github.pulsereport.assertions.AssertionCapture</Premain-Class>
+                            <Agent-Class>io.github.pulsereport.assertions.AssertionCapture</Agent-Class>
+                            <Can-Retransform-Classes>true</Can-Retransform-Classes>
+                        </manifestEntries>
                     </archive>
                 </configuration>
             </plugin>
