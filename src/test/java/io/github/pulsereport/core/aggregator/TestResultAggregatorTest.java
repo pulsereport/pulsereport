@@ -18,7 +18,9 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 import org.testng.IResultMap;
 import org.testng.ISuite;
@@ -525,6 +527,59 @@ public class TestResultAggregatorTest {
                 .map(io.github.pulsereport.core.model.Artifact::getType).toList();
         assertTrue(types.contains("screenshot"), "should include full-key screenshot");
         assertTrue(types.contains("video"), "should include video re-scoped to the full key");
+    }
+
+    @Test
+    public void gitHubActionsMetadataReachesTestRunEnvironment() {
+        Map<String, String> env = Map.of(
+                "GITHUB_ACTIONS", "true",
+                "GITHUB_SHA", "0123456789abcdef0123456789abcdef01234567",
+                "GITHUB_REF_NAME", "main",
+                "GITHUB_REPOSITORY", "acme/shop",
+                "GITHUB_RUN_ID", "99",
+                "GITHUB_RUN_NUMBER", "7");
+        TestResultAggregator ciAggregator = new TestResultAggregator(() -> env);
+        ITestResult result = createMockTestResult("ciTest", "com.Test", ITestResult.FAILURE, 100L, 200L, new AssertionError());
+        ISuite suite = wiredSuiteWithResult("Suite", "CI suite", result);
+        ciAggregator.recordTestResult(result);
+
+        TestRun run = ciAggregator.buildTestRun(suite, new HashMap<>(), new HashMap<>(), new HashMap<>());
+
+        assertNotNull(run.getEnvironment());
+        assertEquals("0123456789abcdef0123456789abcdef01234567", run.getEnvironment().get("git.commit"));
+        assertEquals("main", run.getEnvironment().get("git.branch"));
+        assertEquals("https://github.com/acme/shop/actions/runs/99", run.getEnvironment().get("ci.runUrl"));
+        assertEquals(run.getEnvironment(), ciAggregator.convertToTestRun(suite).getEnvironment());
+    }
+
+    @Test
+    public void gitHubActionsMetadataPreservesUserProvidedKeys() {
+        Map<String, String> env = Map.of(
+                "GITHUB_ACTIONS", "true",
+                "GITHUB_SHA", "0123456789abcdef0123456789abcdef01234567",
+                "GITHUB_REPOSITORY", "acme/shop",
+                "GITHUB_RUN_ID", "99");
+        TestResultAggregator ciAggregator = spy(new TestResultAggregator(() -> env));
+        ISuite suite = mock(ISuite.class);
+        TestRun userRun = TestRun.builder()
+                .id("run-1").name("Suite")
+                .status(TestStatus.PASSED).startTime(Instant.EPOCH).suites(new ArrayList<>())
+                .environment(Map.of("git.commit", "user-provided"))
+                .build();
+        doReturn(userRun).when(ciAggregator).convertToTestRun(suite);
+
+        TestRun run = ciAggregator.buildTestRun(suite, new HashMap<>(), new HashMap<>(), new HashMap<>());
+
+        assertEquals("user-provided", run.getEnvironment().get("git.commit"));
+        assertEquals("https://github.com/acme/shop/actions/runs/99", run.getEnvironment().get("ci.runUrl"));
+    }
+
+    @Test
+    public void environmentStaysNullOutsideGitHubActions() {
+        TestResultAggregator localAggregator = new TestResultAggregator(Map::of);
+        ISuite suite = createMockSuite("LocalSuite");
+
+        assertNull(localAggregator.convertToTestRun(suite).getEnvironment());
     }
 
     private ISuite wiredSuiteWithResult(String suiteName, String contextName, ITestResult result) {

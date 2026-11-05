@@ -37,6 +37,7 @@ import io.cucumber.plugin.event.TestStepFinished;
 import io.cucumber.plugin.event.TestStepStarted;
 import io.github.pulsereport.assertions.AssertionCapture;
 import io.github.pulsereport.assertions.AssertionCollector;
+import io.github.pulsereport.core.ci.GitHubActionsDetector;
 import io.github.pulsereport.core.model.Artifact;
 import io.github.pulsereport.core.model.AssertionResult;
 import io.github.pulsereport.core.model.TestCase;
@@ -474,6 +475,7 @@ public class CucumberAdapter implements EventListener {
                 .duration(runDuration)
                 .status(runStatus)
                 .suites(suites)
+                .environment(GitHubActionsDetector.mergeInto(null, GitHubActionsDetector.detect()))
                 .totalTests(totalTests)
                 .passedTests(totalPassed)
                 .failedTests(totalFailed)

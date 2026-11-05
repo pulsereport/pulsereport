@@ -20,6 +20,7 @@ import org.testng.ITestContext;
 import org.testng.ITestResult;
 
 import io.github.pulsereport.core.aggregator.TestResultAggregator;
+import io.github.pulsereport.core.ci.GitHubActionsDetector;
 import io.github.pulsereport.core.model.TestCase;
 import io.github.pulsereport.core.model.TestRun;
 import io.github.pulsereport.core.model.TestStatus;
@@ -222,6 +223,7 @@ public class StreamingAggregator implements Closeable {
                 .duration(duration)
                 .status(overallStatus)
                 .suites(testSuites)
+                .environment(GitHubActionsDetector.mergeInto(null, GitHubActionsDetector.detect()))
                 .totalTests(totalTests)
                 .passedTests(passedTests)
                 .failedTests(failedTests)

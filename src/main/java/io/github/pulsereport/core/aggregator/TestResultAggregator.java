@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Supplier;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -21,6 +22,7 @@ import org.testng.ITestContext;
 import org.testng.ITestNGMethod;
 import org.testng.ITestResult;
 
+import io.github.pulsereport.core.ci.GitHubActionsDetector;
 import io.github.pulsereport.core.model.Artifact;
 import io.github.pulsereport.core.model.Metric;
 import io.github.pulsereport.core.model.TestCase;
@@ -50,11 +52,18 @@ public class TestResultAggregator {
      */
     private final Map<String, List<ITestResult>> testResultsByKey;
 
+    private final Supplier<Map<String, String>> ciEnvironmentSource;
+
     /**
      * Constructs a new TestResultAggregator.
      */
     public TestResultAggregator() {
+        this(System::getenv);
+    }
+
+    TestResultAggregator(Supplier<Map<String, String>> ciEnvironmentSource) {
         this.testResultsByKey = new ConcurrentHashMap<>();
+        this.ciEnvironmentSource = ciEnvironmentSource;
         logger.debug("TestResultAggregator initialized");
     }
 
@@ -326,6 +335,7 @@ public class TestResultAggregator {
                 .duration(duration)
                 .status(overallStatus)
                 .suites(testSuites)
+                .environment(withCiMetadata(null))
                 .totalTests(totalTests)
                 .passedTests(passedTests)
                 .failedTests(failedTests)
@@ -383,6 +393,17 @@ public class TestResultAggregator {
     private String getTestDisplayName(ITestResult result) {
         String description = result.getMethod().getDescription();
         return (description != null && !description.trim().isEmpty()) ? description.trim() : result.getName();
+    }
+
+    private Map<String, String> withCiMetadata(Map<String, String> environment) {
+        Map<String, String> detected;
+        try {
+            detected = GitHubActionsDetector.detect(ciEnvironmentSource.get());
+        } catch (RuntimeException e) {
+            logger.debug("Could not read environment for CI detection: {}", e.getMessage());
+            detected = null;
+        }
+        return GitHubActionsDetector.mergeInto(environment, detected);
     }
 
     /**
@@ -599,6 +620,7 @@ public class TestResultAggregator {
                 .duration(baseTestRun.getDuration())
                 .status(baseTestRun.getStatus())
                 .suites(enrichedSuites)
+                .environment(withCiMetadata(baseTestRun.getEnvironment()))
                 .totalTests(baseTestRun.getTotalTests())
                 .passedTests(baseTestRun.getPassedTests())
                 .failedTests(baseTestRun.getFailedTests())
