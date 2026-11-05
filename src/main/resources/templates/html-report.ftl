@@ -50,6 +50,7 @@
             --bar-skip: #f6c73c;
             --chip-all-bg: var(--ink);
             --chip-all-fg: #fff;
+            --hit-bg: color-mix(in srgb, var(--accent) 28%, transparent);
             color-scheme: light;
         }
 
@@ -75,6 +76,7 @@
                 --bar-skip: #e4cf6e;
                 --chip-all-bg: var(--border-strong);
                 --chip-all-fg: var(--ink);
+                --hit-bg: color-mix(in srgb, var(--accent) 40%, transparent);
                 color-scheme: dark;
             }
         }
@@ -101,6 +103,7 @@
                 --bar-skip: #e4cf6e;
                 --chip-all-bg: var(--border-strong);
                 --chip-all-fg: var(--ink);
+                --hit-bg: color-mix(in srgb, var(--accent) 40%, transparent);
                 color-scheme: dark;
             }
         }
@@ -1366,9 +1369,10 @@
             z-index: 2;
             display: flex;
             align-items: center;
-            gap: 2px;
-            width: min(360px, calc(100% - 28px));
-            padding: 4px;
+            gap: 1px;
+            /* Tracks the viewport so it stays proportionate to the body on both small and large screens. */
+            width: min(clamp(220px, 20vw, 320px), calc(100% - 28px));
+            padding: 2px;
             border: 1px solid var(--border-strong);
             border-radius: var(--radius);
             background: var(--raised);
@@ -1385,12 +1389,35 @@
         .xsearch > .search-wrap {
             flex: 1 1 auto;
             min-width: 0;
-            margin-right: 4px;
+            margin-right: 2px;
+        }
+
+        .xsearch .search-wrap .ic {
+            left: 7px;
+            width: 12px;
+            height: 12px;
+        }
+
+        .xsearch .search-wrap input {
+            height: 22px;
+            padding: 0 6px 0 24px;
+            border-radius: calc(var(--radius) - 2px);
+            font-size: 12px;
+        }
+
+        .xsearch .ghost.xbtn {
+            width: 22px;
+            height: 22px;
+        }
+
+        .xsearch .xbtn .ic {
+            width: 12px;
+            height: 12px;
         }
 
         .xs-count {
             flex: none;
-            min-width: 64px;
+            min-width: 44px;
             margin-right: 2px;
             font-size: 11px;
             color: var(--ink-muted);
@@ -1400,7 +1427,7 @@
         }
 
         ::highlight(xsearch) {
-            background-color: color-mix(in srgb, var(--accent) 28%, transparent);
+            background-color: var(--hit-bg);
         }
 
         ::highlight(xsearch-active) {
@@ -1410,7 +1437,7 @@
 
         mark.xs-hit {
             border-radius: 2px;
-            background: color-mix(in srgb, var(--accent) 28%, transparent);
+            background: var(--hit-bg);
             color: inherit;
         }
 
@@ -2842,8 +2869,10 @@
                 let timer = 0;
                 const set = (name, text, ok) => {
                     btn.replaceChildren(icon(name));
-                    btn.dataset.tip = text;
                     btn.classList.toggle('ok', ok);
+                    // A null tipText means the button carries no tooltip at all, not even the copied state.
+                    if (tipText == null) return;
+                    btn.dataset.tip = text;
                     refreshTip(btn);
                 };
                 btn.addEventListener('click', async () => {
@@ -4023,11 +4052,11 @@
                 const body = p.body ? h('pre', { class: 'body' }, prettyBody(p.body)) : null;
                 let box = null;
                 if (body) {
-                    const copy = copyButton('Copy ' + label, () => body.textContent, 'Copy');
+                    const copy = copyButton('Copy ' + label, () => body.textContent, null);
                     copy.classList.add('xbtn');
                     const rowId = `xs-${++xsSeq}`;
-                    const tool = (aria, tipText, ic, disabled = true) =>
-                        h('button', { type: 'button', class: 'ghost xbtn', 'aria-label': aria, 'data-tip': tipText, disabled }, icon(ic));
+                    const tool = (aria, ic, disabled = true) =>
+                        h('button', { type: 'button', class: 'ghost xbtn', 'aria-label': aria, disabled }, icon(ic));
                     const ui = {
                         btn: h(
                             'button',
@@ -4036,8 +4065,7 @@
                                 class: 'ghost xbtn',
                                 'aria-label': 'Search ' + label,
                                 'aria-expanded': 'false',
-                                'aria-controls': rowId,
-                                'data-tip': 'Search'
+                                'aria-controls': rowId
                             },
                             icon('search')
                         ),
@@ -4049,9 +4077,9 @@
                             spellcheck: 'false'
                         }),
                         count: h('span', { class: 'xs-count', role: 'status' }),
-                        prev: tool('Previous match', 'Previous\nShift+Enter', 'chev-up'),
-                        next: tool('Next match', 'Next\nEnter', 'chev-down'),
-                        close: tool('Close search', 'Close\nEscape', 'close', false)
+                        prev: tool('Previous match (Shift+Enter)', 'chev-up'),
+                        next: tool('Next match (Enter)', 'chev-down'),
+                        close: tool('Close search (Escape)', 'close', false)
                     };
                     ui.row = h(
                         'div',

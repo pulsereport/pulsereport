@@ -773,8 +773,13 @@ class HtmlReportGeneratorTest {
                 "Find input keeps its type and accessible name");
         assertFalse(input.contains("class:"), "Find input should be styled only by .search-wrap");
         assertFalse(css.contains("xs-input"), "Conflicting .xs-input styling should be removed");
-        assertFalse(hasCss(css, "\\.xsearch[^{]*input[^{]*\\{[^}]*(height|border|background|padding):"),
+        assertFalse(hasCss(css, "\\.xsearch[^{]*input[^{]*\\{[^}]*(border|background|color):"),
                 "No widget rule should override the shared input look");
+        String compact = cssRule(css, ".xsearch .search-wrap input {");
+        assertTrue(hasCss(compact, "height:\\s*2[0-4]px;") && compact.contains("font-size: 12px;"),
+                "Find input should be compact next to the 12px body text");
+        assertTrue(hasCss(cssRule(css, ".body-box > .xsearch {"), "width:[^;]*clamp\\([^;]*vw"),
+                "Widget width should scale with the viewport");
         assertTrue(hasCss(css, "\\.xsearch > \\.search-wrap\\s*\\{[^}]*min-width:\\s*0;"), "Wrapper should shrink in the widget");
 
         String widget = cssRule(css, ".body-box > .xsearch {");
@@ -787,6 +792,21 @@ class HtmlReportGeneratorTest {
     }
 
     @Test
+    void bodyToolbarButtonsHaveNoTooltips() throws IOException {
+        String html = generateHtml(createSampleTestRun());
+        String fn = functionSource(html, "httpSide");
+
+        assertFalse(fn.contains("data-tip"), "Body search, copy, prev/next and close buttons should not show tooltips");
+        assertTrue(fn.contains("copyButton('Copy ' + label, () => body.textContent, null)"),
+                "Body copy button should opt out of tooltips");
+        String copyFn = functionSource(html, "copyButton");
+        assertTrue(copyFn.contains("if (tipText == null) return;"), "Copied state should not add a tooltip back");
+        for (String aria : new String[] {"'Previous match (Shift+Enter)'", "'Next match (Enter)'", "'Close search (Escape)'"}) {
+            assertTrue(fn.contains(aria), "Shortcut hints should stay in the accessible name: " + aria);
+        }
+    }
+
+    @Test
     void bodySearchHighlightsUseAccent() throws IOException {
         String css = styles(generateHtml(createSampleTestRun()));
 
@@ -795,8 +815,15 @@ class HtmlReportGeneratorTest {
         String mark = cssRule(css, "mark.xs-hit {");
         String markOn = cssRule(css, "mark.xs-hit.on {");
         for (String rule : new String[] {all, mark}) {
-            assertTrue(rule.contains("color-mix(in srgb, var(--accent)"), "Matches should tint with the accent: " + rule);
+            assertTrue(rule.contains("var(--hit-bg)"), "Matches should use the shared hit tint: " + rule);
         }
+        java.util.regex.Matcher hit = java.util.regex.Pattern
+                .compile("--hit-bg:\\s*color-mix\\(in srgb, var\\(--accent\\) (\\d+)%").matcher(css);
+        java.util.List<Integer> mixes = new java.util.ArrayList<>();
+        while (hit.find()) mixes.add(Integer.parseInt(hit.group(1)));
+        assertEquals(3, mixes.size(), "Hit tint should be defined for light, forced dark and auto dark");
+        assertTrue(mixes.get(1) > mixes.get(0) && mixes.get(2).equals(mixes.get(1)),
+                "Dark themes should use a stronger hit tint than light: " + mixes);
         for (String rule : new String[] {active, markOn}) {
             assertTrue(hasCss(rule, "background(-color)?:\\s*var\\(--accent\\);"), "Active match should be solid accent: " + rule);
             assertTrue(rule.contains("color: var(--raised);"), "Active match text should contrast with the accent: " + rule);
