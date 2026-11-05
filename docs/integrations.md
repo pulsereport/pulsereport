@@ -380,6 +380,41 @@ notifier.notify(testRun, config);
 
 ---
 
+## GitHub Actions Metadata
+
+When tests run with `GITHUB_ACTIONS=true`, PulseReport adds commit, branch, and run details to the run environment automatically. No configuration is needed, and nothing is added outside GitHub Actions. For publishing JUnit XML from a workflow, see [Output Formats](output-formats.md#github-actions).
+
+| Environment key | Source variables |
+| --------------- | ---------------- |
+| `git.commit` | `GITHUB_SHA` |
+| `git.commitUrl` | `GITHUB_SERVER_URL`, `GITHUB_REPOSITORY`, `GITHUB_SHA` |
+| `git.branch` | `GITHUB_HEAD_REF` (pull requests), otherwise `GITHUB_REF_NAME` |
+| `ci.run` | `GITHUB_RUN_NUMBER`, `GITHUB_WORKFLOW` (e.g. `Run #42 · CI`) |
+| `ci.runUrl` | `GITHUB_SERVER_URL`, `GITHUB_REPOSITORY`, `GITHUB_RUN_ID`; adds `/attempts/N` when `GITHUB_RUN_ATTEMPT` > 1 |
+| `ci.jobUrl` | `ci.runUrl` inputs plus `PULSEREPORT_JOB_ID` (optional, see below) |
+
+Notes:
+
+- GitHub Enterprise Server works through `GITHUB_SERVER_URL` (defaults to `https://github.com`).
+- Invalid values are skipped: URLs are only built from an `http`/`https` server and a valid `owner/repo`, the commit must be a hex SHA, and run, attempt, and job ids must be numeric.
+- Values already present in the environment are never overwritten. If a different `git.commit` is already set, the detected `git.commitUrl` is not added.
+- The HTML report top bar shows the commit and the run as links. The commit tooltip shows the full SHA and branch; the run chip links to the job when `ci.jobUrl` is set, otherwise to the run.
+
+### Direct Job Links
+
+GitHub does not expose the numeric job id as a default environment variable. To link straight to the job, pass it in as `PULSEREPORT_JOB_ID` on the test step:
+
+```yaml
+- name: Run Tests
+  run: mvn test
+  env:
+    PULSEREPORT_JOB_ID: ${{ job.check_run_id }}
+```
+
+`job.check_run_id` is only available on recent GitHub Actions runners and GitHub Enterprise Server versions. If it is empty or missing, the report links to the run instead.
+
+---
+
 ## Integration Patterns
 
 ### Sequential Publishing

@@ -50,6 +50,7 @@
             --bar-skip: #f6c73c;
             --chip-all-bg: var(--ink);
             --chip-all-fg: #fff;
+            --hit-bg: color-mix(in srgb, var(--accent) 28%, transparent);
             color-scheme: light;
         }
 
@@ -75,6 +76,7 @@
                 --bar-skip: #e4cf6e;
                 --chip-all-bg: var(--border-strong);
                 --chip-all-fg: var(--ink);
+                --hit-bg: color-mix(in srgb, var(--accent) 40%, transparent);
                 color-scheme: dark;
             }
         }
@@ -101,6 +103,7 @@
                 --bar-skip: #e4cf6e;
                 --chip-all-bg: var(--border-strong);
                 --chip-all-fg: var(--ink);
+                --hit-bg: color-mix(in srgb, var(--accent) 40%, transparent);
                 color-scheme: dark;
             }
         }
@@ -214,8 +217,8 @@
         }
 
         .brand-mark {
-            width: 22px;
-            height: 22px;
+            width: 32px;
+            height: 32px;
             flex: none;
         }
 
@@ -242,6 +245,9 @@
             gap: 18px;
             flex: 1 1 auto;
             min-width: 0;
+            /* Room for link focus rings inside the clipped strip. */
+            margin: -4px;
+            padding: 4px;
             overflow: hidden;
             white-space: nowrap;
             font-size: 12px;
@@ -257,11 +263,38 @@
         .run-meta .ic {
             width: 14px;
             height: 14px;
+            flex: none;
         }
 
         .run-meta .v {
             font-family: var(--font-mono);
             color: var(--ink);
+        }
+
+        .run-meta .meta .v {
+            max-width: 220px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .run-meta a.meta {
+            color: inherit;
+            text-decoration: none;
+        }
+
+        .run-meta a.meta:hover,
+        .run-meta a.meta:hover .v {
+            color: var(--accent-ink);
+        }
+
+        .run-meta a.meta:hover .v {
+            text-decoration: underline;
+            text-underline-offset: 2px;
+        }
+
+        .run-meta a.meta:focus-visible {
+            outline-offset: 1px;
+            border-radius: 3px;
         }
 
         .actions {
@@ -503,7 +536,7 @@
         /* Panes */
         .panes {
             display: grid;
-            grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
+            grid-template-columns: var(--list-w, 320px) 1px minmax(0, 1fr);
             min-height: 0;
         }
 
@@ -511,16 +544,55 @@
             grid-template-columns: 1fr;
         }
 
-        .app.is-empty .list-pane {
+        .app.is-empty .list-pane,
+        .app.is-empty .splitter {
             display: none;
         }
 
         .list-pane {
             display: flex;
             flex-direction: column;
+            min-width: 0;
             min-height: 0;
             background: var(--raised);
-            border-right: 1px solid var(--border);
+        }
+
+        .splitter {
+            position: relative;
+            z-index: 2;
+            background: var(--border);
+            cursor: col-resize;
+            touch-action: none;
+            transition: background-color 0.12s, box-shadow 0.12s;
+        }
+
+        /* Widen the hit area beyond the 1px line */
+        .splitter::before {
+            content: '';
+            position: absolute;
+            inset: 0 -3px;
+        }
+
+        .splitter:hover,
+        .splitter:focus-visible,
+        .is-resizing .splitter {
+            background: var(--accent);
+            box-shadow: 0 0 0 1px var(--accent);
+        }
+
+        .splitter:focus-visible {
+            outline-offset: 3px;
+            border-radius: 0;
+        }
+
+        .is-resizing {
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        .is-resizing,
+        .is-resizing * {
+            cursor: col-resize !important;
         }
 
         .list-controls {
@@ -797,7 +869,6 @@
 
         .detail {
             container-type: inline-size;
-            max-width: 1100px;
             padding: 22px 28px 56px;
         }
 
@@ -1044,6 +1115,11 @@
             overflow-wrap: anywhere;
         }
 
+        /* Lets the grid track shrink below the nowrap clip buttons' text width. */
+        .awrap {
+            min-width: 0;
+        }
+
         .awrap > summary {
             font: 12px var(--font-mono);
             color: var(--ink-muted);
@@ -1059,17 +1135,11 @@
             table-layout: fixed;
         }
 
-        .at .c-msg {
-            width: 32%;
-        }
-
+        .at .c-fn,
         .at .c-exp,
-        .at .c-act {
-            width: 26%;
-        }
-
-        .at .c-fn {
-            width: 16%;
+        .at .c-act,
+        .at .c-msg {
+            width: 25%;
         }
 
         .at td {
@@ -1094,17 +1164,45 @@
         }
 
         .at th:last-child,
-        .at .a-fn {
+        .at td:last-child {
             padding-right: 0;
+        }
+
+        /* Overflow still runs to the end edge, so the ellipsis survives right alignment. */
+        .at th:last-child,
+        .at .a-text,
+        .at .a-text .a-clip {
             text-align: right;
         }
 
         .at .a-fn {
             overflow: hidden;
-            font-size: 11px;
-            color: var(--ink-muted);
+            color: var(--ink);
             white-space: nowrap;
             text-overflow: ellipsis;
+        }
+
+        .at .a-clip {
+            display: block;
+            width: 100%;
+            padding: 0;
+            overflow: hidden;
+            text-align: left;
+            white-space: nowrap;
+            text-overflow: ellipsis;
+            background: none;
+            border: 0;
+            cursor: default;
+        }
+
+        .at .a-clip[data-clipped],
+        .at tr.is-open .a-clip {
+            cursor: pointer;
+        }
+
+        .at tr.is-open .a-clip {
+            white-space: pre-wrap;
+            overflow-wrap: anywhere;
         }
 
         .bg {
@@ -1197,6 +1295,167 @@
             color: var(--ink-muted);
         }
 
+        .body-box {
+            position: relative;
+            margin-top: 10px;
+        }
+
+        .body-box > .body {
+            margin: 0;
+        }
+
+        /* Overlays sit outside the scrolling <pre>, so they stay put while the body scrolls. */
+        .body-box > .xtools {
+            position: absolute;
+            top: 6px;
+            right: 14px;
+            z-index: 1;
+            display: flex;
+            gap: 2px;
+            padding: 2px;
+            border-radius: var(--radius);
+            background: var(--sunken);
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .body-box:hover > .xtools,
+        .body-box:focus-within > .xtools {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        @media (hover: none) {
+            .body-box > .xtools {
+                opacity: 1;
+                pointer-events: auto;
+            }
+        }
+
+        .xtools .ghost.xbtn:hover {
+            background: var(--border);
+        }
+
+        .ghost.xbtn {
+            width: 24px;
+            height: 24px;
+        }
+
+        .xbtn .ic {
+            width: 14px;
+            height: 14px;
+        }
+
+        .ghost.xbtn:focus-visible {
+            color: var(--ink);
+        }
+
+        .ghost.xbtn[aria-expanded='true'] {
+            background: var(--accent-bg);
+            color: var(--accent-ink);
+        }
+
+        .ghost.xbtn:disabled {
+            opacity: 0.45;
+            cursor: default;
+            background: none;
+            color: var(--ink-muted);
+        }
+
+        .body-box > .xsearch {
+            position: absolute;
+            top: 6px;
+            right: 14px;
+            z-index: 2;
+            display: flex;
+            align-items: center;
+            gap: 1px;
+            /* Tracks the viewport so it stays proportionate to the body on both small and large screens. */
+            width: min(clamp(220px, 20vw, 320px), calc(100% - 28px));
+            padding: 2px;
+            border: 1px solid var(--border-strong);
+            border-radius: var(--radius);
+            background: var(--raised);
+            box-shadow:
+                0 6px 16px -6px rgb(13 15 17 / 0.25),
+                0 1px 3px rgb(13 15 17 / 0.12);
+        }
+
+        /* The open find widget takes the toolbar's place; its close button returns focus to the search toggle. */
+        .xsearch:not([hidden]) + .xtools {
+            display: none;
+        }
+
+        .xsearch > .search-wrap {
+            flex: 1 1 auto;
+            min-width: 0;
+            margin-right: 2px;
+        }
+
+        .xsearch .search-wrap .ic {
+            left: 7px;
+            width: 12px;
+            height: 12px;
+        }
+
+        .xsearch .search-wrap input {
+            height: 22px;
+            padding: 0 6px 0 24px;
+            border-radius: calc(var(--radius) - 2px);
+            font-size: 12px;
+        }
+
+        .xsearch .ghost.xbtn {
+            width: 22px;
+            height: 22px;
+        }
+
+        .xsearch .xbtn .ic {
+            width: 12px;
+            height: 12px;
+        }
+
+        .xs-count {
+            flex: none;
+            min-width: 44px;
+            margin-right: 2px;
+            font-size: 11px;
+            color: var(--ink-muted);
+            font-variant-numeric: tabular-nums;
+            text-align: right;
+            white-space: nowrap;
+        }
+
+        ::highlight(xsearch) {
+            background-color: var(--hit-bg);
+        }
+
+        ::highlight(xsearch-active) {
+            background-color: var(--accent);
+            color: var(--raised);
+        }
+
+        mark.xs-hit {
+            border-radius: 2px;
+            background: var(--hit-bg);
+            color: inherit;
+        }
+
+        mark.xs-hit.on {
+            background: var(--accent);
+            color: var(--raised);
+        }
+
+        .clip {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 1px;
+            height: 1px;
+            opacity: 0;
+            pointer-events: none;
+        }
+
         .xline {
             font: 12px var(--font-mono);
             overflow-wrap: anywhere;
@@ -1265,7 +1524,7 @@
                 border-top: 1px solid var(--border);
             }
 
-            /* Narrow panes stack each assertion: message, then labelled values. */
+            /* Narrow panes stack each assertion: method, then labelled values and message. */
             .dt.at,
             .at tbody,
             .at tr,
@@ -1275,8 +1534,7 @@
             }
 
             .at thead,
-            .at colgroup,
-            .at .a-fn {
+            .at colgroup {
                 display: none;
             }
 
@@ -1296,18 +1554,33 @@
                 padding: 0;
             }
 
-            .at .a-exp,
-            .at .a-act {
-                display: inline-block;
-                max-width: 100%;
-                margin-right: 16px;
-                vertical-align: top;
+            .at .a-exp:not(:empty),
+            .at .a-act:not(:empty),
+            .at .a-text:not(:empty) {
+                display: flex;
+                gap: 0.5ch;
             }
 
-            .at .a-exp::before,
-            .at .a-act::before {
+            .at .a-exp:not(:empty)::before,
+            .at .a-act:not(:empty)::before,
+            .at .a-text:not(:empty)::before {
                 content: attr(data-label) ' ';
+                flex: none;
                 color: var(--ink-muted);
+            }
+
+            .at .a-text::before {
+                font: 12px var(--font-mono);
+            }
+
+            .at .a-clip {
+                flex: 1;
+                min-width: 0;
+            }
+
+            .at .a-text,
+            .at .a-text .a-clip {
+                text-align: left;
             }
         }
 
@@ -2066,6 +2339,10 @@
                 transition: opacity 120ms;
             }
 
+            .body-box > .xtools {
+                transition: opacity 120ms;
+            }
+
             .tip {
                 transition:
                     opacity 120ms,
@@ -2171,8 +2448,8 @@
                 display: block;
             }
 
-            .list-pane {
-                border-right: 0;
+            .splitter {
+                display: none;
             }
 
             .app[data-view='detail'] .list-pane {
@@ -2251,6 +2528,23 @@
                 -webkit-mask-image: none;
                 mask-image: none;
             }
+
+            .at .a-clip {
+                overflow: visible;
+                white-space: pre-wrap;
+                overflow-wrap: anywhere;
+            }
+
+            .body-box > .xtools,
+            .body-box > .xsearch {
+                display: none;
+            }
+
+            .run-meta a.meta,
+            .run-meta a.meta .v {
+                color: inherit;
+                text-decoration: none;
+            }
         }
     </style>
     </#noparse>
@@ -2280,7 +2574,7 @@
         <section class="verdict" id="verdict" aria-label="Run summary"></section>
 
         <div class="panes">
-            <nav class="list-pane" aria-label="Tests">
+            <nav class="list-pane" id="list-pane" aria-label="Tests">
                 <div class="list-controls">
                     <div class="search-wrap">
                         <svg class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
@@ -2306,6 +2600,7 @@
                     <span><kbd>/</kbd> search</span>
                 </p>
             </nav>
+            <div class="splitter" role="separator" aria-orientation="vertical" aria-controls="list-pane" aria-label="Resize test list" tabindex="0" aria-valuenow="320" aria-valuemin="240" aria-valuemax="720"></div>
             <section class="detail-pane" id="detail" aria-label="Test details">
                 <noscript>
                     <div class="empty">
@@ -2392,6 +2687,16 @@
         </svg>
         <svg data-i="chev-right" class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
             <path d="M9 6l6 6-6 6"/>
+        </svg>
+        <svg data-i="chev-up" class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M6 15l6-6 6 6"/>
+        </svg>
+        <svg data-i="chev-down" class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M6 9l6 6 6-6"/>
+        </svg>
+        <svg data-i="search" class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <circle cx="11" cy="11" r="6.5"/>
+            <path d="M20 20l-4.4-4.4"/>
         </svg>
         <svg data-i="close" class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
             <path d="M6 6l12 12M18 6L6 18"/>
@@ -2519,6 +2824,66 @@
             document.addEventListener('keydown', e => {
                 if (e.key === 'Escape') hideTip();
             });
+
+            // ---------- Clipboard ----------
+            const announcer = h('div', { class: 'sr-only', 'aria-live': 'polite' });
+            document.body.append(announcer);
+            const announce = msg => {
+                announcer.textContent = '';
+                setTimeout(() => (announcer.textContent = msg), 50);
+            };
+
+            // file:// pages may lack the async clipboard, so fall back to a hidden textarea.
+            async function copyText(text) {
+                if (navigator.clipboard && window.isSecureContext) {
+                    try {
+                        await navigator.clipboard.writeText(text);
+                        return true;
+                    } catch {
+                        /* fall back */
+                    }
+                }
+                const prev = document.activeElement;
+                const ta = h('textarea', { class: 'clip', readonly: true, tabindex: '-1', 'aria-hidden': 'true' });
+                ta.value = text;
+                document.body.append(ta);
+                ta.focus({ preventScroll: true });
+                ta.select();
+                let ok = false;
+                try {
+                    ok = document.execCommand('copy');
+                } catch {
+                    ok = false;
+                }
+                ta.remove();
+                prev?.focus?.({ preventScroll: true });
+                return ok;
+            }
+
+            function copyButton(label, getText, tipText = label) {
+                const btn = h(
+                    'button',
+                    { type: 'button', class: 'ghost', 'data-tip': tipText, 'aria-label': label },
+                    icon('copy')
+                );
+                let timer = 0;
+                const set = (name, text, ok) => {
+                    btn.replaceChildren(icon(name));
+                    btn.classList.toggle('ok', ok);
+                    // A null tipText means the button carries no tooltip at all, not even the copied state.
+                    if (tipText == null) return;
+                    btn.dataset.tip = text;
+                    refreshTip(btn);
+                };
+                btn.addEventListener('click', async () => {
+                    const ok = await copyText(getText());
+                    set(ok ? 'check' : 'copy', ok ? 'Copied' : 'Copy is not allowed on this page', ok);
+                    announce(ok ? 'Copied' : 'Copy failed');
+                    clearTimeout(timer);
+                    timer = setTimeout(() => set('copy', tipText, false), 1500);
+                });
+                return btn;
+            }
 
             function safeUrl(u) {
                 if (!u) return null;
@@ -2680,14 +3045,67 @@
                 [/start|time|date/, 'clock']
             ];
             const metaIcon = k => (META_ICONS.find(([re]) => re.test(String(k).toLowerCase())) || [])[1] || 'info';
+            const CI_KEYS = ['git.commit', 'git.commitUrl', 'git.branch', 'ci.run', 'ci.runUrl', 'ci.jobUrl'];
+
+            // CI links leave the report, so only absolute http(s) URLs qualify (no file:, javascript:, relative).
+            function safeHref(url) {
+                if (!url) return null;
+                try {
+                    const u = new URL(String(url).trim());
+                    return u.protocol === 'http:' || u.protocol === 'https:' ? u.href : null;
+                } catch {
+                    return null;
+                }
+            }
+
+            function metaChip(ic, label, text, tip, url) {
+                const href = safeHref(url);
+                return h(
+                    href ? 'a' : 'span',
+                    href
+                        ? { class: 'meta', href, target: '_blank', rel: 'noopener noreferrer', 'data-tip': tip }
+                        : { class: 'meta', 'data-tip': tip },
+                    icon(ic),
+                    h('span', { class: 'sr-only' }, `${label}: `),
+                    h('span', { class: 'v' }, text),
+                    href && h('span', { class: 'sr-only' }, ' (opens in a new tab)')
+                );
+            }
+
+            function ciChips(env) {
+                const get = k => (env[k] == null ? '' : String(env[k]).trim());
+                const commit = get('git.commit');
+                const branch = get('git.branch');
+                const chips = [];
+                if (commit) {
+                    const short = /^[0-9a-f]{7,64}$/i.test(commit) ? commit.slice(0, 7) : commit;
+                    const tip = `Commit ${commit}` + (branch ? `\nBranch ${branch}` : '');
+                    chips.push(metaChip('branch', 'Commit', short, tip, get('git.commitUrl')));
+                } else if (branch) {
+                    chips.push(metaChip('branch', 'Branch', branch, `Branch ${branch}`, get('git.commitUrl')));
+                }
+                const job = safeHref(get('ci.jobUrl'));
+                const runUrl = job || safeHref(get('ci.runUrl'));
+                const run = get('ci.run');
+                if (run || runUrl) {
+                    const label = run || 'CI run';
+                    const tip = runUrl ? `${label}\n${job ? 'Open job' : 'Open run'}` : label;
+                    chips.push(metaChip('hash', 'CI run', label, tip, runUrl));
+                }
+                return chips;
+            }
 
             function renderTopbar() {
-                const entries = Object.entries(RUN.environment || {}).slice(0, 5);
+                const env = RUN.environment || {};
+                const entries = Object.entries(env)
+                    .filter(([k]) => !CI_KEYS.includes(k))
+                    .slice(0, 5);
                 const started = fmtWhen(RUN.startTime);
                 const finished = fmtWhen(RUN.endTime);
                 if (started) entries.push(['Started', started]);
                 if (finished) entries.push(['Finished', finished]);
                 $('#run-meta').replaceChildren(
+                    ...ciChips(env),
                     ...entries.map(([k, v]) =>
                         h(
                             'span',
@@ -2847,7 +3265,10 @@
                         { class: 'group dz' },
                         h(
                             'summary',
-                            { 'data-tip': suite.secondaryText || suite.name || '' },
+                            {
+                                'data-tip': (suite.secondaryText || suite.name || '')
+                                    + (suite.tags && suite.tags.length ? '\n' + suite.tags.join(' ') : '')
+                            },
                             h('span', { class: 'gname' }, suite.name || suite.secondaryText || 'Unnamed suite'),
                             failed
                                 ? h('span', { class: 'gbadge' }, `${failed} failed`)
@@ -3043,6 +3464,7 @@
                 d.append(section('Details', renderKv(tc, suite)));
 
                 const pane = $('#detail');
+                activeSearch?.close(false);
                 pane.replaceChildren(d);
                 pane.scrollTop = 0;
             }
@@ -3115,27 +3537,7 @@
             }
 
             function renderTrace(raw, frames, open) {
-                const copy = h(
-                    'button',
-                    { type: 'button', class: 'ghost', 'data-tip': 'Copy stack trace', 'aria-label': 'Copy stack trace' },
-                    icon('copy')
-                );
-                const setCopy = (name, label, ok) => {
-                    copy.replaceChildren(icon(name));
-                    copy.dataset.tip = label;
-                    copy.setAttribute('aria-label', label);
-                    copy.classList.toggle('ok', ok);
-                    refreshTip(copy);
-                };
-                copy.addEventListener('click', async () => {
-                    try {
-                        await navigator.clipboard.writeText(raw);
-                        setCopy('check', 'Copied', true);
-                    } catch {
-                        setCopy('copy', 'Copy is not allowed on this page', false);
-                    }
-                    setTimeout(() => setCopy('copy', 'Copy stack trace', false), 1600);
-                });
+                const copy = copyButton('Copy stack trace', () => raw);
                 const wrap = h(
                     'div',
                     { class: 'trace' },
@@ -3254,14 +3656,16 @@
                 const label = failed
                     ? `${list.length} ${noun}, ${failed} failed`
                     : `${list.length} ${noun} passed`;
+                const clip = v =>
+                    v == null || v === '' ? null : h('button', { type: 'button', class: 'a-clip', 'aria-expanded': 'false' }, v);
                 const row = a =>
                     h(
                         'tr',
                         { class: a.status === 'FAILED' ? 'is-fail' : null },
-                        h('td', { class: 'a-text' }, srStatus(a.status), a.message || a.method),
-                        h('td', { class: 'a-exp', 'data-label': 'expected' }, a.expected),
-                        h('td', { class: 'a-act', 'data-label': 'actual' }, a.actual),
-                        h('td', { class: 'a-fn', 'data-tip': [a.method, a.framework].filter(Boolean).join('\n') }, a.method)
+                        h('td', { class: 'a-fn', 'data-tip': [a.method, a.framework].filter(Boolean).join('\n') }, srStatus(a.status), a.method),
+                        h('td', { class: 'a-exp', 'data-label': 'expected' }, clip(a.expected)),
+                        h('td', { class: 'a-act', 'data-label': 'actual' }, clip(a.actual)),
+                        h('td', { class: 'a-text', 'data-label': 'message' }, clip(a.message))
                     );
                 return h(
                     'details',
@@ -3270,21 +3674,78 @@
                     h(
                         'table',
                         { class: 'dt at' },
-                        h('colgroup', null, ['c-msg', 'c-exp', 'c-act', 'c-fn'].map(c => h('col', { class: c }))),
+                        h('colgroup', null, ['c-fn', 'c-exp', 'c-act', 'c-msg'].map(c => h('col', { class: c }))),
                         h(
                             'thead',
                             null,
                             h(
                                 'tr',
                                 null,
-                                ['Assertion', 'Expected', 'Actual'].map(t => h('th', { scope: 'col' }, t)),
-                                h('th', { scope: 'col' }, h('span', { class: 'sr-only' }, 'Method'))
+                                ['Assertion', 'Expected', 'Actual', 'Message'].map(t => h('th', { scope: 'col' }, t))
                             )
                         ),
                         h('tbody', null, list.map(row))
                     )
                 );
             }
+
+            const CLIP_TIP_MAX = 300;
+
+            // Measured on demand: only truncated cells get a tooltip and a pointer.
+            function syncClip(btn) {
+                const text = btn.textContent;
+                const clipped =
+                    !btn.closest('tr')?.classList.contains('is-open') &&
+                    (btn.scrollWidth > btn.clientWidth || text.includes('\n'));
+                btn.toggleAttribute('data-clipped', clipped);
+                if (!clipped) {
+                    delete btn.dataset.tip;
+                    return;
+                }
+                const preview = text.length > CLIP_TIP_MAX ? text.slice(0, CLIP_TIP_MAX) + '\u2026' : text;
+                const label = btn.parentElement.dataset.label;
+                // Message keeps its own first line as heading; values get their column name.
+                btn.dataset.tip =
+                    label && label !== 'message' ? `${label[0].toUpperCase()}${label.slice(1)}\n${preview}` : preview;
+            }
+
+            function setClipRow(tr, open) {
+                tr.classList.toggle('is-open', open);
+                for (const b of tr.querySelectorAll('.a-clip')) {
+                    b.setAttribute('aria-expanded', String(open));
+                    syncClip(b);
+                }
+            }
+
+            // Capture phase runs before the bubbling tooltip handlers, so they see the fresh data-tip.
+            for (const type of ['pointerover', 'focusin']) {
+                document.addEventListener(
+                    type,
+                    e => {
+                        const btn = e.target.closest?.('.a-clip');
+                        if (btn) syncClip(btn);
+                    },
+                    true
+                );
+            }
+
+            // Any clipped cell toggles its whole row; buttons turn Enter/Space into click.
+            document.addEventListener('click', e => {
+                const btn = e.target.closest?.('.a-clip');
+                const tr = btn?.closest('tr');
+                if (!tr) return;
+                const open = tr.classList.contains('is-open');
+                if (!open) {
+                    syncClip(btn);
+                    if (!btn.hasAttribute('data-clipped')) return;
+                }
+                setClipRow(tr, !open);
+            });
+
+            document.addEventListener('keydown', e => {
+                const tr = e.target.closest?.('.a-clip')?.closest('tr');
+                if (e.key === 'Escape' && tr?.classList.contains('is-open')) setClipRow(tr, false);
+            });
 
             function goToStep(step) {
                 const li = stepEls.get(step);
@@ -3427,6 +3888,152 @@
                 }
             }
 
+            const HAS_HL = typeof CSS !== 'undefined' && !!CSS.highlights && typeof Highlight === 'function';
+            const MAX_HITS = 1000;
+            let activeSearch = null;
+            let xsSeq = 0;
+
+            // Only one search is open at a time, so it owns the global xsearch highlights.
+            function bodySearch(pre, { btn, row, input, count, prev, next, close }) {
+                let hits = [],
+                    cur = -1,
+                    capped = false,
+                    timer = 0;
+
+                const clear = () => {
+                    if (HAS_HL) {
+                        CSS.highlights.delete('xsearch');
+                        CSS.highlights.delete('xsearch-active');
+                    } else if (hits.length) {
+                        for (const m of hits) m.replaceWith(...m.childNodes);
+                        pre.normalize();
+                    }
+                    hits = [];
+                    cur = -1;
+                    capped = false;
+                };
+
+                const collect = q => {
+                    const re = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+                    const found = [];
+                    const walker = document.createTreeWalker(pre, NodeFilter.SHOW_TEXT);
+                    for (let n = walker.nextNode(); n && found.length < MAX_HITS; n = walker.nextNode()) {
+                        for (const m of n.data.matchAll(re)) {
+                            found.push([n, m.index, m[0].length]);
+                            if (found.length >= MAX_HITS) break;
+                        }
+                    }
+                    capped = found.length >= MAX_HITS;
+                    return found;
+                };
+
+                const toRanges = found =>
+                    found.map(([n, at, len]) => {
+                        const r = document.createRange();
+                        r.setStart(n, at);
+                        r.setEnd(n, at + len);
+                        return r;
+                    });
+
+                // Back to front, so splitting a node keeps earlier offsets valid.
+                const toMarks = found => {
+                    const marks = [];
+                    for (let i = found.length - 1; i >= 0; i--) {
+                        const [n, at, len] = found[i];
+                        const hit = n.splitText(at);
+                        hit.splitText(len);
+                        const m = document.createElement('mark');
+                        m.className = 'xs-hit';
+                        hit.replaceWith(m);
+                        m.append(hit);
+                        marks.push(m);
+                    }
+                    return marks.reverse();
+                };
+
+                const reveal = hit => {
+                    const r = hit.getBoundingClientRect();
+                    const b = pre.getBoundingClientRect();
+                    if (r.top < b.top) pre.scrollTop -= b.top - r.top + 8;
+                    else if (r.bottom > b.bottom) pre.scrollTop += r.bottom - b.bottom + 8;
+                };
+
+                const go = i => {
+                    if (!HAS_HL) hits[cur]?.classList.remove('on');
+                    cur = i;
+                    count.textContent = !input.value
+                        ? ''
+                        : hits.length
+                          ? `${cur + 1} of ${hits.length}${capped ? '+' : ''}`
+                          : 'No matches';
+                    prev.disabled = next.disabled = !hits.length;
+                    if (cur < 0) return;
+                    const hit = hits[cur];
+                    if (HAS_HL) CSS.highlights.set('xsearch-active', new Highlight(hit));
+                    else hit.classList.add('on');
+                    reveal(hit);
+                };
+
+                const run = () => {
+                    clearTimeout(timer);
+                    timer = 0;
+                    clear();
+                    if (input.value) {
+                        const found = collect(input.value);
+                        if (HAS_HL) {
+                            hits = toRanges(found);
+                            if (hits.length) CSS.highlights.set('xsearch', new Highlight(...hits));
+                        } else hits = toMarks(found);
+                    }
+                    go(hits.length ? 0 : -1);
+                };
+
+                const step = dir => {
+                    if (hits.length) go(wrapIndex(cur + dir, hits.length));
+                };
+
+                const api = {
+                    close(restoreFocus) {
+                        clearTimeout(timer);
+                        timer = 0;
+                        clear();
+                        input.value = '';
+                        count.textContent = '';
+                        prev.disabled = next.disabled = true;
+                        row.hidden = true;
+                        btn.setAttribute('aria-expanded', 'false');
+                        if (activeSearch === api) activeSearch = null;
+                        if (restoreFocus) btn.focus();
+                    }
+                };
+
+                btn.addEventListener('click', () => {
+                    if (!row.hidden) return api.close(true);
+                    if (activeSearch && activeSearch !== api) activeSearch.close(false);
+                    activeSearch = api;
+                    row.hidden = false;
+                    btn.setAttribute('aria-expanded', 'true');
+                    input.focus();
+                });
+                input.addEventListener('input', () => {
+                    clearTimeout(timer);
+                    timer = setTimeout(run, 120);
+                });
+                input.addEventListener('keydown', e => {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        if (timer) run();
+                        else step(e.shiftKey ? -1 : 1);
+                    } else if (e.key === 'Escape') {
+                        e.preventDefault();
+                        api.close(true);
+                    }
+                });
+                prev.addEventListener('click', () => step(-1));
+                next.addEventListener('click', () => step(1));
+                close.addEventListener('click', () => api.close(true));
+            }
+
             function httpSide(label, p, isResponse) {
                 if (!p)
                     return h(
@@ -3441,6 +4048,50 @@
                     line = h('div', { class: `xline xstatus ${statusClass(code)}` }, code ? `${code} ${REASONS[code] || ''}`.trim() : p.line);
                 } else {
                     line = h('div', { class: 'xline' }, p.line);
+                }
+                const body = p.body ? h('pre', { class: 'body' }, prettyBody(p.body)) : null;
+                let box = null;
+                if (body) {
+                    const copy = copyButton('Copy ' + label, () => body.textContent, null);
+                    copy.classList.add('xbtn');
+                    const rowId = `xs-${++xsSeq}`;
+                    const tool = (aria, ic, disabled = true) =>
+                        h('button', { type: 'button', class: 'ghost xbtn', 'aria-label': aria, disabled }, icon(ic));
+                    const ui = {
+                        btn: h(
+                            'button',
+                            {
+                                type: 'button',
+                                class: 'ghost xbtn',
+                                'aria-label': 'Search ' + label,
+                                'aria-expanded': 'false',
+                                'aria-controls': rowId
+                            },
+                            icon('search')
+                        ),
+                        input: h('input', {
+                            type: 'search',
+                            'aria-label': 'Find in ' + label,
+                            placeholder: 'Find in body',
+                            autocomplete: 'off',
+                            spellcheck: 'false'
+                        }),
+                        count: h('span', { class: 'xs-count', role: 'status' }),
+                        prev: tool('Previous match (Shift+Enter)', 'chev-up'),
+                        next: tool('Next match (Enter)', 'chev-down'),
+                        close: tool('Close search (Escape)', 'close', false)
+                    };
+                    ui.row = h(
+                        'div',
+                        { class: 'xsearch', id: rowId, hidden: true },
+                        h('div', { class: 'search-wrap' }, icon('search'), ui.input),
+                        ui.count,
+                        ui.prev,
+                        ui.next,
+                        ui.close
+                    );
+                    bodySearch(body, ui);
+                    box = h('div', { class: 'body-box' }, ui.row, h('div', { class: 'xtools' }, copy, ui.btn), body);
                 }
                 return h(
                     'div',
@@ -3459,7 +4110,7 @@
                                 )
                             )
                         : null,
-                    p.body ? h('pre', { class: 'body' }, prettyBody(p.body)) : null,
+                    box,
                     p.note ? h('p', { class: 'xnote' }, `${p.note}. Raise reporter.maxArtifactContentSize to capture more.`) : null
                 );
             }
@@ -4094,6 +4745,7 @@
             // ---------- Overview / empty ----------
             function renderOverview() {
                 const pane = $('#detail');
+                activeSearch?.close(false);
                 if (!tests.length) {
                     pane.replaceChildren(
                         h(
@@ -4237,6 +4889,117 @@
 
             systemDark.addEventListener('change', () => setTheme('auto'));
             syncThemeButton();
+
+            // ---------- Resizable list pane ----------
+            const panes = $('.panes');
+            const splitter = $('.splitter');
+            const LIST_W_KEY = 'pulse-report-list-width';
+            const LIST_W_DEFAULT = 320;
+            const LIST_W_MIN = 240;
+            const narrow = matchMedia('(max-width: 767px)');
+            const listMax = () => Math.max(LIST_W_MIN, Math.min(720, Math.floor(window.innerWidth * 0.6)));
+            let listW = LIST_W_DEFAULT;
+            // Width the user asked for; listW is that value clamped to the current viewport
+            let preferredW = LIST_W_DEFAULT;
+
+            try {
+                const stored = parseInt(localStorage.getItem(LIST_W_KEY), 10);
+                if (Number.isFinite(stored)) preferredW = stored;
+            } catch {
+                /* storage unavailable */
+            }
+
+            function storeListW(w) {
+                try {
+                    if (w == null) localStorage.removeItem(LIST_W_KEY);
+                    else localStorage.setItem(LIST_W_KEY, String(w));
+                } catch {
+                    /* storage unavailable */
+                }
+            }
+
+            function setListW(w) {
+                const max = listMax();
+                listW = Math.round(Math.min(max, Math.max(LIST_W_MIN, w)));
+                panes.style.setProperty('--list-w', `${listW}px`);
+                splitter.setAttribute('aria-valuenow', listW);
+                splitter.setAttribute('aria-valuemax', max);
+            }
+
+            function commitListW(w) {
+                setListW(w);
+                preferredW = listW;
+                storeListW(listW);
+            }
+
+            function applyListW() {
+                if (narrow.matches) panes.style.removeProperty('--list-w');
+                else setListW(preferredW);
+            }
+
+            let listDrag = null;
+            let listDragFrame = 0;
+
+            splitter.addEventListener('pointerdown', e => {
+                if (e.button !== 0 || narrow.matches) return;
+                splitter.setPointerCapture(e.pointerId);
+                listDrag = { startX: e.clientX, startW: listW, x: e.clientX };
+                document.body.classList.add('is-resizing');
+            });
+
+            splitter.addEventListener('pointermove', e => {
+                if (!listDrag) return;
+                listDrag.x = e.clientX;
+                if (!listDragFrame) {
+                    listDragFrame = requestAnimationFrame(() => {
+                        listDragFrame = 0;
+                        if (listDrag) setListW(listDrag.startW + listDrag.x - listDrag.startX);
+                    });
+                }
+            });
+
+            function endListDrag() {
+                if (!listDrag) return;
+                cancelAnimationFrame(listDragFrame);
+                listDragFrame = 0;
+                if (listDrag.x !== listDrag.startX) commitListW(listDrag.startW + listDrag.x - listDrag.startX);
+                listDrag = null;
+                document.body.classList.remove('is-resizing');
+            }
+
+            splitter.addEventListener('pointerup', endListDrag);
+            splitter.addEventListener('lostpointercapture', endListDrag);
+
+            splitter.addEventListener('dblclick', () => {
+                setListW(LIST_W_DEFAULT);
+                preferredW = LIST_W_DEFAULT;
+                storeListW(null);
+            });
+
+            splitter.addEventListener('keydown', e => {
+                if (e.metaKey || e.ctrlKey || e.altKey || narrow.matches) return;
+                const step = e.shiftKey ? 64 : 16;
+                const next = {
+                    ArrowLeft: listW - step,
+                    ArrowRight: listW + step,
+                    Home: LIST_W_MIN,
+                    End: listMax()
+                }[e.key];
+                if (next === undefined) return;
+                e.preventDefault();
+                commitListW(next);
+            });
+
+            let resizeFrame = 0;
+            window.addEventListener('resize', () => {
+                if (resizeFrame) return;
+                resizeFrame = requestAnimationFrame(() => {
+                    resizeFrame = 0;
+                    applyListW();
+                });
+            });
+            narrow.addEventListener('change', applyListW);
+            applyListW();
 
             // ---------- Keyboard ----------
             function move(dir) {

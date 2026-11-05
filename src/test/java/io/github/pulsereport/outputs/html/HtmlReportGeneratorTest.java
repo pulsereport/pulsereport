@@ -140,6 +140,12 @@ class HtmlReportGeneratorTest {
         environment.put("browser.name", "Chrome 129");
         environment.put("git.branch", "release/2.4");
         environment.put("build.number", "1842");
+        environment.put("git.commit", "3f9c2ab71d04e5c86b2f1a9e0d7c4b5a6e8f1023");
+        environment.put("git.commitUrl",
+                "https://github.com/acme/shop/commit/3f9c2ab71d04e5c86b2f1a9e0d7c4b5a6e8f1023");
+        environment.put("ci.run", "Run #42 · CI");
+        environment.put("ci.runUrl", "https://github.com/acme/shop/actions/runs/9876543210");
+        environment.put("ci.jobUrl", "https://github.com/acme/shop/actions/runs/9876543210/job/123");
         TestCase skipped = baseCase("tc-skip", TestStatus.SKIPPED).errorMessage("Feature flag disabled").build();
         TestRun sample = createSampleTestRun();
         TestSuite suite = TestSuite.builder()
@@ -168,6 +174,62 @@ class HtmlReportGeneratorTest {
 
         JsonNode embedded = embeddedRun(Files.readString(preview.toPath(), StandardCharsets.UTF_8)).path("environment");
         environment.forEach((key, value) -> assertEquals(value, embedded.path(key).asText(), key));
+    }
+
+    @Test
+    void topBarRendersCiLinksFromEnvironment() throws IOException {
+        Map<String, String> environment = new java.util.LinkedHashMap<>();
+        environment.put("git.commit", "3f9c2ab71d04e5c86b2f1a9e0d7c4b5a6e8f1023");
+        environment.put("git.commitUrl", "https://github.com/acme/shop/commit/3f9c2ab");
+        environment.put("git.branch", "main");
+        environment.put("ci.run", "Run #42 · CI");
+        environment.put("ci.runUrl", "https://github.com/acme/shop/actions/runs/1");
+        environment.put("ci.jobUrl", "https://github.com/acme/shop/actions/runs/1/job/2");
+        TestRun sample = createSampleTestRun();
+        TestRun run = TestRun.builder()
+                .id("run-ci")
+                .name("CI run")
+                .startTime(sample.getStartTime())
+                .endTime(sample.getEndTime())
+                .duration(3000)
+                .status(TestStatus.FAILED)
+                .suites(sample.getSuites())
+                .environment(environment)
+                .build();
+
+        String html = generateHtml(run);
+        JsonNode embedded = embeddedRun(html).path("environment");
+        environment.forEach((key, value) -> assertEquals(value, embedded.path(key).asText(), key));
+
+        String fn = functionSource(html, "renderTopbar");
+        for (String key : new String[] {"git.commitUrl", "ci.runUrl", "ci.jobUrl"}) {
+            assertTrue(html.contains("'" + key + "'"), "Top bar should read " + key);
+        }
+        assertTrue(fn.contains("ciChips("), "renderTopbar should render the CI chips");
+        String chips = functionSource(html, "ciChips");
+        assertTrue(chips.contains("ci.jobUrl") && chips.contains("ci.runUrl") && chips.contains("git.commitUrl"),
+                "CI chips should link the commit, job and run");
+        String link = functionSource(html, "metaChip");
+        assertTrue(link.contains("rel: 'noopener noreferrer'"), "CI links must not leak the opener or referrer");
+        assertTrue(link.contains("target: '_blank'"), "CI links should open in a new tab");
+        assertTrue(html.contains("CI_KEYS"), "CI keys should be excluded from generic environment entries");
+        assertTrue(hasCss(html, "\\.run-meta a\\.meta:hover"), "CI links should react on hover");
+        assertTrue(hasCss(html, "\\.run-meta \\.meta \\.v\\s*\\{[^}]*text-overflow:\\s*ellipsis;"),
+                "Long chip values should truncate");
+    }
+
+    @Test
+    void topBarRejectsNonHttpLinks() throws IOException {
+        String html = generateHtml(createSampleTestRun());
+        String fn = functionSource(html, "safeHref");
+
+        assertTrue(fn.contains("new URL("), "Links should be parsed with the URL API");
+        assertTrue(fn.contains("'http:'") && fn.contains("'https:'"), "Only http(s) links should be allowed");
+        assertFalse(fn.contains("'file:'"), "CI links must not allow file: URLs");
+        for (String name : new String[] {"renderTopbar", "ciChips", "metaChip", "safeHref"}) {
+            assertFalse(functionSource(html, name).contains("innerHTML"), name + " must not build markup from strings");
+        }
+        assertTrue(functionSource(html, "metaChip").contains("safeHref("), "Chips should only link vetted URLs");
     }
 
     // ---------- Embedded run data ----------
@@ -402,6 +464,407 @@ class HtmlReportGeneratorTest {
         assertTrue(hasCss(html, "@media \\(prefers-reduced-motion:\\s*no-preference\\)"));
         assertTrue(html.contains("@media print"));
         assertTrue(hasCss(html, "@media screen and \\(prefers-color-scheme:\\s*dark\\)"));
+    }
+
+    // ---------- Layout ----------
+
+    @Test
+    void brandMarkIs32px() throws IOException {
+        String html = generateHtml(createSampleTestRun());
+
+        assertTrue(hasCss(html, "\\.brand-mark\\s*\\{[^}]*width:\\s*32px;"), ".brand-mark should be 32px wide");
+        assertTrue(hasCss(html, "\\.brand-mark\\s*\\{[^}]*height:\\s*32px;"), ".brand-mark should be 32px high");
+    }
+
+    @Test
+    void detailViewHasNoFixedMaxWidth() throws IOException {
+        String html = generateHtml(createSampleTestRun());
+
+        assertFalse(html.contains("max-width: 1100px"), "Detail view should fit the available width");
+        assertTrue(hasCss(html, "\\.detail\\s*\\{[^}]*container-type:\\s*inline-size;"),
+                ".detail must keep container-type: inline-size for the @container rules");
+    }
+
+    // ---------- Feature tag tooltips ----------
+
+    @Test
+    void embedsFeatureTagsInRunJson() throws IOException {
+        TestSuite suite = TestSuite.builder()
+                .id("suite-tags")
+                .name("Checkout Feature")
+                .startTime(Instant.now())
+                .endTime(Instant.now())
+                .duration(1000)
+                .status(TestStatus.PASSED)
+                .tags(List.of("@smoke", "@api"))
+                .testCases(List.of(baseCase("tc-tag", TestStatus.PASSED).build()))
+                .build();
+
+        JsonNode tags = embeddedRun(generateHtml(createTestRunWithSuite(suite)))
+                .path("suites").get(0).path("tags");
+
+        assertEquals(2, tags.size());
+        assertEquals("@smoke", tags.get(0).asText());
+        assertEquals("@api", tags.get(1).asText());
+    }
+
+    @Test
+    void treeTooltipIncludesSuiteTags() throws IOException {
+        String html = generateHtml(createSampleTestRun());
+
+        int tree = html.indexOf("class: 'group dz'");
+        assertTrue(tree >= 0, "Tree should render suite groups");
+        int marker = html.indexOf("suite.secondaryText || suite.name || ''", tree);
+        assertTrue(marker >= 0, "Tree summary should keep its data-tip tooltip");
+        String construction = html.substring(marker, Math.min(marker + 200, html.length()));
+        assertTrue(construction.contains("suite.tags"),
+                "Tree summary tooltip should append the suite's feature tags");
+    }
+
+    // ---------- Resizable list pane ----------
+
+    @Test
+    void rendersAccessiblePaneSplitter() throws IOException {
+        String html = generateHtml(createSampleTestRun());
+
+        int role = html.indexOf("role=\"separator\"");
+        assertTrue(role >= 0, "Report should render a splitter between the list and detail panes");
+        String tag = html.substring(html.lastIndexOf("<div", role), html.indexOf('>', role));
+        assertTrue(tag.contains("aria-orientation=\"vertical\""), "Splitter should be a vertical separator");
+        assertTrue(tag.contains("aria-controls=\"list-pane\""), "Splitter aria-controls should reference the list pane id");
+        assertTrue(tag.contains("tabindex=\"0\""), "Splitter should be keyboard focusable");
+        assertTrue(tag.contains("aria-label="), "Splitter should have an accessible name");
+        assertTrue(tag.contains("aria-valuenow="), "Splitter should expose its current width");
+        assertTrue(tag.contains("aria-valuemin="), "Splitter should expose its minimum width");
+        assertTrue(tag.contains("aria-valuemax="), "Splitter should expose its maximum width");
+        assertTrue(html.contains("id=\"list-pane\""), "List pane needs an id for aria-controls to reference");
+    }
+
+    @Test
+    void panesUseListWidthVariable() throws IOException {
+        String html = generateHtml(createSampleTestRun());
+
+        assertTrue(hasCss(html, "\\.panes\\s*\\{[^}]*grid-template-columns:\\s*var\\(--list-w,\\s*320px\\)"),
+                ".panes should size the list column with var(--list-w, 320px)");
+        assertFalse(html.contains("minmax(280px, 360px)"),
+                "The fixed minmax list column should be replaced by the --list-w variable");
+    }
+
+    // ---------- Assertion table ----------
+
+    @Test
+    void assertionTableHeadersInMethodFirstOrder() throws IOException {
+        String fn = assertionListSource(generateHtml(createSampleTestRun()));
+
+        int thead = fn.indexOf("'thead'");
+        assertTrue(thead >= 0, "assertionList should build a thead");
+        String head = fn.substring(thead, fn.indexOf("'tbody'", thead));
+        int assertion = head.indexOf("'Assertion'");
+        int expected = head.indexOf("'Expected'");
+        int actual = head.indexOf("'Actual'");
+        int message = head.indexOf("'Message'");
+        assertTrue(assertion >= 0 && expected > assertion && actual > expected && message > actual,
+                "Headers should read Assertion, Expected, Actual, Message");
+        assertFalse(head.contains("'Method'"), "The method column is now the Assertion column");
+    }
+
+    @Test
+    void assertionMessageCellIsExpandable() throws IOException {
+        String html = generateHtml(createSampleTestRun());
+        String fn = assertionListSource(html);
+
+        assertTrue(fn.contains("class: 'a-clip'"), "Message should render in a shared .a-clip element");
+        assertTrue(fn.contains("clip(a.message)"), "Message cell should use the shared clip button");
+        assertTrue(fn.contains("type: 'button'"), "Message toggle should be a real button");
+        assertTrue(fn.contains("'aria-expanded': 'false'"), "Message button should start collapsed");
+        String sync = functionSource(html, "syncClip");
+        assertTrue(sync.contains("dataset.tip"), "Clip tooltip should be set through dataset, not markup");
+        assertFalse(sync.contains("innerHTML"), "Clip tooltip must never build markup from strings");
+        assertTrue(hasCss(html, "\\.a-clip\\s*\\{[^}]*white-space:\\s*nowrap;"), ".a-clip should be single-line");
+        assertTrue(hasCss(html, "\\.a-clip\\s*\\{[^}]*text-overflow:\\s*ellipsis;"), ".a-clip should truncate with an ellipsis");
+        assertTrue(hasCss(html, "tr\\.is-open \\.a-clip\\s*\\{[^}]*white-space:\\s*pre-wrap;"),
+                "Expanded rows should wrap");
+        assertTrue(html.contains("closest?.('.a-clip')"), "Clip toggling should use delegated handlers");
+        assertFalse(html.contains("a-msg"), "The message-only clip is replaced by the shared clip");
+    }
+
+    @Test
+    void assertionColumnsAreEqualWidth() throws IOException {
+        String html = generateHtml(createSampleTestRun());
+
+        assertTrue(assertionListSource(html).contains("['c-fn', 'c-exp', 'c-act', 'c-msg']"),
+                "Columns should stay Assertion, Expected, Actual, Message");
+        assertTrue(hasCss(html, "\\.dt\\.at\\s*\\{[^}]*table-layout:\\s*fixed;"), "Assertion table keeps a fixed layout");
+        assertTrue(hasCss(html,
+                "\\.at \\.c-fn,\\s*\\.at \\.c-exp,\\s*\\.at \\.c-act,\\s*\\.at \\.c-msg\\s*\\{\\s*width:\\s*25%;\\s*\\}"),
+                "All four assertion columns should be 25% wide");
+        assertFalse(hasCss(html, "\\.at \\.c-[a-z]+[^{]*\\{\\s*width:\\s*2[26]%"), "Old 22%/26% widths should be gone");
+    }
+
+    @Test
+    void assertionValuesAreTruncatedLikeMessages() throws IOException {
+        String html = generateHtml(createSampleTestRun());
+        String fn = assertionListSource(html);
+
+        assertTrue(fn.contains("clip(a.expected)") && fn.contains("clip(a.actual)") && fn.contains("clip(a.message)"),
+                "Expected, Actual and Message should share the clip button");
+        assertTrue(fn.contains("class: 'a-clip', 'aria-expanded': 'false'"), "Clip buttons should start collapsed");
+
+        String row = functionSource(html, "setClipRow");
+        assertTrue(row.contains("classList.toggle('is-open'"), "Expansion should be tracked on the row");
+        assertTrue(row.contains("querySelectorAll('.a-clip')") && row.contains("setAttribute('aria-expanded'"),
+                "Every clip in the row should sync aria-expanded");
+        assertTrue(hasCss(html, "e\\.key === 'Escape'[\\s\\S]{0,200}setClipRow\\([^,]+, false\\)"),
+                "Escape should collapse the row");
+
+        String sync = functionSource(html, "syncClip");
+        assertTrue(sync.contains("scrollWidth > ") && sync.contains("clientWidth"), "Overflow should be detected lazily");
+        assertTrue(sync.contains("'data-clipped'"), "Overflowing clips should be marked");
+        assertTrue(hasCss(html, "\\.a-clip\\[data-clipped\\],\\s*\\.at tr\\.is-open \\.a-clip\\s*\\{[^}]*cursor:\\s*pointer;"),
+                "Only clipped or expanded cells should look clickable");
+        assertTrue(hasCss(html, "@media print\\s*\\{[\\s\\S]*\\.at \\.a-clip\\s*\\{[^}]*white-space:\\s*pre-wrap;"),
+                "Print should expand every clipped cell");
+    }
+
+    @Test
+    void clipTooltipIsCappedForLongValues() throws IOException {
+        String html = generateHtml(createSampleTestRun());
+        String sync = functionSource(html, "syncClip");
+
+        assertTrue(html.contains("const CLIP_TIP_MAX = 300;"), "Tooltip preview should be capped at 300 chars");
+        assertTrue(sync.contains(".slice(0, CLIP_TIP_MAX)") && sync.contains("'\\u2026'"),
+                "Long values should be cut with an ellipsis in the tooltip");
+        assertTrue(sync.contains("delete btn.dataset.tip"), "Unclipped cells should not get a tooltip");
+    }
+
+    private static String assertionListSource(String html) {
+        return functionSource(html, "assertionList");
+    }
+
+    // ---------- HTTP body tools ----------
+
+    @Test
+    void httpSidesRenderCopyAndSearchButtons() throws IOException {
+        String html = generateHtml(createSampleTestRun());
+        String fn = functionSource(html, "httpSide");
+
+        assertTrue(fn.contains("copyButton(") && fn.contains("'Copy ' + label"),
+                "Each side should get a copy button labelled per side");
+        assertTrue(fn.contains("'aria-label': 'Search ' + label"), "Each side should get a search button labelled per side");
+        assertTrue(fn.contains("type: 'button'"), "Toolbar icons should be real buttons");
+        assertTrue(fn.contains("'aria-expanded': 'false'"), "Search button should expose its toggle state");
+        assertTrue(fn.contains("'aria-controls'"), "Search button should reference the search row");
+        assertTrue(fn.contains("type: 'search'"), "Search row should hold a search input");
+        assertTrue(fn.contains("'aria-label': 'Find in ' + label"), "Search input needs an accessible name");
+        assertTrue(fn.contains("role: 'status'"), "Match count should be announced as a status");
+        assertTrue(fn.contains("class: 'xtools'"), "Buttons should be grouped outside the body <pre>");
+        assertFalse(fn.contains("[p.line, ...p.headers"), "Sides without a body should not get a line+headers copy");
+
+        String copy = functionSource(html, "copyButton");
+        assertTrue(copy.contains("type: 'button'"), "Shared copy button should be a real button");
+        assertTrue(functionSource(html, "renderTrace").contains("copyButton("),
+                "Stack trace copy should reuse the shared copy button");
+        String clip = functionSource(html, "copyText");
+        assertTrue(clip.contains("navigator.clipboard") && clip.contains("isSecureContext"),
+                "Copy should use the async clipboard API when it is available");
+        assertTrue(clip.contains("execCommand('copy')"), "Copy should fall back to execCommand for file:// pages");
+        assertTrue(html.contains("'aria-live': 'polite'"), "Copy feedback should be announced politely");
+
+        for (String name : new String[] {"search", "chev-up", "chev-down", "copy", "check", "close"}) {
+            assertTrue(html.contains("data-i=\"" + name + "\""), "Icon set should include " + name);
+        }
+        assertTrue(hasCss(html, "\\.xtools\\s*\\{[^}]*right:\\s*14px;"), "Toolbar should be right aligned, clear of the scrollbar");
+        assertTrue(hasCss(html,
+                "@media print\\s*\\{[\\s\\S]*\\.body-box > \\.xtools,\\s*\\.body-box > \\.xsearch\\s*\\{\\s*display:\\s*none;"),
+                "Toolbar and search row should be hidden in print");
+    }
+
+    @Test
+    void httpToolsSitInsideBodyContainer() throws IOException {
+        String html = generateHtml(createSampleTestRun());
+        String fn = functionSource(html, "httpSide");
+
+        int box = fn.indexOf("class: 'body-box'");
+        assertTrue(box >= 0, "The body <pre> should be wrapped in a .body-box container");
+        String boxCall = fn.substring(box, fn.indexOf(';', box));
+        assertTrue(boxCall.contains("class: 'xtools'") && boxCall.contains("ui.row") && boxCall.contains("body)"),
+                "Tools, search row and body should all be children of the body container");
+        assertFalse(hasCss(fn, "class: 'xlabel' \\}[^\\n]*xtools"), "Tools should no longer sit in the label row");
+        assertTrue(fn.contains("bodySearch(body, ui)"), "Search should still run against the <pre>");
+
+        assertTrue(hasCss(html, "\\.body-box\\s*\\{[^}]*position:\\s*relative;"), "Container should anchor the overlay");
+        assertTrue(hasCss(html, "\\.body-box > \\.xtools\\s*\\{[^}]*position:\\s*absolute;"), "Tools should overlay the body");
+        assertTrue(hasCss(html, "\\.body-box > \\.xtools\\s*\\{[^}]*background:\\s*var\\(--sunken\\);"),
+                "Tools should sit on the sunken body colour");
+        assertTrue(hasCss(html, "\\.body-box > \\.xsearch\\s*\\{[^}]*position:\\s*absolute;"),
+                "Search should float inside the body container");
+        assertTrue(hasCss(html,
+                "\\.body-box:hover > \\.xtools,\\s*\\.body-box:focus-within > \\.xtools\\s*\\{[^}]*opacity:\\s*1;"),
+                "Tools should be fully opaque on hover or focus");
+        assertFalse(hasCss(html, "\\.xtools\\s*\\{[^}]*margin-left:\\s*auto;"), "Old label-row placement should be removed");
+    }
+
+    @Test
+    void bodySearchUsesHighlightApiWithMarkFallback() throws IOException {
+        String html = generateHtml(createSampleTestRun());
+        String fn = functionSource(html, "bodySearch");
+
+        assertTrue(html.contains("CSS.highlights"), "Search should use the CSS Custom Highlight API");
+        assertTrue(fn.contains("new Highlight("), "Search should register Highlight objects");
+        assertTrue(fn.contains("createTreeWalker"), "Search should walk text nodes of the body");
+        assertTrue(fn.contains("createElement('mark')"), "Search should fall back to DOM-built <mark> elements");
+        assertFalse(fn.contains("innerHTML"), "Search must never build markup from strings");
+        assertTrue(fn.contains("normalize()"), "Fallback marks should be unwrapped and normalized on clear");
+        assertTrue(hasCss(html, "::highlight\\(xsearch\\)\\s*\\{"), "CSS should style the xsearch highlight");
+        assertTrue(hasCss(html, "::highlight\\(xsearch-active\\)\\s*\\{"), "CSS should style the active match");
+        assertTrue(hasCss(html, "mark\\.xs-hit\\s*\\{"), "CSS should style fallback marks");
+    }
+
+    @Test
+    void messageColumnHeaderIsRightAligned() throws IOException {
+        String html = generateHtml(createSampleTestRun());
+        String css = styles(html);
+
+        assertTrue(hasCss(css, "\\.at th:last-child,\\s*\\.at \\.a-text,\\s*\\.at \\.a-text \\.a-clip\\s*\\{[^}]*text-align:\\s*right;"),
+                "Message header, cell and clip should hug the table's right edge");
+        assertTrue(hasCss(css, "\\.at \\.a-clip\\s*\\{[^}]*text-overflow:\\s*ellipsis;"), "Message should still truncate");
+        assertTrue(assertionListSource(html).contains("['Assertion', 'Expected', 'Actual', 'Message']"),
+                "Message should stay the last column");
+
+        String narrow = cssBlock(css, "@container (max-width:720px)");
+        assertFalse(narrow.contains("text-align: right"), "Stacked layout should not right-align anything");
+        assertTrue(hasCss(narrow, "\\.at \\.a-text,\\s*\\.at \\.a-text \\.a-clip\\s*\\{[^}]*text-align:\\s*left;"),
+                "Stacked layout should keep the labelled message left-aligned");
+    }
+
+    @Test
+    void bodyToolsHiddenUntilHoverOrFocus() throws IOException {
+        String css = styles(generateHtml(createSampleTestRun()));
+
+        String base = cssRule(css, ".body-box > .xtools {");
+        assertTrue(hasCss(base, "opacity:\\s*0;"), "Tools should be fully hidden at rest");
+        assertTrue(hasCss(base, "pointer-events:\\s*none;"), "Hidden tools should not catch clicks");
+        assertFalse(hasCss(base, "display:\\s*none|visibility:\\s*hidden"), "Hidden tools must stay focusable");
+
+        String shown = cssRule(css, ".body-box:hover > .xtools,\n        .body-box:focus-within > .xtools {");
+        assertTrue(hasCss(shown, "opacity:\\s*1;") && hasCss(shown, "pointer-events:\\s*auto;"),
+                "Hover or keyboard focus should reveal the tools fully");
+
+        String touch = cssBlock(css, "@media (hover: none)");
+        assertTrue(hasCss(touch, "\\.body-box > \\.xtools\\s*\\{[^}]*opacity:\\s*1;[^}]*pointer-events:\\s*auto;"),
+                "Touch devices should always show the tools");
+        assertFalse(hasCss(css, "\\.xtools\\s*\\{[^}]*opacity:\\s*0\\.6;"), "The dim resting state should be gone");
+        assertTrue(hasCss(cssBlock(css, "@media (prefers-reduced-motion: no-preference)"),
+                "\\.body-box > \\.xtools\\s*\\{\\s*transition:\\s*opacity"), "Fade should respect reduced motion");
+    }
+
+    @Test
+    void bodySearchInputMatchesFeatureSearch() throws IOException {
+        String html = generateHtml(createSampleTestRun());
+        String css = styles(html);
+        String fn = functionSource(html, "httpSide");
+
+        assertTrue(fn.contains("h('div', { class: 'search-wrap' }, icon('search'), ui.input)"),
+                "Find input should reuse the feature search wrapper and icon");
+        int at = fn.indexOf("input: h('input'");
+        assertTrue(at >= 0, "httpSide should build the find input");
+        String input = fn.substring(at, fn.indexOf("})", at));
+        assertTrue(input.contains("type: 'search'") && input.contains("'aria-label': 'Find in ' + label"),
+                "Find input keeps its type and accessible name");
+        assertFalse(input.contains("class:"), "Find input should be styled only by .search-wrap");
+        assertFalse(css.contains("xs-input"), "Conflicting .xs-input styling should be removed");
+        assertFalse(hasCss(css, "\\.xsearch[^{]*input[^{]*\\{[^}]*(border|background|color):"),
+                "No widget rule should override the shared input look");
+        String compact = cssRule(css, ".xsearch .search-wrap input {");
+        assertTrue(hasCss(compact, "height:\\s*2[0-4]px;") && compact.contains("font-size: 12px;"),
+                "Find input should be compact next to the 12px body text");
+        assertTrue(hasCss(cssRule(css, ".body-box > .xsearch {"), "width:[^;]*clamp\\([^;]*vw"),
+                "Widget width should scale with the viewport");
+        assertTrue(hasCss(css, "\\.xsearch > \\.search-wrap\\s*\\{[^}]*min-width:\\s*0;"), "Wrapper should shrink in the widget");
+
+        String widget = cssRule(css, ".body-box > .xsearch {");
+        assertTrue(widget.contains("background: var(--raised);") && widget.contains("border: 1px solid var(--border-strong);"),
+                "Widget should use full-contrast surface tokens");
+        assertFalse(widget.contains("opacity"), "Widget must not be dimmed");
+        String disabled = cssRule(css, ".ghost.xbtn:disabled {");
+        assertTrue(hasCss(disabled, "opacity:\\s*0\\.(4[5-9]|[5-9])"), "Disabled buttons should stay legible");
+        assertTrue(disabled.contains("color: var(--ink-muted);"), "Disabled buttons should not brighten on hover");
+    }
+
+    @Test
+    void bodyToolbarButtonsHaveNoTooltips() throws IOException {
+        String html = generateHtml(createSampleTestRun());
+        String fn = functionSource(html, "httpSide");
+
+        assertFalse(fn.contains("data-tip"), "Body search, copy, prev/next and close buttons should not show tooltips");
+        assertTrue(fn.contains("copyButton('Copy ' + label, () => body.textContent, null)"),
+                "Body copy button should opt out of tooltips");
+        String copyFn = functionSource(html, "copyButton");
+        assertTrue(copyFn.contains("if (tipText == null) return;"), "Copied state should not add a tooltip back");
+        for (String aria : new String[] {"'Previous match (Shift+Enter)'", "'Next match (Enter)'", "'Close search (Escape)'"}) {
+            assertTrue(fn.contains(aria), "Shortcut hints should stay in the accessible name: " + aria);
+        }
+    }
+
+    @Test
+    void bodySearchHighlightsUseAccent() throws IOException {
+        String css = styles(generateHtml(createSampleTestRun()));
+
+        String all = cssRule(css, "::highlight(xsearch) {");
+        String active = cssRule(css, "::highlight(xsearch-active) {");
+        String mark = cssRule(css, "mark.xs-hit {");
+        String markOn = cssRule(css, "mark.xs-hit.on {");
+        for (String rule : new String[] {all, mark}) {
+            assertTrue(rule.contains("var(--hit-bg)"), "Matches should use the shared hit tint: " + rule);
+        }
+        java.util.regex.Matcher hit = java.util.regex.Pattern
+                .compile("--hit-bg:\\s*color-mix\\(in srgb, var\\(--accent\\) (\\d+)%").matcher(css);
+        java.util.List<Integer> mixes = new java.util.ArrayList<>();
+        while (hit.find()) mixes.add(Integer.parseInt(hit.group(1)));
+        assertEquals(3, mixes.size(), "Hit tint should be defined for light, forced dark and auto dark");
+        assertTrue(mixes.get(1) > mixes.get(0) && mixes.get(2).equals(mixes.get(1)),
+                "Dark themes should use a stronger hit tint than light: " + mixes);
+        for (String rule : new String[] {active, markOn}) {
+            assertTrue(hasCss(rule, "background(-color)?:\\s*var\\(--accent\\);"), "Active match should be solid accent: " + rule);
+            assertTrue(rule.contains("color: var(--raised);"), "Active match text should contrast with the accent: " + rule);
+        }
+        for (String rule : new String[] {all, active, mark, markOn}) {
+            assertFalse(rule.contains("--bar-skip") || rule.contains("#212529"), "Yellow highlight should be gone: " + rule);
+        }
+    }
+
+    // The main stylesheet; the first <style> only holds the inlined font faces.
+    private static String styles(String html) {
+        return html.substring(0, html.lastIndexOf("</style>"));
+    }
+
+    // Body of the first rule starting with the exact selector text.
+    private static String cssRule(String css, String selector) {
+        int at = css.indexOf(selector);
+        assertTrue(at >= 0, "CSS should contain " + selector);
+        return css.substring(at, css.indexOf('}', at) + 1);
+    }
+
+    // Whole at-rule block (brace-balanced) starting at the given header.
+    private static String cssBlock(String css, String header) {
+        int at = css.indexOf(header);
+        assertTrue(at >= 0, "CSS should contain " + header);
+        int depth = 0;
+        for (int i = css.indexOf('{', at); i < css.length(); i++) {
+            char c = css.charAt(i);
+            if (c == '{') depth++;
+            else if (c == '}' && --depth == 0) return css.substring(at, i + 1);
+        }
+        return css.substring(at);
+    }
+
+    private static String functionSource(String html, String name) {
+        int start = html.indexOf("function " + name + "(");
+        assertTrue(start >= 0, "Template should define " + name + "()");
+        int end = html.indexOf("\n            function ", start + 1);
+        int next = html.indexOf("\n            const ", start + 1);
+        if (next > start && (end < 0 || next < end)) end = next;
+        return html.substring(start, end > start ? end : html.length());
     }
 
     // ---------- Helpers ----------
