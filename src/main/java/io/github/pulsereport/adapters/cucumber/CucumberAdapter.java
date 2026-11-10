@@ -22,6 +22,8 @@ import io.cucumber.plugin.EventListener;
 import io.cucumber.plugin.event.DataTableArgument;
 import io.cucumber.plugin.event.DocStringArgument;
 import io.cucumber.plugin.event.EventPublisher;
+import io.cucumber.plugin.event.HookTestStep;
+import io.cucumber.plugin.event.HookType;
 import io.cucumber.plugin.event.Node;
 import io.cucumber.plugin.event.PickleStepTestStep;
 import io.cucumber.plugin.event.Result;
@@ -35,11 +37,13 @@ import io.cucumber.plugin.event.TestSourceParsed;
 import io.cucumber.plugin.event.TestSourceRead;
 import io.cucumber.plugin.event.TestStepFinished;
 import io.cucumber.plugin.event.TestStepStarted;
+import io.github.pulsereport.adapters.CaptureBridge;
 import io.github.pulsereport.assertions.AssertionCapture;
 import io.github.pulsereport.assertions.AssertionCollector;
 import io.github.pulsereport.core.ci.GitHubActionsDetector;
 import io.github.pulsereport.core.model.Artifact;
 import io.github.pulsereport.core.model.AssertionResult;
+import io.github.pulsereport.core.model.Metric;
 import io.github.pulsereport.core.model.TestCase;
 import io.github.pulsereport.core.model.TestRun;
 import io.github.pulsereport.core.model.TestStatus;
@@ -95,6 +99,12 @@ public class CucumberAdapter implements EventListener {
      */
     private static final ThreadLocal<CucumberScenarioContext> currentScenario = new ThreadLocal<>();
 
+    /** The scenario hook running on this thread, while one runs. */
+    private static final ThreadLocal<HookCapture> currentHook = new ThreadLocal<>();
+
+    private record HookCapture(HookType type, String name, Instant start) {
+    }
+
     /**
      * Completed test cases grouped by feature URI. LinkedHashMap preserves
      * insertion order for deterministic output.
@@ -129,6 +139,8 @@ public class CucumberAdapter implements EventListener {
         if (ReporterConfig.resolveAssertionCapture()) {
             AssertionCapture.install();
         }
+        // Tracked Selenium actions (and other bridge captures) become sub-steps of the running step
+        CaptureBridge.register(CucumberStepContext.SINK, CaptureBridge.PRIORITY_STEP);
         publisher.registerHandlerFor(TestRunStarted.class, this::onTestRunStarted);
         publisher.registerHandlerFor(TestSourceRead.class, this::onTestSourceRead);
         publisher.registerHandlerFor(TestSourceParsed.class, this::onTestSourceParsed);
@@ -234,6 +246,7 @@ public class CucumberAdapter implements EventListener {
 
         currentScenario.set(ctx);
         CucumberStepContext.currentStepArtifacts.set(new ArrayList<>());
+        CucumberStepContext.beginScenario();
         logger.debug("Scenario started: {}", tc.getName());
     }
 
@@ -241,6 +254,12 @@ public class CucumberAdapter implements EventListener {
         if (!(event.getTestStep() instanceof PickleStepTestStep)) {
             // Hooks are not report steps; drop anything they assert.
             AssertionCollector.stop();
+            if (currentScenario.get() != null && event.getTestStep() instanceof HookTestStep) {
+                HookTestStep hook = (HookTestStep) event.getTestStep();
+                currentHook.set(new HookCapture(hook.getHookType(), hookName(hook.getCodeLocation()),
+                        event.getInstant()));
+                CucumberStepContext.beginStep();
+            }
             return;
         }
         PickleStepTestStep pStep = (PickleStepTestStep) event.getTestStep();
@@ -262,16 +281,14 @@ public class CucumberAdapter implements EventListener {
         String name = pStep.getStep().getText();
         ctx.startStep(keyword, name, event.getInstant(), isBackground);
 
-        List<Artifact> buf = CucumberStepContext.currentStepArtifacts.get();
-        if (buf != null) {
-            buf.clear();
-        }
+        CucumberStepContext.beginStep();
         AssertionCollector.start();
         logger.debug("Step started: {} {}", keyword, name);
     }
 
     private void onTestStepFinished(TestStepFinished event) {
         if (!(event.getTestStep() instanceof PickleStepTestStep)) {
+            finishHook(event);
             return;
         }
         CucumberScenarioContext ctx = currentScenario.get();
@@ -288,6 +305,11 @@ public class CucumberAdapter implements EventListener {
         TestStatus status = convertStatus(result.getStatus());
         String errorMessage = result.getError() != null ? result.getError().getMessage() : null;
         String stackTrace = result.getError() != null ? stackTraceOf(result.getError()) : null;
+        if (status == TestStatus.FAILED) {
+            // Capture code (e.g. the Selenium tracker) adds its evidence while this step is still open
+            CaptureBridge.fireFailure(result.getError());
+        }
+        List<TestStep> children = CucumberStepContext.endStep();
 
         String docString = null;
         List<List<String>> dataTable = null;
@@ -319,6 +341,7 @@ public class CucumberAdapter implements EventListener {
                 .dataTable(dataTable)
                 .artifacts(stepArtifacts.isEmpty() ? null : stepArtifacts)
                 .assertions(assertions)
+                .children(children)
                 .build();
 
         if (ctx.isCurrentStepBackground()) {
@@ -346,6 +369,13 @@ public class CucumberAdapter implements EventListener {
         String errorMessage = result.getError() != null ? result.getError().getMessage() : null;
         String stackTrace = result.getError() != null ? stackTraceOf(result.getError()) : null;
 
+        List<String> tags = new ArrayList<>(ctx.getTags());
+        java.util.Set<String> extraTags = CucumberStepContext.currentScenarioTags.get();
+        if (extraTags != null) {
+            extraTags.stream().filter(t -> !tags.contains(t)).forEach(tags::add);
+        }
+        List<Metric> metrics = CucumberStepContext.currentScenarioMetrics.get();
+
         TestCase testCase = TestCase.builder()
                 .id(UUID.randomUUID().toString())
                 .name(ctx.getScenarioName())
@@ -360,7 +390,9 @@ public class CucumberAdapter implements EventListener {
                 .bddType(ctx.getBddType())
                 .featureName(ctx.getFeatureName())
                 .featureDescription(ctx.getFeatureDescription())
-                .tags(ctx.getTags())
+                .tags(tags)
+                .metrics(metrics)
+                .adapter("Cucumber")
                 .build();
 
         URI featureUri = tc.getUri();
@@ -374,9 +406,75 @@ public class CucumberAdapter implements EventListener {
             buf2.clear();
         }
         CucumberStepContext.currentStepArtifacts.remove();
+        CucumberStepContext.endScenario();
+        currentHook.remove();
         AssertionCollector.stop();
 
         logger.debug("Scenario finished: {} -> {}", ctx.getScenarioName(), status);
+    }
+
+    /**
+     * Records what a scenario hook captured through {@link CaptureBridge}:
+     * Before/After hooks become "Setup"/"Teardown" steps, an AfterStep hook's
+     * captures join the step it followed, and a BeforeStep hook's the next one.
+     * Hooks that captured nothing stay out of the report, as before.
+     */
+    private void finishHook(TestStepFinished event) {
+        HookCapture hook = currentHook.get();
+        currentHook.remove();
+        CucumberScenarioContext ctx = currentScenario.get();
+        if (hook == null || ctx == null) {
+            return;
+        }
+        Result result = event.getResult();
+        boolean failed = result.getStatus() == Status.FAILED;
+        if (failed) {
+            CaptureBridge.fireFailure(result.getError());
+        }
+        List<TestStep> children = CucumberStepContext.endStep();
+        List<Artifact> artifacts = new ArrayList<>();
+        List<Artifact> buf = CucumberStepContext.currentStepArtifacts.get();
+        if (buf != null) {
+            artifacts.addAll(buf);
+            buf.clear();
+        }
+        if (children.isEmpty() && (!failed || artifacts.isEmpty())) {
+            return;
+        }
+        switch (hook.type()) {
+            case AFTER_STEP:
+                ctx.appendToLastStep(children, artifacts);
+                return;
+            case BEFORE_STEP:
+                CucumberStepContext.carry(children, artifacts);
+                return;
+            default:
+                Instant end = event.getInstant();
+                TestStep.Builder step = TestStep.builder()
+                        .keyword(hook.type() == HookType.BEFORE ? "Setup" : "Teardown")
+                        .name(hook.name())
+                        .status(convertStatus(result.getStatus()))
+                        .startTime(hook.start())
+                        .endTime(end)
+                        .duration(Duration.between(hook.start(), end).toMillis())
+                        .children(children)
+                        .artifacts(artifacts);
+                if (result.getError() != null) {
+                    step.errorMessage(result.getError().getMessage()).stackTrace(stackTraceOf(result.getError()));
+                }
+                ctx.addStep(step.build());
+        }
+    }
+
+    /** "com.example.Hooks.openBrowser(io.cucumber.java.Scenario)" → "openBrowser". */
+    private static String hookName(String codeLocation) {
+        if (codeLocation == null || codeLocation.isBlank()) {
+            return "hook";
+        }
+        int paren = codeLocation.indexOf('(');
+        String method = paren > 0 ? codeLocation.substring(0, paren) : codeLocation;
+        int dot = method.lastIndexOf('.');
+        return dot >= 0 && dot < method.length() - 1 ? method.substring(dot + 1) : method;
     }
 
     private void onTestRunFinished(TestRunFinished event) {
