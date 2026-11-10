@@ -17,6 +17,7 @@ public final class S3PublishConfig extends PublishConfig {
     private final String keyPrefix;
     private final String region;
     private final Map<String, String> metadata;
+    private final boolean uploadArtifacts;
 
     private S3PublishConfig(Builder builder) {
         super(builder.retryAttempts, builder.retryDelayMs);
@@ -25,6 +26,17 @@ public final class S3PublishConfig extends PublishConfig {
         this.region = builder.region;
         this.metadata = builder.metadata != null ? 
                 Collections.unmodifiableMap(builder.metadata) : Collections.emptyMap();
+        this.uploadArtifacts = builder.uploadArtifacts;
+    }
+
+    /**
+     * Whether publishing a report file also uploads the screenshots, videos and
+     * logs it links to (default true).
+     *
+     * @return true to upload linked files next to the report
+     */
+    public boolean isUploadArtifacts() {
+        return uploadArtifacts;
     }
 
     public String getBucketName() {
@@ -62,6 +74,16 @@ public final class S3PublishConfig extends PublishConfig {
         private Map<String, String> metadata;
         private int retryAttempts = 3;
         private long retryDelayMs = 1000;
+        private boolean uploadArtifacts = true;
+
+        /**
+         * @param uploadArtifacts whether to upload the files the report links to
+         * @return this builder
+         */
+        public Builder uploadArtifacts(boolean uploadArtifacts) {
+            this.uploadArtifacts = uploadArtifacts;
+            return this;
+        }
 
         public Builder bucketName(String bucketName) {
             this.bucketName = bucketName;

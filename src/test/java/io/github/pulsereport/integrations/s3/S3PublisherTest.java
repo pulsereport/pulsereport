@@ -3,12 +3,15 @@ package io.github.pulsereport.integrations.s3;
 import java.io.File;
 import java.nio.file.Files;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import org.mockito.ArgumentCaptor;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -51,6 +54,49 @@ class S3PublisherTest {
                 .build();
 
         publisher = new S3Publisher(mockS3Client);
+    }
+
+    @Test
+    void publishFile_uploadsTheFilesTheReportLinksTo() throws Exception {
+        File html = new File(tempDir, "test-report.html");
+        Files.writeString(html.toPath(), "<html></html>");
+        File shot = new File(tempDir, "artifacts/screenshots/00001-failure.png");
+        shot.getParentFile().mkdirs();
+        Files.write(shot.toPath(), new byte[] {1, 2, 3});
+        Files.writeString(new File(tempDir, "test-report.json").toPath(), "{\"suites\":[{\"testCases\":[{\"artifacts\":["
+                + "{\"name\":\"failure.png\",\"type\":\"screenshot\",\"path\":\"artifacts/screenshots/00001-failure.png\"},"
+                + "{\"name\":\"abs.png\",\"type\":\"screenshot\",\"path\":\"/tmp/abs.png\"},"
+                + "{\"name\":\"out.log\",\"type\":\"log\",\"path\":\"../outside.log\"},"
+                + "{\"name\":\"gone.mp4\",\"type\":\"video\",\"path\":\"videos/gone.mp4\"}]}]}]}");
+        when(mockS3Client.putObject(any(PutObjectRequest.class), any(RequestBody.class)))
+                .thenReturn(PutObjectResponse.builder().build());
+
+        publisher.publish(html, s3Config);
+
+        ArgumentCaptor<PutObjectRequest> requests = ArgumentCaptor.forClass(PutObjectRequest.class);
+        verify(mockS3Client, times(2)).putObject(requests.capture(), any(RequestBody.class));
+        List<PutObjectRequest> sent = requests.getAllValues();
+        assertEquals("reports/test-report.html", sent.get(0).key());
+        assertEquals("reports/artifacts/screenshots/00001-failure.png", sent.get(1).key());
+        assertEquals("image/png", sent.get(1).contentType());
+        assertTrue(sent.get(0).contentType().startsWith("text/html"));
+    }
+
+    @Test
+    void publishFile_canSkipLinkedFiles() throws Exception {
+        File html = new File(tempDir, "test-report.html");
+        Files.writeString(html.toPath(), "<html></html>");
+        File shot = new File(tempDir, "artifacts/a.png");
+        shot.getParentFile().mkdirs();
+        Files.write(shot.toPath(), new byte[] {1});
+        Files.writeString(new File(tempDir, "test-report.json").toPath(),
+                "{\"artifacts\":[{\"name\":\"a.png\",\"type\":\"screenshot\",\"path\":\"artifacts/a.png\"}]}");
+        when(mockS3Client.putObject(any(PutObjectRequest.class), any(RequestBody.class)))
+                .thenReturn(PutObjectResponse.builder().build());
+
+        publisher.publish(html, S3PublishConfig.builder().bucketName("b").uploadArtifacts(false).build());
+
+        verify(mockS3Client, times(1)).putObject(any(PutObjectRequest.class), any(RequestBody.class));
     }
 
     @Test
