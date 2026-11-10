@@ -104,10 +104,18 @@ S3PublishConfig config = S3PublishConfig.builder()
 S3Publisher publisher = new S3Publisher(s3Client);
 
 File reportFile = new File("target/pulsereport/test-report.html");
-publisher.publish(reportFile, config);
+publisher.publish(reportFile, config);   // also uploads the screenshots, videos and logs it links to
 
 System.out.println("Report published to bucket: " + config.getBucketName());
 ```
+
+### Linked Files
+
+Publishing a report file also uploads the files it links to by relative path (screenshots,
+videos, logs and page sources under `artifacts/` and `videos/`), under the same key prefix and
+with their content types, so the published report's links keep working. The files are found
+through the report's JSON (`test-report.json` next to an HTML report). To upload only the
+report, use `S3PublishConfig.builder().uploadArtifacts(false)`.
 
 ### Key Prefix Patterns
 

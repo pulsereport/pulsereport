@@ -191,7 +191,9 @@ public void testPerformance() {
 
 ## Selenium Adapter
 
-Extends TestNGAdapter with Selenium WebDriver-specific features.
+Extends TestNGAdapter with Selenium WebDriver-specific features. The tracking
+itself lives in `SeleniumTracker`, which also works in Cucumber step
+definitions (see [Combining with Selenium](#combining-with-selenium)).
 
 ### Installation
 
@@ -221,10 +223,7 @@ so add your own; 4.15.0 or newer is supported (built against 4.15.0, tested up t
 
 #### Automatic Capture with `track(...)`
 
-Wrap the driver once and use the returned driver everywhere. Every open, click,
-type, clear and submit becomes a report step (element, locator, URL change, page
-load time, outcome; password fields are masked), and screenshots and video are
-captured according to configuration:
+Wrap the driver once and use the returned driver everywhere:
 
 ```java
 @Listeners(SeleniumAdapter.class)
@@ -235,15 +234,19 @@ public class WebTest {
     @BeforeMethod
     public void setUp() {
         driver = adapter.track(new ChromeDriver());
+        driver.get("https://example.com/login");      // shown as the test's "Setup" step
     }
 
     @Test
     public void login() {
-        driver.get("https://example.com/login");
-        adapter.step("Log in", () -> {             // optional: groups actions under one step
+        adapter.step("Log in", () -> {                // one step, the actions as its sub-steps
             driver.findElement(By.id("user")).sendKeys("demo");
+            driver.findElement(By.id("password")).sendKeys(secret);   // shown as ••••••
             driver.findElement(By.id("login")).click();
         });
+        adapter.waitFor("dashboard", Duration.ofSeconds(10),
+                ExpectedConditions.visibilityOfElementLocated(By.id("dashboard")));
+        adapter.screenshot("Dashboard");
     }
 
     @AfterMethod(alwaysRun = true)
@@ -253,113 +256,112 @@ public class WebTest {
 }
 ```
 
+What gets recorded:
+
+- **Actions as steps**: clicks, typing, clearing, submitting, navigation, frame/window/alert
+  switches, `Actions` gestures (hover, drag, double/right click, key presses, scrolling) and
+  closed windows, each with its element, locator, URL change and duration. Actions inside
+  `step(...)` become that step's sub-steps; nested `step(...)` calls keep their own sub-steps.
+- **Setup and teardown**: actions in `@BeforeMethod`/`@AfterMethod` (and class, test, suite and
+  group configuration methods) appear as "Setup" and "Teardown" steps of the test. A failed setup
+  keeps its steps, screenshot and page details, so a skipped test shows why.
+- **Failures**: when a test fails because an element was never found, the report adds a failed
+  "Find element By.id: …" step; when a `WebDriverWait` timed out on a lookup, a "Wait for By.id: …"
+  step. Failed tests also get a screenshot, the page URL, title and window size, browser console
+  errors (Chromium-based browsers) and the page source.
+- **Page load times**: every navigation that loads a new document records `page.load.time` and
+  `page.ttfb` metrics, labelled with the URL. Single-page-app route changes are not counted.
+- **Browser**: name, version and platform are read from the driver's capabilities and shown in
+  the run metadata (all browsers, for cross-browser runs) and as a tag on each test, e.g.
+  `Chrome 131`.
+- **Sensitive data**: typed text is masked for password, one-time-code and card fields, and for
+  fields whose name, id or label looks sensitive (`password`, `token`, `otp`, `pin`, `cvv`, plus
+  `reporter.maskBody.fields`). Credentials and sensitive query parameters (`token`, `code`,
+  `access_token`, …) are masked in URLs.
+
+Screenshots are embedded in the report as Base64 by default; with
+`reporter.screenshots.storage=path` they are written to `reporter.screenshots.directory` and shown
+from there. Logs and page sources are written under the report folder (`artifacts/`), and videos to
+`reporter.video.directory` (default `<output>/videos`). The report links files by relative path, so
+keep those folders in place relative to the report. The S3 publisher uploads linked files that sit
+inside the report folder.
+
 | Key | Values | Default |
 | --- | --- | --- |
 | `reporter.screenshots.mode` | `all`, `failed`, `last`, `none` | `failed` |
 | `reporter.video.mode` | `always`, `failed`, `none` (needs [ffmpeg](https://ffmpeg.org)) | `none` |
 | `reporter.video.fps` | 1–30 | `2` |
-| `reporter.video.storage` | `path` (file under `<output>/videos/`), `embed` (Base64 in the HTML, up to 50 MB per video) | `path` |
+| `reporter.screenshots.storage` | `embed` (Base64 in the report), `path` (files in `reporter.screenshots.directory`) | `embed` |
+| `reporter.screenshots.directory` | folder for screenshot files when `storage=path` | `<output>/artifacts/screenshots` |
+| `reporter.video.storage` | `path` (file in `reporter.video.directory`), `embed` (Base64 in the HTML, up to 50 MB per video and 200 MB in total), `url` (sent to the video uploader, see below) | `path` |
+| `reporter.video.directory` | folder for recorded videos | `<output>/videos` |
+| `reporter.selenium.stepDetail` | `full`, `minimal` (no extra browser calls per action; elements are named by locator) | `full` |
+| `reporter.selenium.maskInputs` | `sensitive`, `all`, `none` | `sensitive` |
+| `reporter.selenium.failureCapture` | any of `page`, `console`, `source`, or `none` | `page,console,source` |
+| `reporter.selenium.pageMetrics` | `true`, `false` | `true` |
+| `reporter.selenium.trackScripts` | record `executeScript` calls as steps | `false` |
 
-See [Configuration](configuration.md) for details. Videos stored as `path`
-must be kept next to the report (copy the whole output directory). Video frames
-are captured from the same browser session; the adapter serializes them with
-your test's commands, and recording stops at 1 GB of frames per test.
+See [Configuration](configuration.md) for details. Video frames are captured from the same
+browser session; the adapter serializes them with your test's commands, and recording stops at
+1 GB of frames per test. Videos are encoded in the background after each test, so neither the
+next test nor `driver.quit()` waits for ffmpeg; the report waits for them when the suite ends.
+In the report, steps that happened during a recording get a "Play from here" button.
 
-The manual capture methods below remain available for anything `track(...)`
-doesn't cover, or for drivers you don't wrap.
+> **Note:** The adapter's stores are **static**, so any `SeleniumAdapter` instance you create in
+> test code shares data with the TestNG-registered listener — no singleton plumbing required.
 
-> **Note:** The adapter's artifact/metric stores are **static**, so any
-> `SeleniumAdapter` instance you create in test code shares data with the
-> TestNG-registered listener — no singleton plumbing required.
+#### Videos Stored Elsewhere (MinIO, S3, Selenium Grid)
 
-#### Screenshot Capture
-
-Take the screenshot with WebDriver's `TakesScreenshot`, save it to disk, then
-attach it with `captureBrowserScreenshot(testName, fileName, filePath, fileSize)`:
+To keep recordings out of the report folder, register an uploader. Each video PulseReport records is
+passed to it after encoding; the report plays the URL it returns, and the local file is deleted:
 
 ```java
-import org.openqa.selenium.OutputType;
-import org.openqa.selenium.TakesScreenshot;
-import java.io.File;
+SeleniumAdapter.setVideoUploader((video, testKey) -> {
+    String key = "runs/" + runId + "/" + video.getName();
+    minio.uploadObject(UploadObjectArgs.builder().bucket("videos").object(key)
+            .filename(video.getAbsolutePath()).contentType("video/mp4").build());
+    return "https://minio.example.com/videos/" + key;   // or a presigned URL
+});
+```
 
-@Listeners(SeleniumAdapter.class)
-public class WebTest {
-    private WebDriver driver;
-    private final SeleniumAdapter adapter = new SeleniumAdapter();
-    
-    @BeforeMethod
-    public void setup() {
-        driver = new ChromeDriver();
-    }
-    
-    @Test
-    public void testLogin() {
-        driver.get("https://example.com");
-        // Test logic...
-    }
-    
-    @AfterMethod(alwaysRun = true)
-    public void teardown(ITestResult result) {
-        // Capture a screenshot after each test (e.g. on failure)
-        if (!result.isSuccess()) {
-            File file = ((TakesScreenshot) driver)
-                .getScreenshotAs(OutputType.FILE);
-            adapter.captureBrowserScreenshot(
-                result.getMethod().getMethodName(),
-                "failure-screenshot.png",
-                file.getAbsolutePath(),
-                file.length());
-        }
-        driver.quit();
-    }
-}
+If the upload throws or returns nothing, the local file is kept and linked instead.
+
+Recordings made by something else (Selenium Grid, Selenoid, a cloud provider) can be attached by URL,
+as many per test as you like:
+
+```java
+adapter.attachVideo("https://minio.example.com/videos/run-42/login.mp4");
+adapter.attachVideo("Grid recording", gridVideoUrl, recordingStartedAt);  // start time lines steps up
+```
+
+Pass the recording's start time to get "Play from here" buttons on the steps it covers.
+`SeleniumTracker.attachVideo(...)` does the same without TestNG.
+
+#### Screenshots and Page Source
+
+```java
+adapter.screenshot("After login");    // from the tracked driver, attached to the current step or test
+adapter.capturePageSource();
 ```
 
 #### Browser and Console Logs
 
-Attach browser-level logs, JavaScript console output, or HAR network captures.
-Each is written to `<output>/artifacts/<type>/` and shown inline in the report
-when it is 1 MB or smaller (larger files are linked):
+Attach browser-level logs, JavaScript console output, or HAR network captures to the current
+step or test. Each is written to `<output>/artifacts/<type>/` and shown inline in the report
+when it is 1 MB or smaller (larger files are linked). HAR files are shown as a request table;
+error lines in logs are highlighted and counted in the test header:
 
 ```java
-adapter.captureBrowserLogs("testLogin", "browser.log", logContent);
-adapter.captureConsoleLogs("testLogin", "console.log", consoleContent);
-adapter.captureHarFile("testLogin", "network.har", harContent);
-```
-
-#### Page Load Metrics
-
-Record page timing metrics with `recordPageLoadTime`, `recordDomReadyTime`, and
-`recordNetworkTiming`:
-
-```java
-@Test
-public void testPageLoad() {
-    long start = System.currentTimeMillis();
-    driver.get("https://example.com");
-    long loadTime = System.currentTimeMillis() - start;
-    
-    adapter.recordPageLoadTime("testPageLoad", loadTime);
-    adapter.recordNetworkTiming("testPageLoad", "dns", dnsLookupMs);
-}
+adapter.captureBrowserLogs("browser.log", logContent);
+adapter.captureConsoleLogs("console.log", consoleContent);
+adapter.captureHarFile("network.har", harContent);
 ```
 
 #### Browser Information
 
-Record browser metadata for the run's environment section with
-`recordBrowserMetadata(browserName, browserVersion, platform)` — typically once
-per run, from the driver's capabilities:
-
-```java
-@BeforeSuite
-public void recordBrowserInfo() {
-    Capabilities caps = ((RemoteWebDriver) driver).getCapabilities();
-    adapter.recordBrowserMetadata(
-        caps.getBrowserName(),
-        caps.getBrowserVersion(),
-        System.getProperty("os.name"));
-}
-```
+Usually nothing to do: `track(...)` reads the browser from the driver's capabilities. To
+override what the report header shows, call `recordBrowserMetadata(browserName, browserVersion,
+platform)`; values given here win over detected ones.
 
 ### Example
 
@@ -990,6 +992,32 @@ public void setUp() {
 
 HTTP request/response artifacts captured by the REST-assured filter are automatically attached to the current BDD step. Sensitive headers (`Authorization`, `X-API-Key`, `Cookie`, `Set-Cookie`) are masked by default.
 
+### Combining with Selenium
+
+Track the driver with `SeleniumTracker` (no TestNG needed). Browser actions in a step
+definition become sub-steps of that Gherkin step, actions in `@Before`/`@After` hooks become
+"Setup"/"Teardown" steps, and a failing step gets the failed lookup, a screenshot and the page
+details:
+
+```java
+import io.github.pulsereport.adapters.selenium.SeleniumTracker;
+
+@Before
+public void openBrowser() {
+    driver = SeleniumTracker.track(new ChromeDriver());
+}
+
+@When("I log in as {string}")
+public void logIn(String user) {
+    driver.findElement(By.id("user")).sendKeys(user);
+    driver.findElement(By.id("login")).click();
+}
+```
+
+`SeleniumTracker.step(...)`, `waitFor(...)`, `screenshot(...)` and `capturePageSource()` work
+the same as on `SeleniumAdapter`. Video recording and the `last` screenshot mode need the TestNG
+`SeleniumAdapter`.
+
 ### Report Output
 
 On test run completion, the adapter generates:
@@ -1107,8 +1135,8 @@ Artifact video = captureFullVideo(); // Avoid unless necessary
 
 - **Selenium** — screenshots are automatic only for drivers wrapped with
   `adapter.track(driver)`, and only as `reporter.screenshots.mode` allows
-  (default: failures). For unwrapped drivers, call `captureBrowserScreenshot(...)`
-  (see [Screenshot Capture](#screenshot-capture)).
+  (default: failures). `adapter.screenshot(name)` takes one on demand
+  (see [Screenshots and Page Source](#screenshots-and-page-source)).
 - **Appium** — automatic failure capture requires registering the driver with
   `MobileDriverHolder.set(driver)` in setup (and `MobileDriverHolder.remove()`
   in teardown).

@@ -238,7 +238,7 @@ public void testWithScreenshot() {
 }
 ```
 
-> **Tip:** If you use the `SeleniumAdapter`, it does this for you — call `adapter.captureBrowserScreenshot(testName, fileName, filePath, fileSize)` instead of building the `Artifact` by hand. See the [Selenium Example](../examples/selenium-example/README.md).
+> **Tip:** If you use the `SeleniumAdapter`, it does this for you — wrap the driver with `adapter.track(driver)` and call `adapter.screenshot("name")` instead of building the `Artifact` by hand; failed tests get a screenshot automatically. See the [Selenium Example](../examples/selenium-example/README.md).
 
 ### Record Metrics
 

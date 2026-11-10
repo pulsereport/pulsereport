@@ -41,6 +41,9 @@ Rich, interactive HTML reports for human consumption.
 - **Keyboard navigation**: `↑`/`↓` move between tests, `f` toggles failures only, `/` focuses search.
 - **Readable failures**: Exception name and message first, with framework stack frames collapsed and a copy button for the full trace.
 - **BDD steps**: Cucumber scenarios show Given/When/Then steps with status, data tables, doc strings and per-step attachments.
+- **Sub-steps**: Steps made of smaller steps (a Selenium `step(...)` and its browser actions, Setup/Teardown steps, browser actions inside a Gherkin step) are listed under their parent, expanded when something inside failed.
+- **Video sync**: Steps that happened during a recording get a "Play from here" button, and the player's timeline marks each step.
+- **Browser evidence**: Failed browser tests show the page URL and title under the error; HAR files are listed as a request table; console errors are highlighted and counted in the test header.
 - **HTTP exchanges**: REST-assured requests and responses side by side, with status, headers and pretty-printed JSON bodies.
 - **Screenshots and recordings**: Embedded inline; click a screenshot to enlarge it.
 - **Light and dark themes**: Follows the operating system or browser theme, with a toggle in the top bar.
@@ -84,7 +87,7 @@ The report follows the operating system or browser theme. Picking the other them
 - **Top bar**: Report title, run metadata, theme toggle
 - **Verdict band**: Outcome headline, passed/skipped breakdown, run timeline
 - **Test list**: Tests grouped by suite or feature, with status filters and search
-- **Detail pane**: For the selected test, in order: failure, steps, HTTP exchanges, screenshots, recordings, attachments, then details (class, method, start time, duration, retries, metrics)
+- **Detail pane**: For the selected test, in order: failure, steps, HTTP exchanges, screenshots, recordings, attachments, metrics, then details (class, method, start time, duration, retries)
 
 ### Example
 
@@ -179,6 +182,8 @@ Key facts:
 - **`environment`** is a map of adapter-supplied key/value pairs; its contents vary by adapter.
 - **Indentation is always enabled** — there is no configuration to produce compact output.
 - Error messages, stack traces, artifact metadata, metrics, steps, tags, and retry counts are included whenever present.
+- A step may have `children` (sub-steps, same shape as a step). A test case may have `adapter` (e.g. `"Selenium"`, `"Cucumber"`), and a metric may have `label` (e.g. the URL of a `page.load.time`).
+- Artifact `path` values are either absolute or relative to the report's folder (e.g. `artifacts/screenshots/00012-failure.png`, `videos/LoginTest.login-1a2b.mp4`). A video's `timestamp` is the time of its first frame.
 
 ### Processing JSON Reports
 

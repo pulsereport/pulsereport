@@ -74,20 +74,32 @@ The masking keys are described in detail in [Sensitive Data Masking](#sensitive-
 
 `reporter.assertions.capture` (default `true`) controls automatic assertion capture in Cucumber steps. When it's on, every JUnit, TestNG and Hamcrest assertion that runs inside a step appears under that step in the report, whether it passed or failed. It can also be set as a system property (`-Dreporter.assertions.capture=false`), which takes precedence. See [Assertion Capture](adapters-guide.md#assertion-capture) for details.
 
-`reporter.video.storage` controls how video evidence (Appium, and Selenium drivers wrapped with `track(...)`) is stored: `path` (default), `embed`, or `url`. Selenium videos larger than 50 MB are linked instead of embedded.
+`reporter.video.storage` controls how video evidence (Appium, and Selenium drivers wrapped with `track(...)`) is stored: `path` (default), `embed`, or `url`. For Selenium, `url` means each recording is handed to the uploader registered with `SeleniumAdapter.setVideoUploader(...)` (for example MinIO or S3) and the report plays the returned URL; without an uploader it behaves like `path`. Selenium videos larger than 50 MB, or beyond 200 MB of embedded video in one run, are linked instead of embedded.
 
-For drivers wrapped with `SeleniumAdapter.track(...)`:
+Files in `reporter.screenshots.directory` and `reporter.video.directory` are linked from the report by a path relative to the report's folder, so keep the folders at the same place relative to the report (or move them together). The S3 publisher uploads only linked files that sit inside the report's folder.
+
+For drivers wrapped with `SeleniumAdapter.track(...)` or `SeleniumTracker.track(...)`:
 
 | Key | Values | Default |
 | --- | --- | --- |
-| `reporter.screenshots.mode` | `all` (every step), `failed` (failed steps and failed tests), `last` (last step of each test, plus failures), `none` | `failed` |
+| `reporter.screenshots.mode` | `all` (every top-level step), `failed` (failed steps and failed tests), `last` (last step of each test, plus failures), `none` | `failed` |
+| `reporter.screenshots.storage` | `embed` (Base64 inside the report, no files), `path` (files in `reporter.screenshots.directory`, shown from there) | `embed` |
+| `reporter.screenshots.directory` | Folder for screenshot files when `storage=path`; absolute, or relative to the working directory | `<output>/artifacts/screenshots` |
 | `reporter.video.mode` | `always`, `failed` (kept only for failed tests), `none` | `none` |
+| `reporter.video.directory` | Folder for recorded videos; absolute, or relative to the working directory | `<output>/videos` |
 | `reporter.video.fps` | Frames captured per second, 1–30 | `2` |
 | `reporter.video.ffmpegPath` | ffmpeg executable used to encode MP4 | `ffmpeg` |
+| `reporter.selenium.stepDetail` | `full` (element label, URL change, page load per action; up to two extra browser calls per action), `minimal` (no extra calls; elements named by locator) | `full` |
+| `reporter.selenium.maskInputs` | `sensitive` (password, one-time-code, card and sensitive-looking fields, plus credentials and sensitive parameters in URLs), `all`, `none`. `reporter.maskSensitiveData=false` turns it off | `sensitive` |
+| `reporter.selenium.failureCapture` | Comma list of `page` (URL, title, window size), `console` (browser console, Chromium-based browsers), `source` (page source), or `none` | `page,console,source` |
+| `reporter.selenium.pageMetrics` | Record `page.load.time` and `page.ttfb` for each navigation | `true` |
+| `reporter.selenium.trackScripts` | Record `executeScript` calls as steps | `false` |
 
-Videos are written to `<output directory>/videos/` and need [ffmpeg](https://ffmpeg.org) with libx264; if ffmpeg is missing, a warning is logged and tests run without video. All four keys can also be passed as `-D` system properties.
+Field names in `reporter.maskBody.fields` are also treated as sensitive input fields and URL parameters.
 
-Size limits: screenshots over 10 MB, or beyond 200 MB of screenshots in one report, are not embedded in the HTML (the report links their file path instead). A single test records at most 1 GB of video frames, and encoding is abandoned after 3 minutes.
+Screenshots are embedded in the report by default (`reporter.screenshots.storage=embed`); logs and page sources are written to `<output directory>/artifacts/`, and videos to `reporter.video.directory`; the report refers to files by relative path. Videos need [ffmpeg](https://ffmpeg.org) with libx264; if ffmpeg is missing, a warning is logged and tests run without video. Every key can also be passed as a `-D` system property.
+
+Size limits: screenshots over 10 MB, or beyond 200 MB of screenshots in one report, are not embedded in the HTML (the report links their file instead). A single test records at most 1 GB of video frames, and encoding is abandoned after 3 minutes. Encoding runs in the background; the report waits up to 4 minutes per video when the suite ends.
 
 Other property examples in this document preserve the current PulseReport naming, but they are not all mapped by `ReporterConfig` yet.
 
@@ -150,34 +162,16 @@ reporter.testng.captureConfigMethods=false
 ### Selenium Adapter
 
 ```properties
-# Enable Selenium adapter
-reporter.selenium.enabled=true
-
-# Screenshot settings
-reporter.selenium.screenshot.enabled=true
-reporter.selenium.screenshot.onSuccess=true
-reporter.selenium.screenshot.onFailure=true
-reporter.selenium.screenshot.onSkip=false
-reporter.selenium.screenshot.format=png
-# Options: png, jpg
-
-# Screenshot quality (for jpg)
-reporter.selenium.screenshot.quality=90
-# Range: 1-100
-
-# Screenshot compression
-reporter.selenium.screenshot.compress=true
-reporter.selenium.screenshot.maxWidth=1920
-reporter.selenium.screenshot.maxHeight=1080
-
-# Page metrics
-reporter.selenium.metrics.pageLoad=true
-reporter.selenium.metrics.domReady=true
-reporter.selenium.metrics.firstContentfulPaint=true
-
-# Browser info capture
-reporter.selenium.captureBrowserInfo=true
+reporter.screenshots.mode=failed
+reporter.video.mode=failed
+reporter.selenium.stepDetail=full
+reporter.selenium.maskInputs=sensitive
+reporter.selenium.failureCapture=page,console,source
+reporter.selenium.pageMetrics=true
+reporter.selenium.trackScripts=false
 ```
+
+See the [Selenium key table](#properties-loaded-by-reporterconfig) above for the values.
 
 ### Appium Adapter
 
@@ -231,11 +225,31 @@ The REST-assured adapter masks credentials, tokens, and other sensitive values i
 ### Master Switch
 
 ```properties
-# Gates ALL masking (headers, bodies, XML, tokens). Default: true
+# Gates ALL masking (headers, bodies, XML, tokens, Selenium input and URLs). Default: true
 reporter.maskSensitiveData=true
 ```
 
 When `reporter.maskSensitiveData=false`, no masking of any kind is applied, regardless of the per-category toggles below.
+
+### Selenium Input and URL Masking
+
+```properties
+# sensitive (default) | all | none
+reporter.selenium.maskInputs=sensitive
+```
+
+For drivers wrapped with `track(...)`:
+
+- `sensitive` hides typed text in password, one-time-code (`autocomplete="one-time-code"`) and
+  card fields, and in fields whose name, id or label contains `password`, `token`, `secret`,
+  `otp`, `pin`, `cvv`, `ssn`, `card number`, `iban`, `api key`, `auth`, or any name listed in
+  `reporter.maskBody.fields`. It also hides credentials (`https://user:pass@…`) and the values of
+  sensitive URL parameters (`token`, `code`, `access_token`, `session`, `signature`, …) in step
+  names, URL changes, metric labels and page details.
+- `all` hides every typed text (and keys sent with `Actions` or to alerts), plus the URL masking above.
+- `none` shows everything.
+
+Typed text is shown as `••••••`; masked URL parts as `***`.
 
 ### Header Masking
 

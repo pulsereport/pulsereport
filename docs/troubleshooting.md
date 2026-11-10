@@ -166,12 +166,8 @@ Wrap the driver, and use `reporter.screenshots.mode=all` if you want a screensho
 driver = adapter.track(new ChromeDriver());
 ```
 
-For a driver you don't wrap, attach screenshots yourself:
-
-```java
-File file = ((TakesScreenshot) driver).getScreenshotAs(OutputType.FILE);
-adapter.captureBrowserScreenshot(testName, "page.png", file.getAbsolutePath(), file.length());
-```
+Then take extra screenshots on demand with `adapter.screenshot("page")`. Screenshots come from
+the tracked driver, so wrap every driver you want evidence from.
 
 **Check WebDriver is TakesScreenshot**:
 
@@ -411,7 +407,7 @@ ls -lh target/pulsereport/
 try {
     // test logic
 } catch (AssertionError | RuntimeException e) {
-    adapter.captureBrowserScreenshot(); // capture only when failing
+    adapter.screenshot("failure"); // capture only when failing (tracked drivers do this automatically)
     throw e;
 }
 ```
