@@ -44,6 +44,7 @@ public class ReporterConfig {
     private int videoFps;
     private String ffmpegPath;
     private boolean assertionCapture;
+    private Properties rawProperties = new Properties();
 
     /**
      * Private constructor - use builder or load methods.
@@ -165,6 +166,30 @@ public class ReporterConfig {
     }
 
     /**
+     * Resolves any setting by key: the {@code -D} system property first, then
+     * an auto-detected {@code reporter.properties}, then the default. Never throws.
+     *
+     * @param key the property key
+     * @param defaultValue returned when the key is set nowhere
+     * @return the trimmed value, or {@code defaultValue}
+     */
+    public static String resolveProperty(String key, String defaultValue) {
+        String sysProp = System.getProperty(key);
+        if (sysProp != null && !sysProp.isBlank()) {
+            return sysProp.trim();
+        }
+        try {
+            ReporterConfig config = autoDetect();
+            if (config != null) {
+                return config.getProperty(key, defaultValue);
+            }
+        } catch (RuntimeException e) {
+            // fall through to default
+        }
+        return defaultValue;
+    }
+
+    /**
      * Resolves the HTML report title: the {@code reporter.report.title} system
      * property first, then the same key in an auto-detected
      * {@code reporter.properties}. Never throws.
@@ -192,6 +217,8 @@ public class ReporterConfig {
      */
     public static ReporterConfig loadFromProperties(Properties props) {
         ReporterConfig config = new ReporterConfig();
+        config.rawProperties = new Properties();
+        config.rawProperties.putAll(props);
 
         String formats = interpolate(props.getProperty("reporter.output.formats", ""));
         if (!formats.isEmpty()) {
@@ -481,6 +508,24 @@ public class ReporterConfig {
      */
     public int getVideoFps() {
         return videoFps;
+    }
+
+    /**
+     * Reads any setting by key: the {@code -D} system property first, then the
+     * loaded properties file (with {@code ${ENV}} interpolation), then the
+     * default. Used for adapter-specific settings such as
+     * {@code reporter.selenium.*}.
+     *
+     * @param key the property key
+     * @param defaultValue returned when the key is set nowhere
+     * @return the trimmed value, or {@code defaultValue}
+     */
+    public String getProperty(String key, String defaultValue) {
+        String value = System.getProperty(key);
+        if (value == null) {
+            value = interpolate(rawProperties.getProperty(key));
+        }
+        return value == null || value.isBlank() ? defaultValue : value.trim();
     }
 
     /**
