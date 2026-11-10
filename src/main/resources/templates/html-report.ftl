@@ -1773,18 +1773,24 @@
             border-radius: var(--radius);
         }
 
-        /* Drawn on the frame, not the image, so it stays put while screenshots slide */
-        .car-frame::after {
-            content: '';
-            position: absolute;
-            inset: 0;
+        /* The outline is its own layer over the frame's cell, painted after the image and outside the
+           frame's clip. The browser rounds the image and a border to device pixels separately, so at some
+           zoom levels and scroll positions an image would cover its own bottom edge (invisible on light
+           screenshots, a missing edge on dark ones). Not on the image either, so it stays put while
+           screenshots slide. */
+        .car-edge {
+            position: relative;
+            z-index: 1;
+            grid-row: 1;
+            grid-column: 2;
+            align-self: stretch;
             border: 1px solid var(--shot-edge);
-            border-radius: inherit;
+            border-radius: var(--radius);
             pointer-events: none;
         }
 
-        .is-expanded .car-frame::after {
-            border-color: rgb(255 255 255 / 0.22);
+        .is-expanded .car-edge {
+            border-color: rgb(255 255 255 / 0.3);
         }
 
         .car-ghost {
@@ -1911,9 +1917,19 @@
             min-width: 40px;
             max-width: 240px;
             object-fit: contain;
-            border: 1px solid var(--border);
+            /* Keeps the space; the visible edge is drawn over the image by ::after, like the frame's */
+            border: 1px solid transparent;
             border-radius: var(--radius);
             background: var(--sunken);
+        }
+
+        .car-thumb::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            pointer-events: none;
         }
 
         .car-thumb:hover,
@@ -1921,7 +1937,7 @@
             opacity: 1;
         }
 
-        .car-thumb[aria-current] img {
+        .car-thumb[aria-current]::after {
             border-color: var(--accent);
             box-shadow: 0 0 0 1px var(--accent);
         }
@@ -1969,7 +1985,7 @@
             min-width: 0;
         }
 
-        .car-thumb.is-fail img {
+        .car-thumb.is-fail::after {
             border-color: var(--fail);
             box-shadow: 0 0 0 1px var(--fail);
         }
@@ -1995,7 +2011,7 @@
             background: var(--fail);
         }
 
-        .car-thumb.is-fail[aria-current] img {
+        .car-thumb.is-fail[aria-current]::after {
             box-shadow: 0 0 0 2px var(--fail);
         }
 
@@ -2093,12 +2109,15 @@
             scale: 0.9;
         }
 
+        /* Positioned with its own background so the video can never paint over the controls */
         .pl-bar {
+            position: relative;
             display: flex;
             align-items: center;
             gap: 8px;
             padding: 6px 8px;
             border-top: 1px solid var(--border);
+            background: var(--raised);
         }
 
         .pl-btn {
@@ -2289,9 +2308,19 @@
             border-radius: 0;
         }
 
+        /* Pinned to the screen area: sized by its own aspect ratio, a recording of a whole browser
+           window comes out taller than the space above the controls and pushes over them */
+        .player:fullscreen .pl-screen {
+            overflow: hidden;
+        }
+
         .player:fullscreen video {
+            position: absolute;
+            inset: 0;
+            width: 100%;
             height: 100%;
             max-height: none;
+            object-fit: contain;
         }
 
         .files {
@@ -2629,21 +2658,25 @@
         }
 
         .is-expanded .car-thumb img {
-            border-color: rgb(255 255 255 / 0.16);
             background: rgb(255 255 255 / 0.06);
         }
 
-        .is-expanded .car-thumb[aria-current] img {
+        /* Unselected thumbnails are faded to 60%, so the edge starts brighter than the frame's */
+        .is-expanded .car-thumb::after {
+            border-color: rgb(255 255 255 / 0.3);
+        }
+
+        .is-expanded .car-thumb[aria-current]::after {
             border-color: #5cc8ca;
             box-shadow: 0 0 0 1px #5cc8ca;
         }
 
-        .is-expanded .car-thumb.is-fail img {
+        .is-expanded .car-thumb.is-fail::after {
             border-color: #f07171;
             box-shadow: 0 0 0 1px #f07171;
         }
 
-        .is-expanded .car-thumb.is-fail[aria-current] img {
+        .is-expanded .car-thumb.is-fail[aria-current]::after {
             box-shadow: 0 0 0 2px #f07171;
         }
 
@@ -2695,7 +2728,7 @@
             }
 
             .car-thumb,
-            .car-thumb img {
+            .car-thumb::after {
                 transition:
                     opacity 150ms,
                     border-color 150ms,
@@ -4768,7 +4801,8 @@
                 const close = expanded ? sideBtn('close', 'Close', 'close', closeLightbox) : null;
                 const zoomBadge = expanded ? h('span', { class: 'car-zoom', 'aria-hidden': 'true' }) : null;
                 const frame = h('div', { class: 'car-frame' }, view, zoomBadge);
-                const stage = h('div', { class: 'car-stage' }, prev, frame, next);
+                const edge = h('span', { class: 'car-edge', 'aria-hidden': 'true' });
+                const stage = h('div', { class: 'car-stage' }, prev, frame, edge, next);
 
                 const count = h('span', { class: 'car-count' });
                 const fail = h('span', { class: 'shot-fail', hidden: true }, 'Failure');
