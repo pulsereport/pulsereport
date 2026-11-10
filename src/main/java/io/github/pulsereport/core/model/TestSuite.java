@@ -183,6 +183,18 @@ public final class TestSuite {
     }
 
     /**
+     * Creates a builder pre-filled with this suite's values.
+     *
+     * @return a new builder
+     */
+    public Builder toBuilder() {
+        return new Builder().id(id).name(name).secondaryText(secondaryText).startTime(startTime)
+                .endTime(endTime).duration(duration).status(status).testCases(testCases)
+                .totalTests(totalTests).passedTests(passedTests).failedTests(failedTests)
+                .skippedTests(skippedTests).tags(tags);
+    }
+
+    /**
      * Creates a new builder for TestSuite.
      *
      * @return a new builder instance

@@ -161,6 +161,19 @@ public final class TestRun {
     }
 
     /**
+     * Creates a builder pre-filled with this run's values, so callers can change
+     * one field without copying (and silently dropping) the others.
+     *
+     * @return a new builder
+     */
+    public Builder toBuilder() {
+        return new Builder().id(id).name(name).startTime(startTime).endTime(endTime)
+                .duration(duration).status(status).suites(suites).environment(environment)
+                .totalTests(totalTests).passedTests(passedTests).failedTests(failedTests)
+                .skippedTests(skippedTests);
+    }
+
+    /**
      * Creates a new builder for TestRun.
      * @return a new builder instance
      */

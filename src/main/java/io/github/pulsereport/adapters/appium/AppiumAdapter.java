@@ -527,20 +527,7 @@ public class AppiumAdapter extends TestNGAdapter {
         }
         mergedEnvironment.putAll(metadata);
 
-        return TestRun.builder()
-                .id(builtTestRun.getId())
-                .name(builtTestRun.getName())
-                .startTime(builtTestRun.getStartTime())
-                .endTime(builtTestRun.getEndTime())
-                .duration(builtTestRun.getDuration())
-                .status(builtTestRun.getStatus())
-                .suites(builtTestRun.getSuites())
-                .environment(mergedEnvironment)
-                .totalTests(builtTestRun.getTotalTests())
-                .passedTests(builtTestRun.getPassedTests())
-                .failedTests(builtTestRun.getFailedTests())
-                .skippedTests(builtTestRun.getSkippedTests())
-                .build();
+        return builtTestRun.toBuilder().environment(mergedEnvironment).build();
     }
 
     /**

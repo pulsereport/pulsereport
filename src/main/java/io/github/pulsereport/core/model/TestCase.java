@@ -39,6 +39,7 @@ public final class TestCase {
     private final String featureDescription;
     private final List<TestStep> backgroundSteps;
     private final List<String> tags;
+    private final String adapter;
 
     @JsonCreator
     private TestCase(
@@ -60,7 +61,8 @@ public final class TestCase {
             @JsonProperty("featureName") String featureName,
             @JsonProperty("featureDescription") String featureDescription,
             @JsonProperty("backgroundSteps") List<TestStep> backgroundSteps,
-            @JsonProperty("tags") List<String> tags) {
+            @JsonProperty("tags") List<String> tags,
+            @JsonProperty("adapter") String adapter) {
         this.id = id;
         this.name = name;
         this.className = className;
@@ -80,6 +82,7 @@ public final class TestCase {
         this.featureDescription = featureDescription;
         this.backgroundSteps = backgroundSteps != null ? new ArrayList<>(backgroundSteps) : new ArrayList<>();
         this.tags = tags != null ? new ArrayList<>(tags) : new ArrayList<>();
+        this.adapter = adapter;
     }
 
     /**
@@ -263,6 +266,29 @@ public final class TestCase {
     }
 
     /**
+     * Gets the adapter that recorded this test (e.g. "Selenium", "Cucumber").
+     *
+     * @return the adapter name, or null when the recording adapter did not say
+     */
+    public String getAdapter() {
+        return adapter;
+    }
+
+    /**
+     * Creates a builder pre-filled with this test case's values.
+     *
+     * @return a new builder
+     */
+    public Builder toBuilder() {
+        return new Builder().id(id).name(name).className(className).methodName(methodName)
+                .startTime(startTime).endTime(endTime).duration(duration).status(status)
+                .errorMessage(errorMessage).stackTrace(stackTrace).steps(steps).artifacts(artifacts)
+                .metrics(metrics).retryCount(retryCount).bddType(bddType).featureName(featureName)
+                .featureDescription(featureDescription).backgroundSteps(backgroundSteps).tags(tags)
+                .adapter(adapter);
+    }
+
+    /**
      * Compares this TestCase to another object for equality.
      *
      * @param o the object to compare with
@@ -295,7 +321,8 @@ public final class TestCase {
                 && Objects.equals(featureName, testCase.featureName)
                 && Objects.equals(featureDescription, testCase.featureDescription)
                 && Objects.equals(backgroundSteps, testCase.backgroundSteps)
-                && Objects.equals(tags, testCase.tags);
+                && Objects.equals(tags, testCase.tags)
+                && Objects.equals(adapter, testCase.adapter);
     }
 
     /**
@@ -307,7 +334,7 @@ public final class TestCase {
     public int hashCode() {
         return Objects.hash(id, name, className, methodName, startTime, endTime,
                 duration, status, errorMessage, stackTrace, steps, artifacts, metrics, retryCount,
-                bddType, featureName, featureDescription, backgroundSteps, tags);
+                bddType, featureName, featureDescription, backgroundSteps, tags, adapter);
     }
 
     /**
@@ -360,8 +387,20 @@ public final class TestCase {
         private String featureDescription;
         private List<TestStep> backgroundSteps;
         private List<String> tags;
+        private String adapter;
 
         private Builder() {
+        }
+
+        /**
+         * Sets the adapter that recorded this test.
+         *
+         * @param adapter the adapter name (optional)
+         * @return this builder
+         */
+        public Builder adapter(String adapter) {
+            this.adapter = adapter;
+            return this;
         }
 
         /**
@@ -592,7 +631,7 @@ public final class TestCase {
             }
             return new TestCase(id, name, className, methodName, startTime, endTime,
                     duration, status, errorMessage, stackTrace, steps, artifacts, metrics, retryCount,
-                    bddType, featureName, featureDescription, backgroundSteps, tags);
+                    bddType, featureName, featureDescription, backgroundSteps, tags, adapter);
         }
     }
 }

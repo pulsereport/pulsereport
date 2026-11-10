@@ -34,6 +34,7 @@ public final class TestStep {
     private final String stackTrace;
     private final List<Artifact> artifacts;
     private final List<AssertionResult> assertions;
+    private final List<TestStep> children;
 
     @JsonCreator
     private TestStep(
@@ -49,7 +50,8 @@ public final class TestStep {
             @JsonProperty("errorMessage") String errorMessage,
             @JsonProperty("stackTrace") String stackTrace,
             @JsonProperty("artifacts") List<Artifact> artifacts,
-            @JsonProperty("assertions") List<AssertionResult> assertions) {
+            @JsonProperty("assertions") List<AssertionResult> assertions,
+            @JsonProperty("children") List<TestStep> children) {
         this.name = name;
         this.status = status;
         this.startTime = startTime;
@@ -63,6 +65,7 @@ public final class TestStep {
         this.stackTrace = stackTrace;
         this.artifacts = artifacts != null ? new ArrayList<>(artifacts) : new ArrayList<>();
         this.assertions = assertions != null ? new ArrayList<>(assertions) : new ArrayList<>();
+        this.children = children != null ? new ArrayList<>(children) : new ArrayList<>();
     }
 
     /**
@@ -171,6 +174,27 @@ public final class TestStep {
     }
 
     /**
+     * Gets the sub-steps this step is made of (e.g. the browser actions inside
+     * a named Selenium step), in execution order.
+     * @return an unmodifiable list of sub-steps (empty when the step has none)
+     */
+    @JsonInclude(JsonInclude.Include.NON_EMPTY)
+    public List<TestStep> getChildren() {
+        return Collections.unmodifiableList(children);
+    }
+
+    /**
+     * Creates a builder pre-filled with this step's values.
+     * @return a new builder
+     */
+    public Builder toBuilder() {
+        return new Builder().name(name).status(status).startTime(startTime).endTime(endTime)
+                .duration(duration).description(description).keyword(keyword).docString(docString)
+                .dataTable(dataTable).errorMessage(errorMessage).stackTrace(stackTrace)
+                .artifacts(artifacts).assertions(assertions).children(children);
+    }
+
+    /**
      * Creates a new builder for TestStep.
      * @return a new builder instance
      */
@@ -200,7 +224,8 @@ public final class TestStep {
                 Objects.equals(errorMessage, testStep.errorMessage) &&
                 Objects.equals(stackTrace, testStep.stackTrace) &&
                 Objects.equals(artifacts, testStep.artifacts) &&
-                Objects.equals(assertions, testStep.assertions);
+                Objects.equals(assertions, testStep.assertions) &&
+                Objects.equals(children, testStep.children);
     }
 
     /**
@@ -210,7 +235,7 @@ public final class TestStep {
     @Override
     public int hashCode() {
         return Objects.hash(name, status, startTime, endTime, duration, description,
-                keyword, docString, dataTable, errorMessage, stackTrace, artifacts, assertions);
+                keyword, docString, dataTable, errorMessage, stackTrace, artifacts, assertions, children);
     }
 
     /**
@@ -248,6 +273,7 @@ public final class TestStep {
         private String stackTrace;
         private List<Artifact> artifacts;
         private List<AssertionResult> assertions;
+        private List<TestStep> children;
 
         private Builder() {
         }
@@ -383,6 +409,16 @@ public final class TestStep {
         }
 
         /**
+         * Sets the sub-steps this step is made of.
+         * @param children the sub-steps (optional)
+         * @return this builder
+         */
+        public Builder children(List<TestStep> children) {
+            this.children = children;
+            return this;
+        }
+
+        /**
          * Builds the TestStep instance.
          * @return a new TestStep
          * @throws IllegalArgumentException if required fields are missing
@@ -395,7 +431,7 @@ public final class TestStep {
                 throw new IllegalArgumentException("status is required");
             }
             return new TestStep(name, status, startTime, endTime, duration, description,
-                    keyword, docString, dataTable, errorMessage, stackTrace, artifacts, assertions);
+                    keyword, docString, dataTable, errorMessage, stackTrace, artifacts, assertions, children);
         }
     }
 }
