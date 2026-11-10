@@ -2,512 +2,253 @@ package io.github.pulsereport.adapters.selenium;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.PrintWriter;
-import java.io.StringWriter;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.time.Duration;
 import java.time.Instant;
-import java.util.ArrayDeque;
-import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Collections;
-import java.util.Deque;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.concurrent.locks.ReentrantLock;
+import java.util.Set;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
-import org.openqa.selenium.OutputType;
 import org.openqa.selenium.TakesScreenshot;
 import org.openqa.selenium.WebDriver;
-import org.openqa.selenium.remote.RemoteWebDriver;
-import org.openqa.selenium.support.events.EventFiringDecorator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.testng.ISuite;
 import org.testng.ITestResult;
 
+import io.github.pulsereport.adapters.CaptureBridge;
 import io.github.pulsereport.adapters.testng.TestNGAdapter;
 import io.github.pulsereport.config.ReporterConfig;
 import io.github.pulsereport.core.model.Artifact;
-import io.github.pulsereport.core.model.Metric;
 import io.github.pulsereport.core.model.TestRun;
-import io.github.pulsereport.core.model.TestStatus;
-import io.github.pulsereport.core.model.TestStep;
 
 /**
- * Selenium WebDriver adapter for web test automation.
+ * TestNG listener for Selenium WebDriver tests: records browser actions as
+ * report steps, takes screenshots and video, and adds browser evidence to
+ * failed tests.
  *
- * <p>
- * This adapter extends {@link TestNGAdapter} to provide Selenium-specific
- * functionality for capturing browser screenshots, console logs, network data,
- * and web performance metrics.</p>
- *
- * <h2>Features</h2>
- * <ul>
- * <li>Captures browser screenshots during test execution</li>
- * <li>Captures browser logs and JavaScript console output</li>
- * <li>Captures network traffic via HAR (HTTP Archive) files</li>
- * <li>Records web performance metrics (page load time, DOM ready, network
- * timing)</li>
- * <li>Thread-safe for parallel browser test execution</li>
- * <li>Integrates seamlessly with TestNG</li>
- * </ul>
- *
- * <h2>Usage Example</h2>
+ * <h2>Setup</h2>
  * <pre>{@code
- * public class WebTest {
- *     private static SeleniumAdapter adapter = new SeleniumAdapter();
+ * @Listeners(SeleniumAdapter.class)
+ * public class LoginTest {
+ *     private final SeleniumAdapter adapter = new SeleniumAdapter();
  *     private WebDriver driver;
  *
  *     @BeforeMethod
  *     public void setUp() {
- *         driver = new ChromeDriver();
+ *         driver = adapter.track(new ChromeDriver());   // every click/type/open becomes a step
+ *         driver.get("https://example.com/login");      // recorded as the test's "Setup" step
  *     }
  *
  *     @Test
- *     public void testWebApp() {
- *         long startTime = System.currentTimeMillis();
+ *     public void login() {
+ *         adapter.step("Log in", () -> {                // one step, the actions as its sub-steps
+ *             driver.findElement(By.id("user")).sendKeys("demo");
+ *             driver.findElement(By.id("password")).sendKeys(secret);   // shown as ••••••
+ *             driver.findElement(By.id("login")).click();
+ *         });
+ *         adapter.waitFor("dashboard", Duration.ofSeconds(10),
+ *                 ExpectedConditions.visibilityOfElementLocated(By.id("dashboard")));
+ *         adapter.screenshot("Dashboard");
+ *     }
  *
- *         // Load page and record load time
- *         driver.get("https://example.com");
- *         long pageLoadTime = System.currentTimeMillis() - startTime;
- *         adapter.recordPageLoadTime("testWebApp", pageLoadTime);
- *
- *         // Capture screenshot
- *         File screenshot = ((TakesScreenshot) driver).getScreenshotAs(OutputType.FILE);
- *         adapter.captureBrowserScreenshot("testWebApp", "homepage.png",
- *                                           screenshot.getAbsolutePath(), screenshot.length());
- *
- *         // Capture browser logs
- *         LogEntries logs = driver.manage().logs().get(LogType.BROWSER);
- *         StringBuilder logContent = new StringBuilder();
- *         for (LogEntry entry : logs) {
- *             logContent.append(entry.toString()).append("\n");
- *         }
- *         adapter.captureBrowserLogs("testWebApp", "browser.log", logContent.toString());
- *
- *         // Capture console logs
- *         JavascriptExecutor js = (JavascriptExecutor) driver;
- *         List<String> consoleLogs = (List<String>) js.executeScript(
- *             "return window.console.logs || []");
- *         adapter.captureConsoleLogs("testWebApp", "console.log", String.join("\n", consoleLogs));
- *
- *         // Record network timing
- *         Map<String, Long> timing = (Map<String, Long>) js.executeScript(
- *             "return {dns: performance.timing.domainLookupEnd - performance.timing.domainLookupStart}");
- *         adapter.recordNetworkTiming("testWebApp", "dns", timing.get("dns").doubleValue());
+ *     @AfterMethod(alwaysRun = true)
+ *     public void tearDown() {
+ *         driver.quit();
  *     }
  * }
  * }</pre>
  *
- * <h2>Steps</h2>
- * <pre>{@code
- * driver = adapter.track(new ChromeDriver());   // every click/type/open becomes a step
- *
- * adapter.step("Log in", () -> {               // groups actions under one named step
- *     driver.findElement(By.id("user")).sendKeys("demo");
- *     driver.findElement(By.id("login")).click();
- * });
- * }</pre>
+ * <h2>What is recorded</h2>
+ * <ul>
+ * <li>Clicks, typing (masked for password, one-time-code, card and other
+ * sensitive fields), clearing, submitting, navigation, frame/window/alert
+ * switches, {@code Actions} gestures and closed windows, each with its
+ * element, locator, URL change and duration</li>
+ * <li>Actions in {@code @BeforeMethod}/{@code @AfterMethod} (and class/suite
+ * configuration methods), as "Setup" and "Teardown" steps of the test</li>
+ * <li>Page load time of each navigation, as {@code page.load.time} and
+ * {@code page.ttfb} metrics labelled with the URL</li>
+ * <li>On failure: the element lookup or wait that failed, a screenshot, the
+ * page URL and title, browser console errors and the page source</li>
+ * <li>The browser, version and platform (from the driver's capabilities), as
+ * run metadata and as a tag on each test</li>
+ * <li>Optional video of each test (needs ffmpeg), encoded in the background
+ * after the test</li>
+ * </ul>
  * <p>
- * Steps pass unless the action throws; failures record the error, stack trace
- * and a screenshot, then rethrow.</p>
+ * Screenshots, logs and videos are written under the report folder
+ * ({@code reporter.output.directory}), so copy or publish that folder as a
+ * whole. The same tracking works without TestNG through
+ * {@link SeleniumTracker}, e.g. in Cucumber step definitions.</p>
  *
- * <h2>Screenshots and video</h2>
+ * <h2>Settings</h2>
  * <pre>
- * reporter.screenshots.mode=failed   # all | failed | last | none
- * reporter.video.mode=none           # always | failed | none (requires ffmpeg)
+ * reporter.screenshots.mode=failed               # all | failed | last | none
+ * reporter.video.mode=none                       # always | failed | none (requires ffmpeg)
  * reporter.video.fps=2
  * reporter.video.ffmpegPath=ffmpeg
+ * reporter.video.storage=path                    # path | embed
+ * reporter.selenium.stepDetail=full              # full | minimal
+ * reporter.selenium.maskInputs=sensitive         # sensitive | all | none
+ * reporter.selenium.failureCapture=page,console,source
+ * reporter.selenium.pageMetrics=true
+ * reporter.selenium.trackScripts=false
  * </pre>
  * <p>
- * Set in {@code reporter.properties} or as {@code -D} system properties.</p>
+ * Set them in {@code reporter.properties} or as {@code -D} system properties.</p>
  *
- * <h2>Integration with Selenium</h2>
+ * <h2>Thread safety</h2>
  * <p>
- * This adapter works with any WebDriver implementation (ChromeDriver,
- * FirefoxDriver, etc.) and can be used to capture browser-specific artifacts
- * and metrics. The adapter doesn't directly depend on WebDriver instances -
- * instead, test code should extract the relevant data and pass it to the
- * adapter methods.</p>
- *
- * <h2>Thread Safety</h2>
- * <p>
- * This adapter inherits thread-safety from {@link TestNGAdapter}, making it
- * safe to use with parallel browser test execution. Each thread maintains its
- * own test context to prevent artifact/metric collisions.</p>
+ * Tracked drivers, open steps and captures are per thread, and the stores are
+ * shared by all adapter instances, so parallel tests and adapter instances
+ * created in test code work without extra plumbing.</p>
  *
  * @author Pulse Report Team
  * @since 1.0.0
+ * @see SeleniumTracker
  * @see TestNGAdapter
  */
 public class SeleniumAdapter extends TestNGAdapter {
 
     private static final Logger logger = LoggerFactory.getLogger(SeleniumAdapter.class);
 
-    private static final Map<String, String> runBrowserMetadata = Collections.synchronizedMap(new LinkedHashMap<>());
-
-    private static final ThreadLocal<WebDriver> trackedDriver = new ThreadLocal<>();
-    // Serializes the test's commands and the video recorder's screenshots on one browser session
-    private static final ThreadLocal<ReentrantLock> driverLock = new ThreadLocal<>();
-    private static final ThreadLocal<Deque<StepScope>> openSteps = ThreadLocal.withInitial(ArrayDeque::new);
-    private static final List<String> STEP_TABLE_HEADER = List.of("Action", "Details", "Status", "Duration");
-    private static final ThreadLocal<TestCapture> testCapture = new ThreadLocal<>();
-    private static volatile CaptureSettings captureSettings;
-
     static final long MAX_EMBEDDED_VIDEO_BYTES = 50L * 1024 * 1024;
-    static final int MAX_INLINE_TEXT_BYTES = 1024 * 1024;
+    static final long MAX_EMBEDDED_VIDEO_TOTAL_BYTES = 200L * 1024 * 1024;
+    static final int MAX_INLINE_TEXT_BYTES = SeleniumTracker.MAX_INLINE_TEXT_BYTES;
+    private static final long VIDEO_WAIT_SECONDS = 240;
 
-    private static final String MODE_ALL = "all";
-    private static final String MODE_FAILED = "failed";
-    private static final String MODE_LAST = "last";
-    private static final String MODE_NONE = "none";
-    private static final String MODE_ALWAYS = "always";
+    private static final String VIDEO_ALWAYS = "always";
+
+    private static final Map<String, String> runBrowserMetadata = Collections.synchronizedMap(new LinkedHashMap<>());
+    private static final ThreadLocal<TestCapture> testCapture = new ThreadLocal<>();
+    private static final List<PendingVideo> pendingVideos = new CopyOnWriteArrayList<>();
+    private static final AtomicLong embedBudget = new AtomicLong(MAX_EMBEDDED_VIDEO_TOTAL_BYTES);
+    private static volatile VideoSettings videoSettings;
+    private static volatile ExecutorService encoder;
+    private static volatile VideoUploader videoUploader;
+
+    static {
+        SeleniumTracker.setHooks(new AdapterHooks());
+    }
 
     /** A step body with no return value. */
     @FunctionalInterface
-    public interface StepAction {
-        void run() throws Exception;
+    public interface StepAction extends SeleniumTracker.StepAction {
     }
 
-    /** A step body that returns a value (e.g. a located element). */
+    /**
+     * A step body that returns a value (e.g. a located element).
+     *
+     * @param <T> the result type
+     */
     @FunctionalInterface
-    public interface StepSupplier<T> {
-        T get() throws Exception;
+    public interface StepSupplier<T> extends SeleniumTracker.StepSupplier<T> {
     }
 
-    private static final class StepScope {
-        final List<List<String>> rows = new ArrayList<>();
-        String firstName;
-        String firstDetail;
-
-        void add(String name, String detail, Throwable failure, long durationMs) {
-            if (rows.isEmpty()) {
-                firstName = name;
-                firstDetail = detail;
-            }
-            rows.add(List.of(name, detail == null ? "" : detail,
-                    failure == null ? "PASSED" : "FAILED", formatDuration(durationMs)));
-        }
+    /**
+     * Uploads a recorded video somewhere the report can play it from (MinIO,
+     * S3, a CDN, ...) and returns its URL. Register one with
+     * {@link #setVideoUploader(VideoUploader)}.
+     */
+    @FunctionalInterface
+    public interface VideoUploader {
+        /**
+         * @param video the encoded MP4, deleted after a successful upload
+         * @param testKey the test's unique key, e.g. for building an object key
+         * @return the URL the report should play the video from; null or blank to keep the local file
+         * @throws Exception on failure; the local file is kept and linked instead
+         */
+        String upload(File video, String testKey) throws Exception;
     }
 
-    /** Per-test capture state: video recorder and the step held back for a final screenshot. */
+    /** Per-test capture state: the video recorder and a screenshot taken before a mid-test quit. */
     private static final class TestCapture {
         SeleniumVideoRecorder recorder;
-        TestStep.Builder heldStep;
-        boolean heldStepHasScreenshot;
-        boolean failureScreenshotTaken;
+        Artifact screenshotBeforeQuit;
     }
 
-    record CaptureSettings(String screenshots, String video, int fps, String ffmpegPath, String videoStorage) {
+    private record PendingVideo(String testKey, Future<?> encoding) {
+    }
 
-        static CaptureSettings load() {
+    record VideoSettings(String mode, int fps, String ffmpegPath, String storage, String directory) {
+
+        static VideoSettings load() {
             ReporterConfig config = null;
             try {
                 config = ReporterConfig.autoDetect();
             } catch (RuntimeException e) {
-                logger.warn("PulseReport: could not read reporter.properties; using default capture settings", e);
+                logger.warn("PulseReport: could not read reporter.properties; using default video settings", e);
             }
             if (config == null) {
                 config = ReporterConfig.builder().build();
             }
-            return new CaptureSettings(
-                    option("reporter.screenshots.mode", config.getScreenshotMode(), MODE_FAILED,
-                            List.of(MODE_ALL, MODE_FAILED, MODE_LAST, MODE_NONE)),
-                    option("reporter.video.mode", config.getVideoMode(), MODE_NONE,
-                            List.of(MODE_ALWAYS, MODE_FAILED, MODE_NONE)),
-                    fps(System.getProperty("reporter.video.fps"), config.getVideoFps()),
-                    System.getProperty("reporter.video.ffmpegPath", config.getFfmpegPath()),
-                    config.getVideoStorage());
-        }
-
-        private static String option(String key, String configured, String fallback, List<String> allowed) {
-            String value = System.getProperty(key, configured == null ? fallback : configured)
-                    .trim().toLowerCase(Locale.ROOT);
-            if (allowed.contains(value)) {
-                return value;
+            String mode = config.getProperty("reporter.video.mode", config.getVideoMode());
+            mode = mode == null ? SeleniumTracker.MODE_NONE : mode.trim().toLowerCase(Locale.ROOT);
+            if (!List.of(VIDEO_ALWAYS, SeleniumTracker.MODE_FAILED, SeleniumTracker.MODE_NONE).contains(mode)) {
+                logger.warn("PulseReport: invalid reporter.video.mode='{}'; expected always, failed or none."
+                        + " Using 'none'", mode);
+                mode = SeleniumTracker.MODE_NONE;
             }
-            logger.warn("PulseReport: invalid {}='{}'; expected one of {}. Using '{}'", key, value, allowed, fallback);
-            return fallback;
-        }
-
-        private static int fps(String override, int configured) {
-            int value = configured;
-            if (override != null) {
+            int fps = config.getVideoFps();
+            String fpsOverride = System.getProperty("reporter.video.fps");
+            if (fpsOverride != null) {
                 try {
-                    value = Integer.parseInt(override.trim());
+                    fps = Integer.parseInt(fpsOverride.trim());
                 } catch (NumberFormatException e) {
-                    logger.warn("PulseReport: invalid reporter.video.fps='{}'; using {}", override, configured);
+                    logger.warn("PulseReport: invalid reporter.video.fps='{}'; using {}", fpsOverride, fps);
                 }
             }
-            return Math.min(30, Math.max(1, value));
+            String storage = config.getProperty("reporter.video.storage", config.getVideoStorage());
+            storage = storage == null ? "path" : storage.trim().toLowerCase(Locale.ROOT);
+            if (!List.of("path", "embed", "url").contains(storage)) {
+                logger.warn("PulseReport: invalid reporter.video.storage='{}'; expected path or embed. Using 'path'",
+                        storage);
+                storage = "path";
+            }
+            return new VideoSettings(mode, Math.min(30, Math.max(1, fps)),
+                    config.getProperty("reporter.video.ffmpegPath", config.getFfmpegPath()), storage,
+                    config.getProperty("reporter.video.directory", null));
         }
     }
 
     /**
-     * Constructs a new SeleniumAdapter.
+     * Constructs a new SeleniumAdapter. Test code may create its own instances;
+     * they share all state with the TestNG-registered listener.
      */
     public SeleniumAdapter() {
         super();
-        logger.info("SeleniumAdapter initialized");
+        logger.debug("SeleniumAdapter initialized");
     }
+
+    // ------------------------------------------------------------------ test code API
 
     /**
-     * Records run-level browser metadata for the final TestRun environment.
-     *
-     * <p>
-     * Call this once browser capabilities are available so the generated
-     * TestRun can expose browser metadata to report renderers.</p>
-     *
-     * @param browserName the browser name (for example, Chrome)
-     * @param browserVersion the browser version (for example, 124)
-     * @param platform the execution platform (for example, macOS 14)
-     */
-    public void recordBrowserMetadata(String browserName, String browserVersion, String platform) {
-        putRunBrowserMetadata("browser", browserName);
-        putRunBrowserMetadata("browserVersion", browserVersion);
-        putRunBrowserMetadata("platform", platform);
-        logger.debug("Recorded browser metadata for run: browser='{}', version='{}', platform='{}'",
-                browserName,
-                browserVersion,
-                platform);
-    }
-
-    @Override
-    public void onSuiteStart(String suiteName) {
-        runBrowserMetadata.clear();
-        super.onSuiteStart(suiteName);
-    }
-
-    /**
-     * Captures a browser screenshot and attaches it to the specified test.
-     *
-     * <p>
-     * Use this method to capture screenshots from WebDriver during test
-     * execution. The screenshot file should already be saved to disk.</p>
-     *
-     * @param testName the name of the test to attach the screenshot to
-     * @param fileName the name of the screenshot file (e.g., "homepage.png")
-     * @param filePath the absolute path to the screenshot file
-     * @param fileSize the size of the screenshot file in bytes
-     * @throws IllegalArgumentException if any parameter is null or if
-     * testName/fileName is empty
-     */
-    public void captureBrowserScreenshot(String testName, String fileName, String filePath, long fileSize) {
-        validateParameter(testName, "testName");
-        validateParameter(fileName, "fileName");
-        validateParameter(filePath, "filePath");
-
-        Artifact screenshot = Artifact.builder()
-                .name(fileName)
-                .type("screenshot")
-                .path(filePath)
-                .mimeType("image/png")
-                .size(fileSize)
-                .timestamp(Instant.now())
-                .build();
-
-        addArtifact(testName, screenshot);
-        logger.debug("Captured browser screenshot '{}' for test '{}'", fileName, testName);
-    }
-
-    /**
-     * Captures browser logs and attaches them to the specified test.
-     *
-     * <p>
-     * Use this method to capture browser-level logs (network errors, security
-     * warnings, etc.) from the WebDriver logging API. The log is written to the
-     * report directory and shown inline in the report.</p>
-     *
-     * @param testName the name of the test to attach the logs to
-     * @param logFileName the name of the log file (e.g., "browser.log")
-     * @param logContent the content of the browser logs
-     * @throws IllegalArgumentException if any parameter is null or if
-     * testName/logFileName is empty
-     */
-    public void captureBrowserLogs(String testName, String logFileName, String logContent) {
-        validateParameter(testName, "testName");
-        validateParameter(logFileName, "logFileName");
-        validateParameter(logContent, "logContent");
-
-        addArtifact(testName, textArtifact(testName, logFileName, "browser-log", "text/plain", logContent));
-        logger.debug("Captured browser logs '{}' for test '{}'", logFileName, testName);
-    }
-
-    /**
-     * Captures JavaScript console logs and attaches them to the specified test.
-     *
-     * <p>
-     * Use this method to capture console.log, console.warn, console.error, etc.
-     * output from the browser's JavaScript console. The log is written to the
-     * report directory and shown inline in the report.</p>
-     *
-     * @param testName the name of the test to attach the console logs to
-     * @param logFileName the name of the log file (e.g., "console.log")
-     * @param logContent the content of the console logs
-     * @throws IllegalArgumentException if any parameter is null or if
-     * testName/logFileName is empty
-     */
-    public void captureConsoleLogs(String testName, String logFileName, String logContent) {
-        validateParameter(testName, "testName");
-        validateParameter(logFileName, "logFileName");
-        validateParameter(logContent, "logContent");
-
-        addArtifact(testName, textArtifact(testName, logFileName, "console-log", "text/plain", logContent));
-        logger.debug("Captured console logs '{}' for test '{}'", logFileName, testName);
-    }
-
-    /**
-     * Captures a HAR (HTTP Archive) file and attaches it to the specified test.
-     *
-     * <p>
-     * HAR files contain detailed network traffic information including all HTTP
-     * requests/responses, headers, timing data, etc. Use browser extensions or
-     * proxy tools (like BrowserMob Proxy) to generate HAR files. The file is
-     * written to the report directory; HAR files up to 1 MB are also shown
-     * inline.</p>
-     *
-     * @param testName the name of the test to attach the HAR file to
-     * @param harFileName the name of the HAR file (e.g., "network.har")
-     * @param harContent the content of the HAR file (JSON format)
-     * @throws IllegalArgumentException if any parameter is null or if
-     * testName/harFileName is empty
-     */
-    public void captureHarFile(String testName, String harFileName, String harContent) {
-        validateParameter(testName, "testName");
-        validateParameter(harFileName, "harFileName");
-        validateParameter(harContent, "harContent");
-
-        addArtifact(testName, textArtifact(testName, harFileName, "har", "application/json", harContent));
-        logger.debug("Captured HAR file '{}' for test '{}'", harFileName, testName);
-    }
-
-    /**
-     * Writes text evidence under {@code <report dir>/artifacts/<type>/} and inlines it
-     * when small enough, so the report shows it without the file and links it otherwise.
-     */
-    private static Artifact textArtifact(String testName, String fileName, String type, String mimeType,
-            String content) {
-        byte[] bytes = content.getBytes(StandardCharsets.UTF_8);
-        // The hash keeps same-named files from different tests apart; the name can't climb out of the folder
-        String relativePath = "artifacts/" + type + "/" + Integer.toHexString(testName.hashCode()) + "-"
-                + fileName.replaceAll("[^A-Za-z0-9._-]", "_");
-        try {
-            File file = new File(reportDirectory(), relativePath);
-            Files.createDirectories(file.getParentFile().toPath());
-            Files.write(file.toPath(), bytes);
-        } catch (IOException e) {
-            logger.warn("PulseReport: could not write {} for '{}': {}", fileName, testName, e.getMessage());
-        }
-        return Artifact.builder()
-                .name(fileName)
-                .type(type)
-                .path(relativePath)
-                .mimeType(mimeType)
-                .size((long) bytes.length)
-                .timestamp(Instant.now())
-                .content(bytes.length <= MAX_INLINE_TEXT_BYTES ? content : null)
-                .build();
-    }
-
-    /**
-     * Records page load time metric and attaches it to the specified test.
-     *
-     * <p>
-     * Use this method to measure and record how long it takes for a web page to
-     * fully load (including all resources).</p>
-     *
-     * @param testName the name of the test to attach the metric to
-     * @param pageLoadTimeMs the page load time in milliseconds
-     * @throws IllegalArgumentException if testName is null or empty
-     */
-    public void recordPageLoadTime(String testName, double pageLoadTimeMs) {
-        validateParameter(testName, "testName");
-
-        Metric pageLoadMetric = Metric.builder()
-                .name("page.load.time")
-                .value(pageLoadTimeMs)
-                .unit("ms")
-                .timestamp(Instant.now())
-                .build();
-
-        addMetric(testName, pageLoadMetric);
-        logger.debug("Recorded page load time for test '{}': {} ms", testName, pageLoadTimeMs);
-    }
-
-    /**
-     * Records DOM ready time metric and attaches it to the specified test.
-     *
-     * <p>
-     * Use this method to measure and record how long it takes for the DOM to
-     * become ready (DOMContentLoaded event).</p>
-     *
-     * @param testName the name of the test to attach the metric to
-     * @param domReadyTimeMs the DOM ready time in milliseconds
-     * @throws IllegalArgumentException if testName is null or empty
-     */
-    public void recordDomReadyTime(String testName, double domReadyTimeMs) {
-        validateParameter(testName, "testName");
-
-        Metric domReadyMetric = Metric.builder()
-                .name("dom.ready.time")
-                .value(domReadyTimeMs)
-                .unit("ms")
-                .timestamp(Instant.now())
-                .build();
-
-        addMetric(testName, domReadyMetric);
-        logger.debug("Recorded DOM ready time for test '{}': {} ms", testName, domReadyTimeMs);
-    }
-
-    /**
-     * Records network timing metric and attaches it to the specified test.
-     *
-     * <p>
-     * Use this method to record specific network timing metrics such as DNS
-     * lookup time, TCP connection time, SSL handshake time, etc. from the
-     * Navigation Timing API.</p>
-     *
-     * @param testName the name of the test to attach the metric to
-     * @param timingType the type of timing (e.g., "dns", "tcp", "ssl",
-     * "request", "response")
-     * @param timingMs the timing value in milliseconds
-     * @throws IllegalArgumentException if testName or timingType is null or
-     * empty
-     */
-    public void recordNetworkTiming(String testName, String timingType, double timingMs) {
-        validateParameter(testName, "testName");
-        validateParameter(timingType, "timingType");
-
-        Metric networkTiming = Metric.builder()
-                .name("network." + timingType + ".time")
-                .value(timingMs)
-                .unit("ms")
-                .timestamp(Instant.now())
-                .build();
-
-        addMetric(testName, networkTiming);
-        logger.debug("Recorded network timing '{}' for test '{}': {} ms", timingType, testName, timingMs);
-    }
-
-    /**
-     * Wraps a driver so every open, click, type, clear and submit is recorded as
-     * a step with its element, locator, URL change, page load time and outcome.
-     * Use the returned driver in place of the original.
+     * Wraps a driver so the actions performed through it are recorded as steps
+     * with their element, locator, URL change, page load time and outcome. Use
+     * the returned driver in place of the original. The browser, version and
+     * platform are read from the driver's capabilities.
      *
      * @param driver the driver to track
      * @return a decorated driver that records steps
      */
     public WebDriver track(WebDriver driver) {
-        if (driver == null) {
-            throw new IllegalArgumentException("driver cannot be null");
-        }
-        trackedDriver.set(driver);
-        ReentrantLock lock = new ReentrantLock();
-        driverLock.set(lock);
-        startVideo();
-        return new EventFiringDecorator<WebDriver>(new SeleniumStepListener(this, driver, lock)).decorate(driver);
+        return SeleniumTracker.track(driver);
     }
 
     /**
@@ -516,24 +257,19 @@ public class SeleniumAdapter extends TestNGAdapter {
      * @param action the step body
      */
     public void step(StepAction action) {
-        step(null, action);
+        SeleniumTracker.step(action);
     }
 
     /**
-     * Runs {@code action} as a named step. Tracked driver actions inside it are
-     * listed in the step's table. Exceptions mark the step FAILED and are rethrown.
+     * Runs {@code action} as a named step. Tracked actions inside it become its
+     * sub-steps. Exceptions mark the step FAILED with a screenshot and are
+     * rethrown.
      *
      * @param message the step name shown in the report
      * @param action the step body
      */
     public void step(String message, StepAction action) {
-        if (action == null) {
-            throw new IllegalArgumentException("action cannot be null");
-        }
-        step(message, () -> {
-            action.run();
-            return null;
-        });
+        SeleniumTracker.step(message, action);
     }
 
     /**
@@ -545,151 +281,407 @@ public class SeleniumAdapter extends TestNGAdapter {
      * @return the value returned by {@code action}
      */
     public <T> T step(String message, StepSupplier<T> action) {
-        if (action == null) {
-            throw new IllegalArgumentException("action cannot be null");
-        }
-        Deque<StepScope> scopes = openSteps.get();
-        StepScope scope = new StepScope();
-        scopes.push(scope);
-        Instant startedAt = Instant.now();
-        long start = System.nanoTime();
-        Throwable failure = null;
-        try {
-            return action.get();
-        } catch (Exception | AssertionError t) {
-            failure = t;
-            throw sneakyThrow(t);
-        } finally {
-            scopes.pop();
-            finishStep(message, scope, failure, startedAt, (System.nanoTime() - start) / 1_000_000);
-        }
+        return SeleniumTracker.step(message, action);
     }
 
-    void untrack(WebDriver driver) {
-        if (trackedDriver.get() == driver) {
-            trackedDriver.remove();
-            driverLock.remove();
-        }
+    /**
+     * Waits for {@code condition} on the tracked driver and records the wait as
+     * a step; a timeout fails the step with a screenshot and is rethrown.
+     *
+     * @param description what is awaited, e.g. "dashboard to load"
+     * @param timeout how long to wait
+     * @param condition e.g. {@code ExpectedConditions.visibilityOfElementLocated(...)}
+     * @param <T> the condition's result type
+     * @return the condition's result
+     */
+    public <T> T waitFor(String description, Duration timeout, Function<? super WebDriver, T> condition) {
+        return SeleniumTracker.waitFor(description, timeout, condition);
     }
 
-    /** The tracked driver, or null once its session has ended (including a quit on the unwrapped driver). */
-    private static WebDriver activeDriver() {
-        WebDriver driver = trackedDriver.get();
-        if (driver instanceof RemoteWebDriver && ((RemoteWebDriver) driver).getSessionId() == null) {
-            trackedDriver.remove();
-            driverLock.remove();
-            return null;
-        }
-        return driver;
+    /**
+     * Takes a screenshot of the tracked browser and attaches it to the current
+     * step or test.
+     *
+     * @param name the name shown in the report
+     * @return the screenshot, or null when no driver is tracked on this thread
+     */
+    public Artifact screenshot(String name) {
+        return SeleniumTracker.screenshot(name);
     }
 
-    /** Captures end-of-test evidence while the browser is still open, for drivers quit mid-test. */
-    void beforeQuit(WebDriver driver) {
-        TestCapture capture = testCapture.get();
-        if (capture == null || trackedDriver.get() != driver) {
-            return;
-        }
-        attachFinalScreenshot(capture, driver);
-        if (capture.recorder != null) {
-            capture.recorder.stop();
-        }
+    /**
+     * Sends every video this adapter records to {@code uploader} after it is
+     * encoded, and links the URL it returns in the report instead of a local
+     * file. Pass null to stop uploading.
+     *
+     * <pre>{@code
+     * SeleniumAdapter.setVideoUploader((video, testKey) -> {
+     *     String key = "runs/" + runId + "/" + video.getName();
+     *     minio.uploadObject(UploadObjectArgs.builder().bucket("videos").object(key)
+     *             .filename(video.getAbsolutePath()).contentType("video/mp4").build());
+     *     return "https://minio.example.com/videos/" + key;
+     * });
+     * }</pre>
+     *
+     * @param uploader the uploader, or null
+     */
+    public static void setVideoUploader(VideoUploader uploader) {
+        videoUploader = uploader;
+    }
+
+    /**
+     * Attaches a recording stored elsewhere (e.g. a MinIO, S3 or Selenium Grid
+     * video URL) to the running test. Call it once per video.
+     *
+     * @param url where the video is served
+     * @return the attached video, or null when no test is running on this thread
+     */
+    public Artifact attachVideo(String url) {
+        return SeleniumTracker.attachVideo(null, url, null);
+    }
+
+    /**
+     * Attaches a recording stored elsewhere to the running test.
+     *
+     * @param name the name shown under the player
+     * @param url where the video is served
+     * @param startedAt when the recording started, so steps line up with it; null when unknown
+     * @return the attached video, or null when no test is running on this thread
+     */
+    public Artifact attachVideo(String name, String url, Instant startedAt) {
+        return SeleniumTracker.attachVideo(name, url, startedAt);
+    }
+
+    /**
+     * Attaches the tracked browser's page source to the current step or test.
+     *
+     * @return the page source artifact, or null when no driver is tracked
+     */
+    public Artifact capturePageSource() {
+        return SeleniumTracker.capturePageSource();
+    }
+
+    /**
+     * Attaches browser-level logs (network errors, security warnings, ...) to
+     * the current step or test. The log is written to the report folder and
+     * shown inline when 1 MB or smaller.
+     *
+     * @param logFileName the file name, e.g. "browser.log"
+     * @param logContent the log text
+     */
+    public void captureBrowserLogs(String logFileName, String logContent) {
+        attachText(logFileName, logContent, "browser-log", "text/plain");
+    }
+
+    /**
+     * Attaches JavaScript console output to the current step or test.
+     *
+     * @param logFileName the file name, e.g. "console.log"
+     * @param logContent the console text
+     */
+    public void captureConsoleLogs(String logFileName, String logContent) {
+        attachText(logFileName, logContent, "console-log", "text/plain");
+    }
+
+    /**
+     * Attaches a HAR (HTTP Archive) network capture to the current step or
+     * test; the report lists its requests.
+     *
+     * @param harFileName the file name, e.g. "network.har"
+     * @param harContent the HAR JSON
+     */
+    public void captureHarFile(String harFileName, String harContent) {
+        attachText(harFileName, harContent, "har", "application/json");
+    }
+
+    /**
+     * Records run-level browser metadata for the report header. Usually not
+     * needed: {@link #track} reads it from the driver's capabilities. Values
+     * given here win over detected ones.
+     *
+     * @param browserName the browser name (for example, Chrome)
+     * @param browserVersion the browser version (for example, 124)
+     * @param platform the execution platform (for example, macOS 14)
+     */
+    public void recordBrowserMetadata(String browserName, String browserVersion, String platform) {
+        putRunBrowserMetadata("browser", browserName);
+        putRunBrowserMetadata("browserVersion", browserVersion);
+        putRunBrowserMetadata("platform", platform);
+        logger.debug("Recorded browser metadata for run: browser='{}', version='{}', platform='{}'",
+                browserName, browserVersion, platform);
+    }
+
+    // ------------------------------------------------------------------ TestNG lifecycle
+
+    @Override
+    public void onSuiteStart(String suiteName) {
+        runBrowserMetadata.clear();
+        SeleniumTracker.clearDetectedBrowsers();
+        super.onSuiteStart(suiteName);
     }
 
     @Override
     public void onTestStart(ITestResult result) {
         super.onTestStart(result);
+        SeleniumTracker.resetThreadState();
         // A test whose finish event never arrived must not leave its recorder running
         releaseCapture(testCapture.get());
         testCapture.set(new TestCapture());
         startVideo();
+        SeleniumTracker.Tracked t = SeleniumTracker.active();
+        CaptureBridge.Sink sink = CaptureBridge.current();
+        if (t != null && sink != null) {
+            SeleniumTracker.label(sink, t); // a driver created in @BeforeClass carries over
+        }
     }
 
     @Override
     public void onTestSuccess(ITestResult result) {
-        finishTestCapture(result, false);
+        String testKey = getCurrentTestKey();
+        TestCapture capture = testCapture.get();
+        if (capture != null && testKey != null && SeleniumTracker.MODE_LAST.equals(SeleniumTracker.settings().screenshots())) {
+            attachFinalScreenshot(testKey, capture);
+        }
         super.onTestSuccess(result);
+        finishTestCapture(capture, result, testKey, false);
     }
 
     @Override
     public void onTestFailure(ITestResult result) {
-        finishTestCapture(result, true);
-        super.onTestFailure(result);
+        String testKey = getCurrentTestKey();
+        TestCapture capture = testCapture.get();
+        super.onTestFailure(result); // adds the browser evidence while the test is still open
+        finishTestCapture(capture, result, testKey, true);
     }
 
     @Override
     public void onTestSkipped(ITestResult result) {
-        finishTestCapture(result, false);
+        String testKey = getCurrentTestKey();
+        TestCapture capture = testCapture.get();
         super.onTestSkipped(result);
+        finishTestCapture(capture, result, testKey, false);
     }
 
     @Override
     public void onTestFailedButWithinSuccessPercentage(ITestResult result) {
-        finishTestCapture(result, true);
+        String testKey = getCurrentTestKey();
+        TestCapture capture = testCapture.get();
         super.onTestFailedButWithinSuccessPercentage(result);
+        finishTestCapture(capture, result, testKey, true);
     }
 
-    private static CaptureSettings settings() {
-        CaptureSettings settings = captureSettings;
+    /** Waits for this suite's videos to finish encoding, then builds the report. */
+    @Override
+    public void onFinish(ISuite suite) {
+        awaitVideos(suite.getName() + ".");
+        super.onFinish(suite);
+    }
+
+    @Override
+    protected TestRun enrichTestRun(TestRun builtTestRun) {
+        Map<String, SeleniumTracker.BrowserInfo> detected = SeleniumTracker.detectedBrowsers();
+        if (builtTestRun == null || (runBrowserMetadata.isEmpty() && detected.isEmpty())) {
+            return builtTestRun;
+        }
+        Map<String, String> environment = new LinkedHashMap<>();
+        if (builtTestRun.getEnvironment() != null) {
+            environment.putAll(builtTestRun.getEnvironment());
+        }
+        if (detected.size() == 1) {
+            SeleniumTracker.BrowserInfo only = detected.values().iterator().next();
+            putIfPresent(environment, "browser", only.name());
+            putIfPresent(environment, "browserVersion", only.version());
+            putIfPresent(environment, "platform", only.platform());
+        } else if (detected.size() > 1) {
+            environment.put("browser", String.join(", ", detected.keySet()));
+            Set<String> platforms = detected.values().stream().map(SeleniumTracker.BrowserInfo::platform)
+                    .filter(p -> p != null).collect(Collectors.toCollection(LinkedHashSet::new));
+            if (!platforms.isEmpty()) {
+                environment.put("platform", String.join(", ", platforms));
+            }
+        }
+        synchronized (runBrowserMetadata) {
+            environment.putAll(runBrowserMetadata);
+        }
+        return builtTestRun.toBuilder().environment(environment).build();
+    }
+
+    // ------------------------------------------------------------------ screenshots + video
+
+    private static void attachFinalScreenshot(String testKey, TestCapture capture) {
+        SeleniumTracker.Tracked t = SeleniumTracker.active();
+        Artifact shot = t != null ? SeleniumTracker.screenshot(t.camera(), "final.png") : capture.screenshotBeforeQuit;
+        capture.screenshotBeforeQuit = null;
+        if (shot != null && !attachToLastStep(testKey, shot)) {
+            addArtifactToKey(testKey, shot);
+        }
+    }
+
+    private static VideoSettings videoSettings() {
+        VideoSettings settings = videoSettings;
         if (settings == null) {
-            settings = CaptureSettings.load();
-            captureSettings = settings;
+            settings = VideoSettings.load();
+            videoSettings = settings;
         }
         return settings;
     }
 
-    private void startVideo() {
+    /** Re-reads settings on next use (tests change system properties between cases). */
+    static void resetSettings() {
+        videoSettings = null;
+        SeleniumTracker.resetSettings();
+    }
+
+    private static void startVideo() {
         TestCapture capture = testCapture.get();
-        WebDriver driver = activeDriver();
-        CaptureSettings settings = settings();
-        if (capture == null || capture.recorder != null || !(driver instanceof TakesScreenshot)
-                || MODE_NONE.equals(settings.video())
+        SeleniumTracker.Tracked t = SeleniumTracker.active();
+        VideoSettings settings = videoSettings();
+        if (capture == null || capture.recorder != null || t == null || !(t.raw() instanceof TakesScreenshot)
+                || SeleniumTracker.MODE_NONE.equals(settings.mode())
                 || !SeleniumVideoRecorder.isFfmpegAvailable(settings.ffmpegPath())) {
             return;
         }
         try {
-            capture.recorder = new SeleniumVideoRecorder((TakesScreenshot) driver, settings.fps(), driverLock.get());
+            capture.recorder = new SeleniumVideoRecorder((TakesScreenshot) t.raw(), settings.fps(), t.lock());
         } catch (IOException e) {
             logger.warn("PulseReport: could not start video recording: {}", e.getMessage());
         }
     }
 
-    private void finishTestCapture(ITestResult result, boolean failed) {
-        TestCapture capture = testCapture.get();
+    private void finishTestCapture(TestCapture capture, ITestResult result, String testKey, boolean failed) {
         testCapture.remove();
-        if (openSteps.get().isEmpty()) {
-            openSteps.remove();
-        }
-        if (capture == null) {
+        if (capture == null || capture.recorder == null) {
             return;
         }
-        String testKey = getCurrentTestKey();
+        SeleniumVideoRecorder recorder = capture.recorder;
+        recorder.stop();
+        if (testKey == null || (SeleniumTracker.MODE_FAILED.equals(videoSettings().mode()) && !failed)) {
+            recorder.discard();
+            return;
+        }
+        String fileName = videoFileName(result, testKey);
         try {
-            if (testKey != null) {
-                recordCapture(capture, result, testKey, failed);
-            }
+            pendingVideos.add(new PendingVideo(testKey, encoder().submit(() -> encodeVideo(testKey, fileName, recorder))));
         } catch (RuntimeException e) {
-            logger.warn("PulseReport: could not finish screenshot/video capture for '{}'", testKey, e);
-        } finally {
-            releaseCapture(capture);
+            logger.warn("PulseReport: could not queue video for '{}': {}", testKey, e.getMessage());
+            recorder.discard();
         }
     }
 
-    private void recordCapture(TestCapture capture, ITestResult result, String testKey, boolean failed) {
-        WebDriver driver = activeDriver();
-        attachFinalScreenshot(capture, driver);
-        if (capture.heldStep != null) {
-            addStep(testKey, capture.heldStep.build());
-            capture.failureScreenshotTaken |= failed && capture.heldStepHasScreenshot;
+    /** Runs on the encoder pool, so the next test (and the browser's quit) doesn't wait for ffmpeg. */
+    private static void encodeVideo(String testKey, String fileName, SeleniumVideoRecorder recorder) {
+        VideoSettings settings = videoSettings();
+        try {
+            File output = new File(SeleniumTracker.directory(settings.directory(), "videos"), fileName);
+            if (!recorder.encode(output, settings.ffmpegPath(), settings.fps())) {
+                return;
+            }
+            long start = recorder.videoStartMillis();
+            long size = output.length();
+            Artifact.Builder video = Artifact.builder()
+                    .name(fileName)
+                    .type("video")
+                    .mimeType("video/mp4")
+                    .path(SeleniumTracker.reportPath(output))
+                    .size(size)
+                    // The first frame's time, so the report can line steps up with the video
+                    .timestamp(start > 0 ? Instant.ofEpochMilli(start) : Instant.now());
+            String url = upload(output, testKey);
+            if (url != null) {
+                addArtifactToKey(testKey, video.path(url).build());
+                return;
+            }
+            if ("url".equals(settings.storage())) {
+                logger.warn("PulseReport: reporter.video.storage=url but no uploader is set "
+                        + "(SeleniumAdapter.setVideoUploader); {} is linked from its folder", fileName);
+            }
+            if ("embed".equals(settings.storage())) {
+                if (size > MAX_EMBEDDED_VIDEO_BYTES) {
+                    logger.warn("PulseReport: {} is over the {} MB embed limit; the report links the file instead",
+                            fileName, MAX_EMBEDDED_VIDEO_BYTES >> 20);
+                } else if (!reserveEmbedBudget(size)) {
+                    logger.warn("PulseReport: embedded videos reached {} MB in total; the report links {} instead",
+                            MAX_EMBEDDED_VIDEO_TOTAL_BYTES >> 20, fileName);
+                } else {
+                    video.content(Base64.getEncoder().encodeToString(Files.readAllBytes(output.toPath())));
+                }
+            }
+            addArtifactToKey(testKey, video.build());
+        } catch (IOException | RuntimeException e) {
+            logger.warn("PulseReport: could not attach video for '{}': {}", testKey, e.getMessage());
+        } finally {
+            recorder.discard();
         }
-        if (failed && !capture.failureScreenshotTaken && !MODE_NONE.equals(settings().screenshots())) {
-            Artifact screenshot = screenshot(driver, "test-failure.png");
-            if (screenshot != null) {
-                addArtifact(testKey, screenshot);
+    }
+
+    /** @return the uploaded video's URL, or null when there is no uploader or the upload failed */
+    private static String upload(File video, String testKey) {
+        VideoUploader uploader = videoUploader;
+        if (uploader == null) {
+            return null;
+        }
+        try {
+            String url = uploader.upload(video, testKey);
+            if (url == null || url.isBlank()) {
+                return null;
+            }
+            Files.deleteIfExists(video.toPath());
+            return url.trim();
+        } catch (Exception e) {
+            logger.warn("PulseReport: video upload failed for '{}'; linking the local file instead: {}",
+                    testKey, e.toString());
+            return null;
+        }
+    }
+
+    private static boolean reserveEmbedBudget(long size) {
+        while (true) {
+            long left = embedBudget.get();
+            if (size > left) {
+                return false;
+            }
+            if (embedBudget.compareAndSet(left, left - size)) {
+                return true;
             }
         }
-        if (capture.recorder != null) {
-            finishVideo(testKey, videoFileName(result, testKey), capture.recorder, failed);
+    }
+
+    private static void awaitVideos(String suitePrefix) {
+        for (PendingVideo video : pendingVideos) {
+            if (!video.testKey().startsWith(suitePrefix)) {
+                continue;
+            }
+            try {
+                video.encoding().get(VIDEO_WAIT_SECONDS, TimeUnit.SECONDS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return;
+            } catch (ExecutionException | java.util.concurrent.TimeoutException e) {
+                logger.warn("PulseReport: video for '{}' was not ready in time: {}", video.testKey(), e.toString());
+            } finally {
+                pendingVideos.remove(video);
+            }
         }
+    }
+
+    private static ExecutorService encoder() {
+        ExecutorService pool = encoder;
+        if (pool == null) {
+            synchronized (SeleniumAdapter.class) {
+                pool = encoder;
+                if (pool == null) {
+                    int threads = Math.max(1, Math.min(4, Runtime.getRuntime().availableProcessors() / 2));
+                    AtomicInteger n = new AtomicInteger();
+                    pool = Executors.newFixedThreadPool(threads, r -> {
+                        Thread thread = new Thread(r, "pulsereport-video-encoder-" + n.incrementAndGet());
+                        thread.setDaemon(true);
+                        return thread;
+                    });
+                    encoder = pool;
+                }
+            }
+        }
+        return pool;
     }
 
     private static void releaseCapture(TestCapture capture) {
@@ -699,232 +691,72 @@ public class SeleniumAdapter extends TestNGAdapter {
         }
     }
 
-    private static void attachFinalScreenshot(TestCapture capture, WebDriver driver) {
-        if (capture.heldStep == null || capture.heldStepHasScreenshot) {
-            return;
-        }
-        Artifact screenshot = screenshot(driver, "final.png");
-        if (screenshot != null) {
-            capture.heldStep.artifacts(List.of(screenshot));
-            capture.heldStepHasScreenshot = true;
-        }
-    }
-
-    private void finishVideo(String testKey, String fileName, SeleniumVideoRecorder recorder, boolean failed) {
-        recorder.stop();
-        CaptureSettings settings = settings();
-        try {
-            if (MODE_FAILED.equals(settings.video()) && !failed) {
-                return;
-            }
-            String relativePath = "videos/" + fileName;
-            File output = new File(reportDirectory(), relativePath);
-            if (!recorder.encode(output, settings.ffmpegPath(), settings.fps())) {
-                return;
-            }
-            Artifact.Builder video = Artifact.builder()
-                    .name(fileName)
-                    .type("video")
-                    .mimeType("video/mp4")
-                    .path(relativePath)
-                    .size(output.length())
-                    .timestamp(Instant.now());
-            if ("embed".equals(settings.videoStorage())) {
-                if (output.length() <= MAX_EMBEDDED_VIDEO_BYTES) {
-                    video.content(Base64.getEncoder().encodeToString(Files.readAllBytes(output.toPath())));
-                } else {
-                    logger.warn("PulseReport: {} is over the {} MB embed limit; the report links the file instead",
-                            fileName, MAX_EMBEDDED_VIDEO_BYTES >> 20);
-                }
-            }
-            addArtifact(testKey, video.build());
-        } catch (IOException e) {
-            logger.warn("PulseReport: could not attach video for '{}': {}", testKey, e.getMessage());
-        } finally {
-            recorder.discard();
-        }
-    }
-
     /** e.g. LoginTest.testValidLogin-1a2b3c.mp4; the hash keeps parameterized invocations apart. */
     private static String videoFileName(ITestResult result, String testKey) {
         String readable = result.getTestClass().getRealClass().getSimpleName() + "." + result.getMethod().getMethodName();
         return readable.replaceAll("[^A-Za-z0-9._-]", "_") + "-" + Integer.toHexString(testKey.hashCode()) + ".mp4";
     }
 
-    private static File reportDirectory() {
-        String dir = ReporterConfig.resolveOutputDirectory("reporter.output.directory", "target/pulsereport");
-        File file = new File(dir);
-        return file.isAbsolute() ? file : new File(System.getProperty("user.dir", "."), dir);
-    }
+    /** Lifecycle callbacks from {@link SeleniumTracker}. */
+    private static final class AdapterHooks implements SeleniumTracker.Hooks {
 
-    /** Formats a duration the same way the HTML report does: 16ms, 1.1s, 31s, 1m 05s. */
-    static String formatDuration(long ms) {
-        if (ms < 1000) {
-            return ms + "ms";
-        }
-        if (ms < 10_000) {
-            return String.format(Locale.ROOT, "%.1fs", ms / 1000.0);
-        }
-        long seconds = Math.round(ms / 1000.0);
-        return seconds < 60 ? seconds + "s" : String.format(Locale.ROOT, "%dm %02ds", seconds / 60, seconds % 60);
-    }
-
-    void recordAction(String name, String detail, Throwable failure, Instant startedAt, long durationMs,
-            WebDriver driver) {
-        StepScope scope = openSteps.get().peek();
-        if (scope != null) {
-            scope.add(name, detail, failure, durationMs);
-            return;
-        }
-        recordStep(name, detail, null, failure, startedAt, durationMs, driver);
-    }
-
-    private void finishStep(String message, StepScope scope, Throwable failure, Instant startedAt,
-            long durationMs) {
-        boolean named = message != null && !message.isBlank();
-        String name = named ? message : scope.firstName;
-        String description = null;
-        List<List<String>> table = null;
-
-        if (name == null) {
-            name = "Step";
-        } else if (!named && scope.rows.size() == 1) {
-            description = scope.firstDetail;
-        } else if (!named) {
-            name += " (+" + (scope.rows.size() - 1) + " more)";
-        }
-        if (!scope.rows.isEmpty() && (named || scope.rows.size() > 1)) {
-            table = new ArrayList<>();
-            table.add(STEP_TABLE_HEADER);
-            table.addAll(scope.rows);
+        @Override
+        public void onTrack(WebDriver driver) {
+            startVideo();
         }
 
-        StepScope parent = openSteps.get().peek();
-        if (parent != null) {
-            parent.add(name, description, failure, durationMs);
-            return;
-        }
-        recordStep(name, description, table, failure, startedAt, durationMs, activeDriver());
-    }
-
-    private void recordStep(String name, String description, List<List<String>> table, Throwable failure,
-            Instant startedAt, long durationMs, WebDriver driver) {
-        String testKey = getCurrentTestKey();
-        if (testKey == null) {
-            logger.debug("No active test on this thread; step '{}' not recorded", name);
-            return;
-        }
-        TestStep.Builder step = TestStep.builder()
-                .name(name)
-                .status(failure == null ? TestStatus.PASSED : TestStatus.FAILED)
-                .startTime(startedAt)
-                .endTime(startedAt.plusMillis(durationMs))
-                .duration(durationMs)
-                .description(description)
-                .dataTable(table);
-        String screenshotMode = settings().screenshots();
-        Artifact screenshot = null;
-        if (failure != null) {
-            StringWriter trace = new StringWriter();
-            failure.printStackTrace(new PrintWriter(trace));
-            step.errorMessage(failure.getMessage() != null ? failure.getMessage() : failure.getClass().getName())
-                    .stackTrace(trace.toString());
-            if (!MODE_NONE.equals(screenshotMode)) {
-                screenshot = screenshot(driver, "step-failure.png");
+        /** Captures end-of-test evidence while the browser is still open, for drivers quit mid-test. */
+        @Override
+        public void beforeQuit(WebDriver driver) {
+            TestCapture capture = testCapture.get();
+            if (capture == null) {
+                return; // quit in @AfterMethod: the test already finished
             }
-        } else if (MODE_ALL.equals(screenshotMode)) {
-            screenshot = screenshot(driver, "step.png");
-        }
-        if (screenshot != null) {
-            step.artifacts(List.of(screenshot));
-        }
-
-        TestCapture capture = testCapture.get();
-        if (capture != null && failure != null && screenshot != null) {
-            capture.failureScreenshotTaken = true;
-        }
-        if (capture != null && MODE_LAST.equals(screenshotMode)) {
-            // Hold the newest step so the end-of-test screenshot can be attached to it
-            if (capture.heldStep != null) {
-                addStep(testKey, capture.heldStep.build());
+            SeleniumTracker.Tracked t = SeleniumTracker.active();
+            // In "last" mode the end-of-test screenshot is due; take it while the browser still exists
+            if (t != null && SeleniumTracker.MODE_LAST.equals(SeleniumTracker.settings().screenshots())) {
+                capture.screenshotBeforeQuit = SeleniumTracker.screenshot(t.camera(), "final.png");
             }
-            capture.heldStep = step;
-            capture.heldStepHasScreenshot = screenshot != null;
-            return;
-        }
-        addStep(testKey, step.build());
-    }
-
-    private static Artifact screenshot(WebDriver driver, String name) {
-        if (!(driver instanceof TakesScreenshot)) {
-            return null;
-        }
-        ReentrantLock lock = driverLock.get();
-        if (lock != null) {
-            lock.lock();
-        }
-        try {
-            File file = ((TakesScreenshot) driver).getScreenshotAs(OutputType.FILE);
-            return Artifact.builder()
-                    .name(name)
-                    .type("screenshot")
-                    .path(file.getAbsolutePath())
-                    .mimeType("image/png")
-                    .size(file.length())
-                    .timestamp(Instant.now())
-                    .build();
-        } catch (RuntimeException e) {
-            logger.debug("Could not capture screenshot", e);
-            return null;
-        } finally {
-            if (lock != null) {
-                lock.unlock();
+            if (capture.recorder != null) {
+                capture.recorder.stop();
             }
         }
+
+        @Override
+        public Artifact fallbackScreenshot() {
+            TestCapture capture = testCapture.get();
+            if (capture == null) {
+                return null;
+            }
+            Artifact shot = capture.screenshotBeforeQuit;
+            capture.screenshotBeforeQuit = null;
+            return shot;
+        }
     }
 
-    @SuppressWarnings("unchecked")
-    private static <E extends Throwable> RuntimeException sneakyThrow(Throwable t) throws E {
-        throw (E) t;
+    // ------------------------------------------------------------------ helpers
+
+    private void attachText(String fileName, String content, String type, String mimeType) {
+        Artifact artifact = validatedText(fileName, content, type, mimeType);
+        if (!SeleniumTracker.attach(artifact, SeleniumTracker.active())) {
+            logger.warn("PulseReport: '{}' not attached: no test is running on this thread", fileName);
+        }
     }
 
-    @Override
-    protected TestRun enrichTestRun(TestRun builtTestRun) {
-        if (builtTestRun == null || runBrowserMetadata.isEmpty()) {
-            return builtTestRun;
+    private Artifact validatedText(String fileName, String content, String type, String mimeType) {
+        validateParameter(fileName, "fileName");
+        if (content == null) {
+            throw new IllegalArgumentException("content cannot be null");
         }
-
-        Map<String, String> mergedEnvironment = new LinkedHashMap<>();
-        if (builtTestRun.getEnvironment() != null) {
-            mergedEnvironment.putAll(builtTestRun.getEnvironment());
-        }
-        synchronized (runBrowserMetadata) {
-            mergedEnvironment.putAll(runBrowserMetadata);
-        }
-
-        return TestRun.builder()
-                .id(builtTestRun.getId())
-                .name(builtTestRun.getName())
-                .startTime(builtTestRun.getStartTime())
-                .endTime(builtTestRun.getEndTime())
-                .duration(builtTestRun.getDuration())
-                .status(builtTestRun.getStatus())
-                .suites(builtTestRun.getSuites())
-                .environment(mergedEnvironment)
-                .totalTests(builtTestRun.getTotalTests())
-                .passedTests(builtTestRun.getPassedTests())
-                .failedTests(builtTestRun.getFailedTests())
-                .skippedTests(builtTestRun.getSkippedTests())
-                .build();
+        return SeleniumTracker.textArtifact(fileName, type, mimeType, content);
     }
 
-    /**
-     * Validates that a parameter is not null or empty.
-     *
-     * @param parameter the parameter to validate
-     * @param parameterName the name of the parameter (for error messages)
-     * @throws IllegalArgumentException if parameter is null or empty
-     */
+    private static void putIfPresent(Map<String, String> map, String key, String value) {
+        if (value != null && !value.isBlank()) {
+            map.put(key, value);
+        }
+    }
+
     private void validateParameter(String parameter, String parameterName) {
         if (parameter == null) {
             throw new IllegalArgumentException(parameterName + " cannot be null");
@@ -935,17 +767,10 @@ public class SeleniumAdapter extends TestNGAdapter {
     }
 
     private void putRunBrowserMetadata(String key, String value) {
-        if (value == null) {
+        if (value == null || value.trim().isEmpty()) {
             runBrowserMetadata.remove(key);
             return;
         }
-
-        String normalizedValue = value.trim();
-        if (normalizedValue.isEmpty()) {
-            runBrowserMetadata.remove(key);
-            return;
-        }
-
-        runBrowserMetadata.put(key, normalizedValue);
+        runBrowserMetadata.put(key, value.trim());
     }
 }
