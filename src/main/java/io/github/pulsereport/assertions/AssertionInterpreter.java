@@ -24,6 +24,7 @@ final class AssertionInterpreter {
     static final String JUNIT4 = "org.junit.Assert";
     static final String TESTNG = "org.testng.Assert";
     static final String HAMCREST = "org.hamcrest.MatcherAssert";
+    static final String ASSERTJ_FAIL = "org.assertj.core.api.Fail";
 
     static final int MAX_VALUE_LENGTH = 2000;
 
@@ -124,6 +125,7 @@ final class AssertionInterpreter {
         if (JUNIT4.equals(owner)) return "JUnit 4";
         if (TESTNG.equals(owner)) return "TestNG";
         if (HAMCREST.equals(owner)) return "Hamcrest";
+        if (ASSERTJ_FAIL.equals(owner)) return "AssertJ";
         return owner;
     }
 
