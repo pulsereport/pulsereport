@@ -335,7 +335,9 @@ adapter.attachVideo("Grid recording", gridVideoUrl, recordingStartedAt);  // sta
 ```
 
 Pass the recording's start time to get "Play from here" buttons on the steps it covers.
-`SeleniumTracker.attachVideo(...)` does the same without TestNG.
+`SeleniumTracker.attachVideo(...)` does the same without TestNG, e.g. in Cucumber. A recording is
+always attached to the test or scenario, even when attached from `@AfterMethod` or a Cucumber `@After`
+hook (the usual place to upload one after the browser closes), so its steps still line up with it.
 
 #### Screenshots and Page Source
 
@@ -617,6 +619,23 @@ public void setUp() {
     RestAssured.filters(new RestAssuredAdapter());
 }
 ```
+
+### Where Captures Go
+
+Every exchange (and every artifact or metric added by hand) goes to whatever is running on the thread when the call is made:
+
+| Call made in | Lands in |
+|---|---|
+| A `@Test` method | The test |
+| `@BeforeMethod` / `@BeforeClass` | A **Setup** step, named after the method, on the next test |
+| `@AfterMethod` | A **Teardown** step on the test that just finished |
+| A Cucumber step | That step |
+| A Cucumber `@Before` / `@After` hook | A **Setup** / **Teardown** step on the scenario |
+| A Cucumber `@BeforeStep` / `@AfterStep` hook | The step that follows / the step it followed |
+
+Metrics (`recordResponseTime`, `addMetric`, ...) go to the running test or scenario. A configuration method or hook that made no calls adds nothing to the report. Selenium actions follow the same rules, so a step that drives the browser and calls the API shows both.
+
+Outside of any test (no TestNG or Cucumber adapter running on the thread), captures are kept under the test name you pass, for `RestAssuredAdapter.getArtifacts(name)` and `getMetrics(name)`.
 
 ### Features
 

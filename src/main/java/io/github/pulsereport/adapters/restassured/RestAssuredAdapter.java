@@ -11,6 +11,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import io.github.pulsereport.adapters.CaptureBridge;
 import io.github.pulsereport.adapters.cucumber.CucumberStepContext;
 import io.github.pulsereport.config.ReporterConfig;
 import io.github.pulsereport.core.model.Artifact;
@@ -157,9 +158,10 @@ public class RestAssuredAdapter implements Filter {
     }
 
     /**
-     * Routes an artifact to the active Cucumber step buffer when a Cucumber
-     * step is executing on the current thread; otherwise stores in the internal
-     * map.
+     * Adds an artifact to whatever is running on this thread, through
+     * {@link CaptureBridge}: the Cucumber step or hook, the TestNG test, or the
+     * Setup/Teardown step of a TestNG configuration method. Without a running
+     * test it is stored under the test name, for {@link #getArtifacts(String)}.
      *
      * @param testName the name of the test to attach the artifact to
      * @param artifact the artifact to add
@@ -168,6 +170,12 @@ public class RestAssuredAdapter implements Filter {
     public void addArtifact(String testName, Artifact artifact) {
         if (artifact == null) {
             throw new IllegalArgumentException("Artifact cannot be null");
+        }
+        CaptureBridge.Sink sink = CaptureBridge.current();
+        if (sink != null) {
+            sink.addArtifact(artifact);
+            logger.debug("Added artifact '{}' to the running test", artifact.getName());
+            return;
         }
         List<Artifact> cucumberBuf = CucumberStepContext.currentStepArtifacts.get();
         if (cucumberBuf != null) {
@@ -184,7 +192,10 @@ public class RestAssuredAdapter implements Filter {
     }
 
     /**
-     * Adds a metric to a test.
+     * Adds a metric to whatever is running on this thread, through
+     * {@link CaptureBridge} (the Cucumber scenario or the TestNG test). Without
+     * a running test it is stored under the test name, for
+     * {@link #getMetrics(String)}.
      *
      * @param testName the name of the test to attach the metric to
      * @param metric the metric to add
@@ -193,6 +204,12 @@ public class RestAssuredAdapter implements Filter {
     public void addMetric(String testName, Metric metric) {
         if (metric == null) {
             throw new IllegalArgumentException("Metric cannot be null");
+        }
+        CaptureBridge.Sink sink = CaptureBridge.current();
+        if (sink != null) {
+            sink.addMetric(metric);
+            logger.debug("Added metric '{}' to the running test", metric.getName());
+            return;
         }
         String key = currentTestName.get();
         if (key == null) {
@@ -333,15 +350,13 @@ public class RestAssuredAdapter implements Filter {
     public Response filter(FilterableRequestSpecification requestSpec,
             FilterableResponseSpecification responseSpec,
             FilterContext ctx) {
-        // Get current test name from thread local (set by onTestStart for TestNG).
-        // For Cucumber runs there is no TestNG listener, so testName is null — but
-        // CucumberStepContext.currentStepArtifacts is non-null when a step is active.
-        // Use a sentinel name so the capture methods are invoked; addArtifact() will
-        // route the artifacts to the active Cucumber step buffer automatically.
+        // Capture when something will receive it: a test or hook reachable through CaptureBridge
+        // (a Cucumber step or hook, a TestNG test or configuration method, where no test name is
+        // set yet), or a test name set by another framework. addArtifact() routes the artifacts.
         String testName = currentTestName.get();
-        boolean inCucumberStep = (testName == null)
-                && (CucumberStepContext.currentStepArtifacts.get() != null);
-        String effectiveName = testName != null ? testName : (inCucumberStep ? "__cucumber__" : null);
+        boolean running = testName == null
+                && (CaptureBridge.current() != null || CucumberStepContext.currentStepArtifacts.get() != null);
+        String effectiveName = testName != null ? testName : (running ? "__running__" : null);
 
         // Guard: only the first (outermost) filter instance on this thread captures.
         // Subsequent duplicate instances skip capture but still call ctx.next().

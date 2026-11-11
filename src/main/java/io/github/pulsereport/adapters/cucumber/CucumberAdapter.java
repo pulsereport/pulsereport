@@ -375,6 +375,7 @@ public class CucumberAdapter implements EventListener {
             extraTags.stream().filter(t -> !tags.contains(t)).forEach(tags::add);
         }
         List<Metric> metrics = CucumberStepContext.currentScenarioMetrics.get();
+        List<Artifact> artifacts = CucumberStepContext.currentScenarioArtifacts.get();
 
         TestCase testCase = TestCase.builder()
                 .id(UUID.randomUUID().toString())
@@ -392,6 +393,7 @@ public class CucumberAdapter implements EventListener {
                 .featureDescription(ctx.getFeatureDescription())
                 .tags(tags)
                 .metrics(metrics)
+                .artifacts(artifacts)
                 .adapter("Cucumber")
                 .build();
 
@@ -417,7 +419,8 @@ public class CucumberAdapter implements EventListener {
      * Records what a scenario hook captured through {@link CaptureBridge}:
      * Before/After hooks become "Setup"/"Teardown" steps, an AfterStep hook's
      * captures join the step it followed, and a BeforeStep hook's the next one.
-     * Hooks that captured nothing stay out of the report, as before.
+     * Hooks that captured nothing (no sub-steps or artifacts, such as REST
+     * Assured calls) stay out of the report, as before.
      */
     private void finishHook(TestStepFinished event) {
         HookCapture hook = currentHook.get();
@@ -438,7 +441,7 @@ public class CucumberAdapter implements EventListener {
             artifacts.addAll(buf);
             buf.clear();
         }
-        if (children.isEmpty() && (!failed || artifacts.isEmpty())) {
+        if (children.isEmpty() && artifacts.isEmpty()) {
             return;
         }
         switch (hook.type()) {

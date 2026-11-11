@@ -39,6 +39,9 @@ public final class CucumberStepContext {
      */
     static final ThreadLocal<List<TestStep>> currentStepChildren = new ThreadLocal<>();
 
+    /** Artifacts that belong to the scenario itself (recordings), captured while it runs. */
+    static final ThreadLocal<List<Artifact>> currentScenarioArtifacts = new ThreadLocal<>();
+
     /** Metrics recorded while the current scenario runs. */
     static final ThreadLocal<List<Metric>> currentScenarioMetrics = new ThreadLocal<>();
 
@@ -70,6 +73,12 @@ public final class CucumberStepContext {
 
         @Override
         public void addArtifact(Artifact artifact) {
+            // A recording goes on the scenario, where the report syncs the steps against it
+            List<Artifact> scenario = currentScenarioArtifacts.get();
+            if (scenario != null && CaptureBridge.belongsToTest(artifact)) {
+                scenario.add(artifact);
+                return;
+            }
             List<Artifact> artifacts = currentStepArtifacts.get();
             if (artifacts != null) {
                 artifacts.add(artifact);
@@ -95,6 +104,7 @@ public final class CucumberStepContext {
 
     /** Starts capturing for a scenario. */
     static void beginScenario() {
+        currentScenarioArtifacts.set(new ArrayList<>());
         currentScenarioMetrics.set(new ArrayList<>());
         currentScenarioTags.set(new LinkedHashSet<>());
         carriedChildren.remove();
@@ -104,6 +114,7 @@ public final class CucumberStepContext {
     /** Stops capturing for a scenario. */
     static void endScenario() {
         currentStepChildren.remove();
+        currentScenarioArtifacts.remove();
         currentScenarioMetrics.remove();
         currentScenarioTags.remove();
         carriedChildren.remove();

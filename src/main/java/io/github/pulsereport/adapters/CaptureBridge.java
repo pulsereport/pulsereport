@@ -176,4 +176,18 @@ public final class CaptureBridge {
             }
         }
     }
+
+    /**
+     * Whether an artifact describes the whole test rather than the step or hook
+     * it was captured in. A recording covers the whole test, and the report
+     * syncs steps against it only when it is attached to the test, so sinks
+     * attach a recording to the test even when it arrives during a hook (e.g. a
+     * video uploaded in {@code @AfterMethod} or a Cucumber {@code @After} hook).
+     *
+     * @param artifact the captured artifact
+     * @return true when the artifact belongs on the test itself
+     */
+    public static boolean belongsToTest(Artifact artifact) {
+        return artifact != null && "video".equalsIgnoreCase(artifact.getType());
+    }
 }

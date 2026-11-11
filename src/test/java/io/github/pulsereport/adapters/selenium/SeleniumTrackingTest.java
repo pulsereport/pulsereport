@@ -480,6 +480,22 @@ class SeleniumTrackingTest {
     }
 
     @Test
+    void recordingAttachedInTeardownGoesOnTheTest() {
+        adapter.onTestStart(result);
+        adapter.onTestSuccess(result);
+
+        IInvokedMethod tearDown = configMethod("uploadRecording", false);
+        ITestResult configResult = configResult(ITestResult.SUCCESS, null);
+        adapter.beforeInvocation(tearDown, configResult);
+        adapter.attachVideo("https://minio.example.test/videos/run-1/login.mp4");
+        adapter.afterInvocation(tearDown, configResult);
+
+        assertEquals(List.of("video"), adapter.artifacts().stream().map(Artifact::getType).toList());
+        assertTrue(adapter.steps().stream().noneMatch(s -> "Teardown".equals(s.getKeyword())),
+                "a recording alone makes no teardown step");
+    }
+
+    @Test
     void browserIsDetectedFromCapabilities() {
         adapter.onSuiteStart("WebSuite");
         adapter.onTestStart(result);

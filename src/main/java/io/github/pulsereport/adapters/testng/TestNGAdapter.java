@@ -936,7 +936,10 @@ public class TestNGAdapter implements Adapter, ITestListener, ISuiteListener, II
         target.metrics.addAll(captured.metrics);
         target.tags.addAll(captured.tags);
         target.adapter = captured.adapter;
-        if (!captured.steps.isEmpty() || !captured.artifacts.isEmpty() || failure != null) {
+        // A recording goes on the test, where the report syncs the steps against it
+        List<Artifact> stepArtifacts = new ArrayList<>();
+        captured.artifacts.forEach(a -> (CaptureBridge.belongsToTest(a) ? target.artifacts : stepArtifacts).add(a));
+        if (!captured.steps.isEmpty() || !stepArtifacts.isEmpty() || failure != null) {
             Instant end = Instant.now();
             TestStatus status = failure != null ? TestStatus.FAILED
                     : testResult.getStatus() == ITestResult.SKIP ? TestStatus.SKIPPED : TestStatus.PASSED;
@@ -948,7 +951,7 @@ public class TestNGAdapter implements Adapter, ITestListener, ISuiteListener, II
                     .endTime(end)
                     .duration(Duration.between(scope.startedAt, end).toMillis())
                     .children(new ArrayList<>(captured.steps))
-                    .artifacts(new ArrayList<>(captured.artifacts));
+                    .artifacts(stepArtifacts);
             if (failure != null) {
                 StringWriter trace = new StringWriter();
                 failure.printStackTrace(new PrintWriter(trace));
@@ -963,6 +966,7 @@ public class TestNGAdapter implements Adapter, ITestListener, ISuiteListener, II
                 pendingSetup.set(target);
             } else {
                 pending.steps.addAll(target.steps);
+                pending.artifacts.addAll(target.artifacts);
                 pending.metrics.addAll(target.metrics);
                 pending.tags.addAll(target.tags);
                 if (target.adapter != null) {
