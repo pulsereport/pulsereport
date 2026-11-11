@@ -1073,7 +1073,7 @@
             padding: 0px 0;
         }
 
-        /* --kw-w widens the keyword column for a whole list (e.g. Setup/Teardown), so step names stay aligned */
+        /* --kw-w widens the keyword column for a whole list (e.g. @BeforeMethod), so step names stay aligned */
         .step {
             display: grid;
             grid-template-columns: 16px var(--kw-w, 46px) minmax(0, 1fr) auto;
@@ -2847,7 +2847,7 @@
                 grid-template-columns: 16px minmax(0, 1fr) auto;
             }
 
-            /* Setup/Teardown keep their keyword: the method name alone doesn't say it ran outside the test */
+            /* Hook steps (@BeforeMethod...) keep their keyword: the method name alone doesn't say it ran outside the test */
             .step.is-hook {
                 grid-template-columns: 16px auto minmax(0, 1fr) auto;
             }
@@ -3837,6 +3837,9 @@
                     d.append(
                         section('Steps', tc.featureDescription ? h('p', { class: 'desc' }, tc.featureDescription) : null, steps)
                     );
+                // Assertions the test made outside of any step (a TestNG test method)
+                const testAsserts = assertionList(tc.assertions || []);
+                if (testAsserts) d.append(section('Assertions', testAsserts));
                 const arts = tc.artifacts || [];
                 const exchanges = pairExchanges(arts);
                 if (exchanges.length)
@@ -4024,7 +4027,7 @@
             }
 
             // ---------- Steps ----------
-            // Setup/Teardown outgrow the Gherkin keyword column, so the whole list widens to keep names aligned
+            // Hook keywords (@BeforeMethod...) outgrow the Gherkin keyword column, so the whole list widens to keep names aligned
             function kwStyle(list) {
                 const n = Math.max(0, ...list.map(s => (s.keyword || '').trim().length));
                 return n > 5 ? `--kw-w: ${n}ch` : null;
@@ -4075,7 +4078,8 @@
 
             function stepEl(s, ctx) {
                 const failed = s.status === 'FAILED';
-                const hook = /^(setup|teardown)$/i.test((s.keyword || '').trim());
+                // @BeforeMethod, @After...; Setup/Teardown in reports from older versions
+                const hook = /^(setup|teardown|@(before|after)\w*)$/i.test((s.keyword || '').trim());
                 const arts = s.artifacts || [];
                 const kids = s.children || [];
                 const own = stepShotBtn(arts);

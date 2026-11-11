@@ -15,7 +15,7 @@ public class AssertionCaptureSteps {
     private String user;
 
     @Before
-    public void hookAssertionIsNotAStep() {
+    public void checkFixtures() {
         Assertions.assertTrue(true, "hook assertion");
     }
 

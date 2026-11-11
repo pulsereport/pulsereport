@@ -1,6 +1,7 @@
 package io.github.pulsereport.adapters.restassured;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -16,6 +17,8 @@ import io.github.pulsereport.adapters.cucumber.CucumberStepContext;
 import io.github.pulsereport.config.ReporterConfig;
 import io.github.pulsereport.core.model.Artifact;
 import io.github.pulsereport.core.model.Metric;
+import io.github.pulsereport.core.model.TestStatus;
+import io.github.pulsereport.core.model.TestStep;
 import io.restassured.filter.Filter;
 import io.restassured.filter.FilterContext;
 import io.restassured.http.Headers;
@@ -121,6 +124,9 @@ public class RestAssuredAdapter implements Filter {
     // the outermost instance records artifacts.
     private static final ThreadLocal<Boolean> capturing = ThreadLocal.withInitial(() -> false);
 
+    // Artifacts of the HTTP call being recorded as a step on this thread; null when calls aren't steps
+    private static final ThreadLocal<List<Artifact>> pendingCall = new ThreadLocal<>();
+
     private static final ConcurrentHashMap<String, List<Artifact>> artifactsByTest = new ConcurrentHashMap<>();
     private static final ConcurrentHashMap<String, List<Metric>> metricsByTest = new ConcurrentHashMap<>();
 
@@ -170,6 +176,11 @@ public class RestAssuredAdapter implements Filter {
     public void addArtifact(String testName, Artifact artifact) {
         if (artifact == null) {
             throw new IllegalArgumentException("Artifact cannot be null");
+        }
+        List<Artifact> call = pendingCall.get();
+        if (call != null) {
+            call.add(artifact);
+            return;
         }
         CaptureBridge.Sink sink = CaptureBridge.current();
         if (sink != null) {
@@ -361,25 +372,81 @@ public class RestAssuredAdapter implements Filter {
         // Guard: only the first (outermost) filter instance on this thread captures.
         // Subsequent duplicate instances skip capture but still call ctx.next().
         boolean shouldCapture = effectiveName != null && !capturing.get();
-        if (shouldCapture) {
-            capturing.set(true);
-            captureRequestFromSpec(effectiveName, requestSpec);
+        // In a TestNG test or configuration method the call becomes a step of its own, so the
+        // checks made on its response are listed with it; in a Cucumber step it stays on that step
+        CaptureBridge.Sink sink = shouldCapture ? CaptureBridge.current() : null;
+        boolean asStep = sink != null && sink.recordsCallsAsSteps();
+        Instant startedAt = Instant.now();
+        long started = System.nanoTime();
+        if (asStep) {
+            pendingCall.set(new CopyOnWriteArrayList<>());
         }
-
-        Response response;
+        Response response = null;
+        Throwable failure = null;
         try {
-            response = ctx.next(requestSpec, responseSpec);
-        } finally {
             if (shouldCapture) {
-                capturing.set(false);
+                capturing.set(true);
+                captureRequestFromSpec(effectiveName, requestSpec);
+            }
+            try {
+                response = ctx.next(requestSpec, responseSpec);
+            } finally {
+                if (shouldCapture) {
+                    capturing.set(false);
+                }
+            }
+            if (shouldCapture) {
+                captureResponseFromSpec(effectiveName, response);
+            }
+            return response;
+        } catch (RuntimeException | Error e) {
+            failure = e;
+            throw e;
+        } finally {
+            if (asStep) {
+                List<Artifact> artifacts = pendingCall.get();
+                pendingCall.remove();
+                recordCallStep(sink, requestSpec, artifacts, failure, startedAt, started);
             }
         }
+    }
 
-        if (shouldCapture) {
-            captureResponseFromSpec(effectiveName, response);
+    /** Records one HTTP call as a step named after it, holding its request and response. */
+    private static void recordCallStep(CaptureBridge.Sink sink, FilterableRequestSpecification requestSpec,
+            List<Artifact> artifacts, Throwable failure, Instant startedAt, long startedNanos) {
+        try {
+            long durationMs = (System.nanoTime() - startedNanos) / 1_000_000;
+            TestStep.Builder step = TestStep.builder()
+                    .name(callName(requestSpec))
+                    .status(failure == null ? TestStatus.PASSED : TestStatus.FAILED)
+                    .startTime(startedAt)
+                    .endTime(startedAt.plusMillis(durationMs))
+                    .duration(durationMs)
+                    .artifacts(artifacts == null ? List.of() : new ArrayList<>(artifacts));
+            if (failure != null) {
+                step.errorMessage(failure.getMessage() != null ? failure.getMessage() : failure.getClass().getName());
+            }
+            sink.addStep(step.build());
+        } catch (RuntimeException e) {
+            logger.debug("Could not record the HTTP call as a step", e);
         }
+    }
 
-        return response;
+    /** "GET /users/1": the method and path, without the query string (it may carry secrets). */
+    static String callName(FilterableRequestSpecification requestSpec) {
+        String method = requestSpec.getMethod();
+        String uri = requestSpec.getURI();
+        String path = uri;
+        try {
+            java.net.URI parsed = java.net.URI.create(uri);
+            if (parsed.getRawPath() != null && !parsed.getRawPath().isEmpty()) {
+                path = parsed.getRawPath();
+            }
+        } catch (RuntimeException e) {
+            int query = uri == null ? -1 : uri.indexOf('?');
+            path = query >= 0 ? uri.substring(0, query) : uri;
+        }
+        return (method == null ? "HTTP" : method) + " " + (path == null || path.isEmpty() ? "/" : path);
     }
 
     /**

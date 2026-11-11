@@ -40,6 +40,7 @@ public final class TestCase {
     private final List<TestStep> backgroundSteps;
     private final List<String> tags;
     private final String adapter;
+    private final List<AssertionResult> assertions;
 
     @JsonCreator
     private TestCase(
@@ -62,7 +63,8 @@ public final class TestCase {
             @JsonProperty("featureDescription") String featureDescription,
             @JsonProperty("backgroundSteps") List<TestStep> backgroundSteps,
             @JsonProperty("tags") List<String> tags,
-            @JsonProperty("adapter") String adapter) {
+            @JsonProperty("adapter") String adapter,
+            @JsonProperty("assertions") List<AssertionResult> assertions) {
         this.id = id;
         this.name = name;
         this.className = className;
@@ -83,6 +85,7 @@ public final class TestCase {
         this.backgroundSteps = backgroundSteps != null ? new ArrayList<>(backgroundSteps) : new ArrayList<>();
         this.tags = tags != null ? new ArrayList<>(tags) : new ArrayList<>();
         this.adapter = adapter;
+        this.assertions = assertions != null ? new ArrayList<>(assertions) : new ArrayList<>();
     }
 
     /**
@@ -275,6 +278,18 @@ public final class TestCase {
     }
 
     /**
+     * Gets the assertions evaluated by the test itself, outside of any step
+     * (e.g. in a TestNG test method). Assertions made inside a step are on that
+     * step.
+     *
+     * @return an unmodifiable list, in execution order
+     */
+    @JsonInclude(JsonInclude.Include.NON_EMPTY)
+    public List<AssertionResult> getAssertions() {
+        return Collections.unmodifiableList(assertions);
+    }
+
+    /**
      * Creates a builder pre-filled with this test case's values.
      *
      * @return a new builder
@@ -285,7 +300,7 @@ public final class TestCase {
                 .errorMessage(errorMessage).stackTrace(stackTrace).steps(steps).artifacts(artifacts)
                 .metrics(metrics).retryCount(retryCount).bddType(bddType).featureName(featureName)
                 .featureDescription(featureDescription).backgroundSteps(backgroundSteps).tags(tags)
-                .adapter(adapter);
+                .adapter(adapter).assertions(assertions);
     }
 
     /**
@@ -322,7 +337,8 @@ public final class TestCase {
                 && Objects.equals(featureDescription, testCase.featureDescription)
                 && Objects.equals(backgroundSteps, testCase.backgroundSteps)
                 && Objects.equals(tags, testCase.tags)
-                && Objects.equals(adapter, testCase.adapter);
+                && Objects.equals(adapter, testCase.adapter)
+                && Objects.equals(assertions, testCase.assertions);
     }
 
     /**
@@ -334,7 +350,7 @@ public final class TestCase {
     public int hashCode() {
         return Objects.hash(id, name, className, methodName, startTime, endTime,
                 duration, status, errorMessage, stackTrace, steps, artifacts, metrics, retryCount,
-                bddType, featureName, featureDescription, backgroundSteps, tags, adapter);
+                bddType, featureName, featureDescription, backgroundSteps, tags, adapter, assertions);
     }
 
     /**
@@ -388,8 +404,20 @@ public final class TestCase {
         private List<TestStep> backgroundSteps;
         private List<String> tags;
         private String adapter;
+        private List<AssertionResult> assertions;
 
         private Builder() {
+        }
+
+        /**
+         * Sets the assertions the test evaluated outside of any step.
+         *
+         * @param assertions the assertions, in execution order (optional)
+         * @return this builder
+         */
+        public Builder assertions(List<AssertionResult> assertions) {
+            this.assertions = assertions;
+            return this;
         }
 
         /**
@@ -631,7 +659,7 @@ public final class TestCase {
             }
             return new TestCase(id, name, className, methodName, startTime, endTime,
                     duration, status, errorMessage, stackTrace, steps, artifacts, metrics, retryCount,
-                    bddType, featureName, featureDescription, backgroundSteps, tags, adapter);
+                    bddType, featureName, featureDescription, backgroundSteps, tags, adapter, assertions);
         }
     }
 }

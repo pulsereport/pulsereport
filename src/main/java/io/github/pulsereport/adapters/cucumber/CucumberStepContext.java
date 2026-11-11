@@ -7,6 +7,7 @@ import java.util.Set;
 
 import io.github.pulsereport.adapters.CaptureBridge;
 import io.github.pulsereport.core.model.Artifact;
+import io.github.pulsereport.core.model.AssertionResult;
 import io.github.pulsereport.core.model.Metric;
 import io.github.pulsereport.core.model.TestStep;
 
@@ -51,6 +52,10 @@ public final class CucumberStepContext {
     /** What a before-step hook captured, handed to the step that follows it. */
     private static final ThreadLocal<List<TestStep>> carriedChildren = new ThreadLocal<>();
     private static final ThreadLocal<List<Artifact>> carriedArtifacts = new ThreadLocal<>();
+    private static final ThreadLocal<List<AssertionResult>> carriedAssertions = new ThreadLocal<>();
+
+    /** Assertions a before-step hook handed to the step or hook now running. */
+    private static final ThreadLocal<List<AssertionResult>> seededAssertions = new ThreadLocal<>();
 
     /**
      * Routes captures made through {@link CaptureBridge} (e.g. by the Selenium
@@ -94,6 +99,11 @@ public final class CucumberStepContext {
         }
 
         @Override
+        public boolean recordsCallsAsSteps() {
+            return false; // the Gherkin step names the action; its HTTP exchanges are shown on it
+        }
+
+        @Override
         public void addTag(String tag) {
             Set<String> tags = currentScenarioTags.get();
             if (tags != null && tag != null && !tag.isBlank()) {
@@ -109,6 +119,8 @@ public final class CucumberStepContext {
         currentScenarioTags.set(new LinkedHashSet<>());
         carriedChildren.remove();
         carriedArtifacts.remove();
+        carriedAssertions.remove();
+        seededAssertions.remove();
     }
 
     /** Stops capturing for a scenario. */
@@ -119,6 +131,8 @@ public final class CucumberStepContext {
         currentScenarioTags.remove();
         carriedChildren.remove();
         carriedArtifacts.remove();
+        carriedAssertions.remove();
+        seededAssertions.remove();
     }
 
     /** Starts capturing for a Gherkin step or hook, seeded with what a before-step hook captured. */
@@ -136,8 +150,11 @@ public final class CucumberStepContext {
         if (carried != null) {
             children.addAll(carried);
         }
+        List<AssertionResult> carriedChecks = carriedAssertions.get();
+        seededAssertions.set(carriedChecks == null ? new ArrayList<>() : new ArrayList<>(carriedChecks));
         carriedChildren.remove();
         carriedArtifacts.remove();
+        carriedAssertions.remove();
         currentStepChildren.set(children);
     }
 
@@ -149,9 +166,17 @@ public final class CucumberStepContext {
     }
 
     /** Hands a before-step hook's captures to the next Gherkin step. */
-    static void carry(List<TestStep> children, List<Artifact> artifacts) {
+    static void carry(List<TestStep> children, List<Artifact> artifacts, List<AssertionResult> assertions) {
         carriedChildren.set(new ArrayList<>(children));
         carriedArtifacts.set(new ArrayList<>(artifacts));
+        carriedAssertions.set(new ArrayList<>(assertions));
+    }
+
+    /** @return the assertions a before-step hook handed to the running step or hook (taken once) */
+    static List<AssertionResult> takeSeededAssertions() {
+        List<AssertionResult> seeded = seededAssertions.get();
+        seededAssertions.remove();
+        return seeded == null ? new ArrayList<>() : seeded;
     }
 
     private CucumberStepContext() {

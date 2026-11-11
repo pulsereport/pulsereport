@@ -81,6 +81,18 @@ public final class CaptureBridge {
          */
         default void addTag(String tag) {
         }
+
+        /**
+         * Whether a call made by a tool (e.g. a REST Assured request) should be
+         * recorded as a step of its own, so the checks made on its response can be
+         * listed with it. A Cucumber step already names the action, so there the
+         * call is shown on that step instead.
+         *
+         * @return true to record calls as steps, false to attach their artifacts
+         */
+        default boolean recordsCallsAsSteps() {
+            return true;
+        }
     }
 
     /** Adds evidence to a test or step that just failed. */

@@ -46,10 +46,10 @@ class CucumberRestCaptureTest {
         JsonNode report = new ObjectMapper().readTree(Files.readString(outputDir.resolve("test-report.json")));
         JsonNode scenario = report.path("suites").get(0).path("testCases").get(0);
         JsonNode steps = scenario.path("steps");
-        assertEquals(2, steps.size(), "Setup + the Gherkin step; the After hook only attached a recording");
+        assertEquals(2, steps.size(), "@Before + the Gherkin step; the After hook only attached a recording");
 
         JsonNode setup = steps.get(0);
-        assertEquals("Setup", setup.path("keyword").asText());
+        assertEquals("@Before", setup.path("keyword").asText());
         assertEquals("createUser", setup.path("name").asText());
         assertEquals(List.of("http-request", "http-response"), types(setup.path("artifacts")));
         assertEquals(List.of("http-request", "http-response"), types(steps.get(1).path("artifacts")));

@@ -52,7 +52,7 @@ import io.github.pulsereport.core.model.TestRun;
  *     @BeforeMethod
  *     public void setUp() {
  *         driver = adapter.track(new ChromeDriver());   // every click/type/open becomes a step
- *         driver.get("https://example.com/login");      // recorded as the test's "Setup" step
+ *         driver.get("https://example.com/login");      // recorded in the test's "@BeforeMethod" step
  *     }
  *
  *     @Test
@@ -81,7 +81,8 @@ import io.github.pulsereport.core.model.TestRun;
  * switches, {@code Actions} gestures and closed windows, each with its
  * element, locator, URL change and duration</li>
  * <li>Actions in {@code @BeforeMethod}/{@code @AfterMethod} (and class/suite
- * configuration methods), as "Setup" and "Teardown" steps of the test</li>
+ * configuration methods), as steps of the test named after the method, with
+ * the annotation ("@BeforeMethod") as their keyword</li>
  * <li>Page load time of each navigation, as {@code page.load.time} and
  * {@code page.ttfb} metrics labelled with the URL</li>
  * <li>On failure: the element lookup or wait that failed, a screenshot, the

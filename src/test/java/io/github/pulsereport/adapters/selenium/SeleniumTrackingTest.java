@@ -430,7 +430,7 @@ class SeleniumTrackingTest {
         adapter.onTestSuccess(result);
 
         TestStep setup = adapter.steps().get(0);
-        assertEquals("Setup", setup.getKeyword());
+        assertEquals("@BeforeMethod", setup.getKeyword());
         assertEquals("setUp", setup.getName());
         assertEquals("Open \"https://example.test/login\"", setup.getChildren().get(0).getName());
         assertEquals("Open \"https://example.test/home\"", adapter.steps().get(1).getName());
@@ -475,7 +475,7 @@ class SeleniumTrackingTest {
         adapter.afterInvocation(tearDown, configResult);
 
         TestStep teardown = adapter.steps().get(adapter.steps().size() - 1);
-        assertEquals("Teardown", teardown.getKeyword());
+        assertEquals("@AfterMethod", teardown.getKeyword());
         assertEquals("Open \"https://example.test/logout\"", teardown.getChildren().get(0).getName());
     }
 
@@ -491,7 +491,7 @@ class SeleniumTrackingTest {
         adapter.afterInvocation(tearDown, configResult);
 
         assertEquals(List.of("video"), adapter.artifacts().stream().map(Artifact::getType).toList());
-        assertTrue(adapter.steps().stream().noneMatch(s -> "Teardown".equals(s.getKeyword())),
+        assertTrue(adapter.steps().stream().noneMatch(s -> "@AfterMethod".equals(s.getKeyword())),
                 "a recording alone makes no teardown step");
     }
 

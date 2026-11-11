@@ -45,8 +45,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import io.github.pulsereport.adapters.CaptureBridge;
+import io.github.pulsereport.assertions.AssertionCollector;
 import io.github.pulsereport.config.ReporterConfig;
 import io.github.pulsereport.core.model.Artifact;
+import io.github.pulsereport.core.model.AssertionResult;
 import io.github.pulsereport.core.model.Metric;
 import io.github.pulsereport.core.model.TestStatus;
 import io.github.pulsereport.core.model.TestStep;
@@ -242,10 +244,12 @@ public final class SeleniumTracker {
         }
     }
 
-    /** A named step being recorded; tracked actions inside it become its children. */
+    /** A named step being recorded; tracked actions inside it become its children, its assertions its own. */
     private static final class StepScope {
         final List<TestStep> children = new ArrayList<>();
         final List<Artifact> artifacts = new ArrayList<>();
+        /** Collects the step's assertions, nested in the test's or Gherkin step's collector; null when none is open. */
+        final Object assertions = AssertionCollector.isActive() ? AssertionCollector.open() : null;
     }
 
     private record FailedLookup(String locator, Throwable error, Instant startedAt, long durationMs) {
@@ -638,6 +642,7 @@ public final class SeleniumTracker {
 
     private static void finishStep(String message, StepScope scope, Throwable failure, Instant startedAt,
             long durationMs) {
+        List<AssertionResult> checks = scope.assertions == null ? List.of() : AssertionCollector.close(scope.assertions);
         Tracked t = active();
         Camera camera = t == null ? null : t.camera();
         if (failure != null) {
@@ -650,7 +655,7 @@ public final class SeleniumTracker {
         TestStep only = scope.children.size() == 1 ? scope.children.get(0) : null;
         TestStep.Builder step;
         List<Artifact> artifacts;
-        if (!named && only != null && scope.artifacts.isEmpty()
+        if (!named && only != null && scope.artifacts.isEmpty() && checks.isEmpty()
                 && (failure == null || only.getStatus() == TestStatus.FAILED)) {
             // A single unnamed action needs no wrapper step
             step = only.toBuilder();
@@ -671,6 +676,7 @@ public final class SeleniumTracker {
             if (failure != null) {
                 withError(step, failure);
             }
+            step.assertions(checks);
         }
         if (failure != null && !isEvidenced(failure) && screenshotsEnabled()) {
             Artifact shot = screenshot(camera, "step-failure.png");

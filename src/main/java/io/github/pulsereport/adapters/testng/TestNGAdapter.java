@@ -30,9 +30,12 @@ import org.testng.ITestResult;
 import io.github.pulsereport.adapters.Adapter;
 import io.github.pulsereport.adapters.CaptureBridge;
 import io.github.pulsereport.adapters.restassured.RestAssuredAdapter;
+import io.github.pulsereport.assertions.AssertionCapture;
+import io.github.pulsereport.assertions.AssertionCollector;
 import io.github.pulsereport.config.ReporterConfig;
 import io.github.pulsereport.core.aggregator.TestResultAggregator;
 import io.github.pulsereport.core.model.Artifact;
+import io.github.pulsereport.core.model.AssertionResult;
 import io.github.pulsereport.core.model.Metric;
 import io.github.pulsereport.core.model.TestCase;
 import io.github.pulsereport.core.model.TestRun;
@@ -252,6 +255,18 @@ public class TestNGAdapter implements Adapter, ITestListener, ISuiteListener, II
      */
     private static final Map<String, List<TestStep>> stepsByTest = new ConcurrentHashMap<>();
 
+    /** Assertions each test method evaluated outside of any tracked step, by test key. */
+    private static final Map<String, List<AssertionResult>> assertionsByTest = new ConcurrentHashMap<>();
+
+    /**
+     * Test methods running on this thread, innermost first, with the assertion collector
+     * opened for each (more than one when a test runs TestNG itself).
+     */
+    private static final ThreadLocal<Deque<TestAssertions>> testAssertions = ThreadLocal.withInitial(ArrayDeque::new);
+
+    private record TestAssertions(ITestResult result, Object collector, Instant startedAt) {
+    }
+
     /**
      * Thread-local storage for the current test key. Each thread tracks its own
      * test key to avoid collisions with parameterized tests, duplicate method
@@ -291,13 +306,16 @@ public class TestNGAdapter implements Adapter, ITestListener, ISuiteListener, II
     private static final class ConfigScope {
         final ITestResult result;
         final boolean setup;
+        final String keyword;
         final String methodName;
         final Instant startedAt = Instant.now();
         final PendingSetup captured = new PendingSetup();
+        final Object assertions = AssertionCollector.open();
 
-        ConfigScope(ITestResult result, boolean setup, String methodName) {
+        ConfigScope(ITestResult result, boolean setup, String keyword, String methodName) {
             this.result = result;
             this.setup = setup;
+            this.keyword = keyword;
             this.methodName = methodName;
         }
     }
@@ -411,6 +429,9 @@ public class TestNGAdapter implements Adapter, ITestListener, ISuiteListener, II
     public TestNGAdapter() {
         this.aggregator = new TestResultAggregator();
         this.testRun = null;
+        if (ReporterConfig.resolveAssertionCapture()) {
+            AssertionCapture.install();
+        }
         logger.info("TestNGAdapter initialized");
     }
 
@@ -658,6 +679,7 @@ public class TestNGAdapter implements Adapter, ITestListener, ISuiteListener, II
         artifactsByTest.keySet().removeIf(k -> k.startsWith(suitePrefix));
         metricsByTest.keySet().removeIf(k -> k.startsWith(suitePrefix));
         stepsByTest.keySet().removeIf(k -> k.startsWith(suitePrefix));
+        assertionsByTest.keySet().removeIf(k -> k.startsWith(suitePrefix));
         adapterByTest.keySet().removeIf(k -> k.startsWith(suitePrefix));
         tagsByTest.keySet().removeIf(k -> k.startsWith(suitePrefix));
         keysByMethodName.values().forEach(set -> set.removeIf(k -> k.startsWith(suitePrefix)));
@@ -873,15 +895,26 @@ public class TestNGAdapter implements Adapter, ITestListener, ISuiteListener, II
     /**
      * Opens a capture scope for a configuration method ({@code @BeforeMethod},
      * {@code @AfterClass}, ...), so steps recorded through {@link CaptureBridge}
-     * while it runs become a "Setup" or "Teardown" step of the test it belongs
-     * to instead of being dropped.
+     * while it runs become a step of the test it belongs to, named after the
+     * annotation ("@BeforeMethod"), instead of being dropped.
      *
      * @param method the method about to run
      * @param testResult its result object
      */
     @Override
     public void beforeInvocation(IInvokedMethod method, ITestResult testResult) {
-        if (method == null || !method.isConfigurationMethod()) {
+        if (method == null) {
+            return;
+        }
+        if (method.isTestMethod() && !method.isConfigurationMethod()) {
+            Deque<TestAssertions> running = testAssertions.get();
+            TestAssertions open = running.peek();
+            if (open == null || open.result() != testResult) { // another adapter instance may have opened it
+                running.push(new TestAssertions(testResult, AssertionCollector.open(), Instant.now()));
+            }
+            return;
+        }
+        if (!method.isConfigurationMethod()) {
             return;
         }
         Deque<ConfigScope> scopes = configScopes.get();
@@ -895,7 +928,7 @@ public class TestNGAdapter implements Adapter, ITestListener, ISuiteListener, II
         ITestNGMethod m = method.getTestMethod();
         boolean setup = m.isBeforeMethodConfiguration() || m.isBeforeClassConfiguration()
                 || m.isBeforeTestConfiguration() || m.isBeforeSuiteConfiguration() || m.isBeforeGroupsConfiguration();
-        scopes.push(new ConfigScope(testResult, setup, m.getMethodName()));
+        scopes.push(new ConfigScope(testResult, setup, annotationOf(m, setup), m.getMethodName()));
     }
 
     /**
@@ -908,7 +941,30 @@ public class TestNGAdapter implements Adapter, ITestListener, ISuiteListener, II
      */
     @Override
     public void afterInvocation(IInvokedMethod method, ITestResult testResult) {
-        if (method == null || !method.isConfigurationMethod()) {
+        if (method == null) {
+            return;
+        }
+        if (method.isTestMethod() && !method.isConfigurationMethod()) {
+            Deque<TestAssertions> running = testAssertions.get();
+            TestAssertions open = running.peek();
+            if (open != null && open.result() == testResult) {
+                running.pop();
+                List<AssertionResult> captured = AssertionCollector.close(open.collector());
+                String testKey = aggregator.getTestKey(testResult);
+                List<TestStep> steps = stepsByTest.get(testKey);
+                List<AssertionResult> unattached = captured;
+                if (steps != null) {
+                    synchronized (steps) {
+                        unattached = attachAssertions(steps, captured, open.startedAt());
+                    }
+                }
+                if (!unattached.isEmpty()) {
+                    assertionsByTest.computeIfAbsent(testKey, k -> new CopyOnWriteArrayList<>()).addAll(unattached);
+                }
+            }
+            return;
+        }
+        if (!method.isConfigurationMethod()) {
             return;
         }
         Deque<ConfigScope> scopes = configScopes.get();
@@ -927,9 +983,72 @@ public class TestNGAdapter implements Adapter, ITestListener, ISuiteListener, II
         finishConfigScope(scope, testResult, failure);
     }
 
+    /** The configuration annotation a method ran under, e.g. "@BeforeMethod", used as its step's keyword. */
+    private static String annotationOf(ITestNGMethod m, boolean setup) {
+        if (m.isBeforeSuiteConfiguration()) return "@BeforeSuite";
+        if (m.isBeforeTestConfiguration()) return "@BeforeTest";
+        if (m.isBeforeClassConfiguration()) return "@BeforeClass";
+        if (m.isBeforeGroupsConfiguration()) return "@BeforeGroups";
+        if (m.isBeforeMethodConfiguration()) return "@BeforeMethod";
+        if (m.isAfterMethodConfiguration()) return "@AfterMethod";
+        if (m.isAfterGroupsConfiguration()) return "@AfterGroups";
+        if (m.isAfterClassConfiguration()) return "@AfterClass";
+        if (m.isAfterTestConfiguration()) return "@AfterTest";
+        if (m.isAfterSuiteConfiguration()) return "@AfterSuite";
+        return setup ? "@BeforeMethod" : "@AfterMethod";
+    }
+
+    /** A step recorded for a configuration method or hook rather than by the test itself. */
+    static boolean isHookStep(TestStep step) {
+        String keyword = step.getKeyword();
+        return keyword != null && (keyword.startsWith("@Before") || keyword.startsWith("@After")
+                || "Setup".equals(keyword) || "Teardown".equals(keyword));
+    }
+
+    /**
+     * Gives each assertion to the step it followed: the last step (an action, a call,
+     * a named step) that started before it, among those that started at or after
+     * {@code from} and aren't hooks. Assertions made before any such step are returned.
+     *
+     * @param steps steps in execution order; updated in place
+     * @param assertions assertions in execution order
+     * @param from when the method that made the assertions started
+     * @return the assertions no step took
+     */
+    static List<AssertionResult> attachAssertions(List<TestStep> steps, List<AssertionResult> assertions, Instant from) {
+        List<AssertionResult> unattached = new ArrayList<>();
+        if (assertions.isEmpty()) {
+            return unattached;
+        }
+        Map<Integer, List<AssertionResult>> byStep = new java.util.TreeMap<>();
+        for (AssertionResult a : assertions) {
+            int target = -1;
+            for (int i = 0; i < steps.size() && a.getTimestamp() != null; i++) {
+                TestStep step = steps.get(i);
+                Instant start = step.getStartTime();
+                if (start != null && !start.isBefore(from) && !start.isAfter(a.getTimestamp()) && !isHookStep(step)) {
+                    target = i;
+                }
+            }
+            if (target < 0) {
+                unattached.add(a);
+            } else {
+                byStep.computeIfAbsent(target, k -> new ArrayList<>()).add(a);
+            }
+        }
+        byStep.forEach((i, added) -> {
+            TestStep step = steps.get(i);
+            List<AssertionResult> all = new ArrayList<>(step.getAssertions());
+            all.addAll(added);
+            steps.set(i, step.toBuilder().assertions(all).build());
+        });
+        return unattached;
+    }
+
     private static void finishConfigScope(ConfigScope scope, ITestResult testResult, Throwable failure) {
         PendingSetup captured = scope.captured;
-        if (captured.isEmpty() && failure == null) {
+        List<AssertionResult> assertions = AssertionCollector.close(scope.assertions);
+        if (captured.isEmpty() && assertions.isEmpty() && failure == null) {
             return;
         }
         PendingSetup target = new PendingSetup();
@@ -939,19 +1058,23 @@ public class TestNGAdapter implements Adapter, ITestListener, ISuiteListener, II
         // A recording goes on the test, where the report syncs the steps against it
         List<Artifact> stepArtifacts = new ArrayList<>();
         captured.artifacts.forEach(a -> (CaptureBridge.belongsToTest(a) ? target.artifacts : stepArtifacts).add(a));
-        if (!captured.steps.isEmpty() || !stepArtifacts.isEmpty() || failure != null) {
+        if (!captured.steps.isEmpty() || !stepArtifacts.isEmpty() || !assertions.isEmpty() || failure != null) {
+            // Each check goes to the call or action it followed; the rest stay on the method's step
+            List<TestStep> children = new ArrayList<>(captured.steps);
+            List<AssertionResult> own = attachAssertions(children, assertions, scope.startedAt);
             Instant end = Instant.now();
             TestStatus status = failure != null ? TestStatus.FAILED
                     : testResult.getStatus() == ITestResult.SKIP ? TestStatus.SKIPPED : TestStatus.PASSED;
             TestStep.Builder step = TestStep.builder()
-                    .keyword(scope.setup ? "Setup" : "Teardown")
+                    .keyword(scope.keyword)
                     .name(scope.methodName)
                     .status(status)
                     .startTime(scope.startedAt)
                     .endTime(end)
                     .duration(Duration.between(scope.startedAt, end).toMillis())
-                    .children(new ArrayList<>(captured.steps))
-                    .artifacts(stepArtifacts);
+                    .children(children)
+                    .artifacts(stepArtifacts)
+                    .assertions(own);
             if (failure != null) {
                 StringWriter trace = new StringWriter();
                 failure.printStackTrace(new PrintWriter(trace));
@@ -1034,7 +1157,7 @@ public class TestNGAdapter implements Adapter, ITestListener, ISuiteListener, II
             }
             int last = steps.size() - 1;
             TestStep step = steps.get(last);
-            if ("Setup".equals(step.getKeyword()) || "Teardown".equals(step.getKeyword())) {
+            if (isHookStep(step)) {
                 return false;
             }
             List<Artifact> artifacts = new ArrayList<>(step.getArtifacts());
@@ -1116,9 +1239,19 @@ public class TestNGAdapter implements Adapter, ITestListener, ISuiteListener, II
         return labels;
     }
 
-    /** Applies the adapter names and extra tags recorded per test key. */
+    /**
+     * Assertions a test evaluated outside of any tracked step (for subclasses and tests).
+     *
+     * @param testKey the test key
+     * @return the assertions recorded so far, in execution order
+     */
+    protected static List<AssertionResult> recordedAssertions(String testKey) {
+        return testKey == null ? List.of() : List.copyOf(assertionsByTest.getOrDefault(testKey, List.of()));
+    }
+
+    /** Applies the adapter names, extra tags and test-level assertions recorded per test key. */
     private static TestRun applyTestLabels(TestRun run) {
-        if (run == null || (adapterByTest.isEmpty() && tagsByTest.isEmpty())) {
+        if (run == null || (adapterByTest.isEmpty() && tagsByTest.isEmpty() && assertionsByTest.isEmpty())) {
             return run;
         }
         boolean changed = false;
@@ -1128,7 +1261,8 @@ public class TestNGAdapter implements Adapter, ITestListener, ISuiteListener, II
             for (TestCase tc : suite.getTestCases()) {
                 String adapter = adapterByTest.get(tc.getId());
                 Set<String> extra = tagsByTest.get(tc.getId());
-                if (adapter == null && (extra == null || extra.isEmpty())) {
+                List<AssertionResult> assertions = assertionsByTest.get(tc.getId());
+                if (adapter == null && (extra == null || extra.isEmpty()) && (assertions == null || assertions.isEmpty())) {
                     cases.add(tc);
                     continue;
                 }
@@ -1138,8 +1272,14 @@ public class TestNGAdapter implements Adapter, ITestListener, ISuiteListener, II
                         tags.addAll(extra);
                     }
                 }
-                cases.add(tc.toBuilder().adapter(adapter != null ? adapter : tc.getAdapter())
-                        .tags(new ArrayList<>(tags)).build());
+                TestCase.Builder updated = tc.toBuilder().adapter(adapter != null ? adapter : tc.getAdapter())
+                        .tags(new ArrayList<>(tags));
+                if (assertions != null && !assertions.isEmpty()) {
+                    List<AssertionResult> all = new ArrayList<>(tc.getAssertions());
+                    all.addAll(assertions);
+                    updated.assertions(all);
+                }
+                cases.add(updated.build());
                 changed = true;
             }
             suites.add(suite.toBuilder().testCases(cases).build());

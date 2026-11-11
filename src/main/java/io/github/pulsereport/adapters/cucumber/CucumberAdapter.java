@@ -102,7 +102,10 @@ public class CucumberAdapter implements EventListener {
     /** The scenario hook running on this thread, while one runs. */
     private static final ThreadLocal<HookCapture> currentHook = new ThreadLocal<>();
 
-    private record HookCapture(HookType type, String name, Instant start) {
+    /** The assertion collector opened for the Gherkin step running on this thread. */
+    private static final ThreadLocal<Object> stepAssertions = new ThreadLocal<>();
+
+    private record HookCapture(HookType type, String name, Instant start, Object assertions) {
     }
 
     /**
@@ -252,12 +255,10 @@ public class CucumberAdapter implements EventListener {
 
     private void onTestStepStarted(TestStepStarted event) {
         if (!(event.getTestStep() instanceof PickleStepTestStep)) {
-            // Hooks are not report steps; drop anything they assert.
-            AssertionCollector.stop();
             if (currentScenario.get() != null && event.getTestStep() instanceof HookTestStep) {
                 HookTestStep hook = (HookTestStep) event.getTestStep();
                 currentHook.set(new HookCapture(hook.getHookType(), hookName(hook.getCodeLocation()),
-                        event.getInstant()));
+                        event.getInstant(), AssertionCollector.open()));
                 CucumberStepContext.beginStep();
             }
             return;
@@ -282,7 +283,7 @@ public class CucumberAdapter implements EventListener {
         ctx.startStep(keyword, name, event.getInstant(), isBackground);
 
         CucumberStepContext.beginStep();
-        AssertionCollector.start();
+        stepAssertions.set(AssertionCollector.open());
         logger.debug("Step started: {} {}", keyword, name);
     }
 
@@ -326,7 +327,9 @@ public class CucumberAdapter implements EventListener {
             stepArtifacts.addAll(buf);
             buf.clear();
         }
-        List<AssertionResult> assertions = AssertionCollector.stop();
+        List<AssertionResult> assertions = CucumberStepContext.takeSeededAssertions();
+        assertions.addAll(AssertionCollector.close(stepAssertions.get()));
+        stepAssertions.remove();
 
         TestStep step = TestStep.builder()
                 .name(ctx.getCurrentStepName())
@@ -409,18 +412,24 @@ public class CucumberAdapter implements EventListener {
         }
         CucumberStepContext.currentStepArtifacts.remove();
         CucumberStepContext.endScenario();
+        // A step or hook that never reported finishing must not keep collecting
+        HookCapture openHook = currentHook.get();
+        if (openHook != null) {
+            AssertionCollector.close(openHook.assertions());
+        }
         currentHook.remove();
-        AssertionCollector.stop();
+        AssertionCollector.close(stepAssertions.get());
+        stepAssertions.remove();
 
         logger.debug("Scenario finished: {} -> {}", ctx.getScenarioName(), status);
     }
 
     /**
      * Records what a scenario hook captured through {@link CaptureBridge}:
-     * Before/After hooks become "Setup"/"Teardown" steps, an AfterStep hook's
+     * Before/After hooks become "@Before"/"@After" steps, an AfterStep hook's
      * captures join the step it followed, and a BeforeStep hook's the next one.
-     * Hooks that captured nothing (no sub-steps or artifacts, such as REST
-     * Assured calls) stay out of the report, as before.
+     * Hooks that captured nothing (no sub-steps, artifacts such as REST Assured
+     * calls, or assertions) stay out of the report, as before.
      */
     private void finishHook(TestStepFinished event) {
         HookCapture hook = currentHook.get();
@@ -441,27 +450,30 @@ public class CucumberAdapter implements EventListener {
             artifacts.addAll(buf);
             buf.clear();
         }
-        if (children.isEmpty() && artifacts.isEmpty()) {
+        List<AssertionResult> assertions = CucumberStepContext.takeSeededAssertions();
+        assertions.addAll(AssertionCollector.close(hook.assertions()));
+        if (children.isEmpty() && artifacts.isEmpty() && assertions.isEmpty()) {
             return;
         }
         switch (hook.type()) {
             case AFTER_STEP:
-                ctx.appendToLastStep(children, artifacts);
+                ctx.appendToLastStep(children, artifacts, assertions);
                 return;
             case BEFORE_STEP:
-                CucumberStepContext.carry(children, artifacts);
+                CucumberStepContext.carry(children, artifacts, assertions);
                 return;
             default:
                 Instant end = event.getInstant();
                 TestStep.Builder step = TestStep.builder()
-                        .keyword(hook.type() == HookType.BEFORE ? "Setup" : "Teardown")
+                        .keyword(hook.type() == HookType.BEFORE ? "@Before" : "@After")
                         .name(hook.name())
                         .status(convertStatus(result.getStatus()))
                         .startTime(hook.start())
                         .endTime(end)
                         .duration(Duration.between(hook.start(), end).toMillis())
                         .children(children)
-                        .artifacts(artifacts);
+                        .artifacts(artifacts)
+                        .assertions(assertions);
                 if (result.getError() != null) {
                     step.errorMessage(result.getError().getMessage()).stackTrace(stackTraceOf(result.getError()));
                 }

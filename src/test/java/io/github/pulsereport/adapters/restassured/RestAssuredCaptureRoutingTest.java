@@ -65,6 +65,10 @@ class RestAssuredCaptureRoutingTest {
         List<Metric> metrics() {
             return recordedMetrics(key);
         }
+
+        List<io.github.pulsereport.core.model.AssertionResult> assertions() {
+            return recordedAssertions(key);
+        }
     }
 
     @BeforeEach
@@ -83,7 +87,7 @@ class RestAssuredCaptureRoutingTest {
     }
 
     @Test
-    void requestsInBeforeMethodBecomeTheSetupStep() {
+    void requestsInBeforeMethodBecomeStepsOfTheBeforeMethodStep() {
         IInvokedMethod setUp = configMethod("createUser", true);
         ITestResult configResult = configResult();
         testng.beforeInvocation(setUp, configResult);
@@ -95,16 +99,42 @@ class RestAssuredCaptureRoutingTest {
         testng.onTestSuccess(result);
 
         TestStep setup = testng.steps().get(0);
-        assertEquals("Setup", setup.getKeyword());
+        assertEquals("@BeforeMethod", setup.getKeyword());
         assertEquals("createUser", setup.getName());
-        assertEquals(List.of("http-request", "http-response"), types(setup.getArtifacts()));
-        assertTrue(setup.getArtifacts().get(0).getContent().contains("https://api.example.test/users"));
-        assertEquals(List.of("http-request", "http-response"), types(testng.artifacts()),
-                "the test's own call stays on the test");
+        TestStep post = setup.getChildren().get(0);
+        assertEquals("POST /users", post.getName());
+        assertEquals(List.of("http-request", "http-response"), types(post.getArtifacts()));
+        assertTrue(post.getArtifacts().get(0).getContent().contains("https://api.example.test/users"));
+
+        TestStep get = testng.steps().get(1);
+        assertEquals("GET /users/1", get.getName(), "the test's own call is a step of the test");
+        assertEquals(List.of("http-request", "http-response"), types(get.getArtifacts()));
+        assertTrue(testng.artifacts().isEmpty(), "exchanges live in their call steps");
     }
 
     @Test
-    void requestsInAfterMethodBecomeTheTeardownStep() {
+    void checksAfterACallAreListedWithThatCall() {
+        assertTrue(io.github.pulsereport.assertions.AssertionCapture.install());
+        IInvokedMethod test = mock(IInvokedMethod.class);
+        when(test.isTestMethod()).thenReturn(true);
+        testng.onTestStart(result);
+        testng.beforeInvocation(test, result);
+        call("GET", "https://api.example.test/users/1", 200);
+        org.testng.Assert.assertEquals(200, 200, "user 1 status");
+        call("GET", "https://api.example.test/users/2", 200);
+        org.testng.Assert.assertTrue(true, "user 2 is Ervin");
+        testng.afterInvocation(test, result);
+        testng.onTestSuccess(result);
+
+        List<TestStep> steps = testng.steps();
+        assertEquals(List.of("GET /users/1", "GET /users/2"), steps.stream().map(TestStep::getName).toList());
+        assertEquals(List.of("user 1 status"), steps.get(0).getAssertions().stream().map(a -> a.getMessage()).toList());
+        assertEquals(List.of("user 2 is Ervin"), steps.get(1).getAssertions().stream().map(a -> a.getMessage()).toList());
+        assertTrue(testng.assertions().isEmpty(), "nothing left at test level");
+    }
+
+    @Test
+    void requestsInAfterMethodBecomeStepsOfTheAfterMethodStep() {
         testng.onTestStart(result);
         testng.onTestSuccess(result);
 
@@ -115,9 +145,10 @@ class RestAssuredCaptureRoutingTest {
         testng.afterInvocation(tearDown, configResult);
 
         TestStep teardown = testng.steps().get(testng.steps().size() - 1);
-        assertEquals("Teardown", teardown.getKeyword());
+        assertEquals("@AfterMethod", teardown.getKeyword());
         assertEquals("deleteUser", teardown.getName());
-        assertEquals(List.of("http-request", "http-response"), types(teardown.getArtifacts()));
+        assertEquals("DELETE /users/1", teardown.getChildren().get(0).getName());
+        assertEquals(List.of("http-request", "http-response"), types(teardown.getChildren().get(0).getArtifacts()));
     }
 
     @Test
@@ -128,7 +159,7 @@ class RestAssuredCaptureRoutingTest {
         List<Artifact> storedByName = RestAssuredAdapter.getArtifacts(testng.key);
         testng.onTestSuccess(result);
 
-        assertEquals(2, testng.artifacts().size());
+        assertEquals(2, testng.steps().get(0).getArtifacts().size());
         assertTrue(storedByName.isEmpty(), "went to the test directly, not to the name-keyed store");
         assertEquals(List.of("api.response.time"), testng.metrics().stream().map(Metric::getName).toList());
     }

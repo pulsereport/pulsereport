@@ -55,10 +55,10 @@ class CucumberSeleniumCaptureTest {
         JsonNode scenario = report.path("suites").get(0).path("testCases").get(0);
         assertEquals("Cucumber", scenario.path("adapter").asText());
         JsonNode steps = scenario.path("steps");
-        assertEquals(4, steps.size(), "Before hook + three Gherkin steps; the After hook captured nothing");
+        assertEquals(4, steps.size(), "@Before hook + three Gherkin steps; the After hook captured nothing");
 
         JsonNode setup = steps.get(0);
-        assertEquals("Setup", setup.path("keyword").asText());
+        assertEquals("@Before", setup.path("keyword").asText());
         assertEquals("openBrowser", setup.path("name").asText());
         assertEquals("Open \"https://example.test/login\"", setup.path("children").get(0).path("name").asText());
 
@@ -113,7 +113,7 @@ class CucumberSeleniumCaptureTest {
         CucumberStepContext.beginScenario();
         try {
             TestStep action = TestStep.builder().name("Open").status(TestStatus.PASSED).build();
-            CucumberStepContext.carry(List.of(action), List.of());
+            CucumberStepContext.carry(List.of(action), List.of(), List.of());
             CucumberStepContext.beginStep();
             assertEquals(List.of(action), CucumberStepContext.endStep());
         } finally {
