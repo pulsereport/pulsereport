@@ -41,7 +41,7 @@ Rich, interactive HTML reports for human consumption.
 - **Keyboard navigation**: `↑`/`↓` move between tests, `f` toggles failures only, `/` focuses search.
 - **Readable failures**: Exception name and message first, with framework stack frames collapsed and a copy button for the full trace.
 - **BDD steps**: Cucumber scenarios show Given/When/Then steps with status, data tables, doc strings and per-step attachments.
-- **Sub-steps**: Steps made of smaller steps (a Selenium `step(...)` and its browser actions, Setup/Teardown steps, browser actions inside a Gherkin step) are listed under their parent, expanded when something inside failed.
+- **Sub-steps**: Steps made of smaller steps (a Selenium `step(...)` and its browser actions, `@BeforeMethod`/`@After` hook steps and the calls inside them, browser actions inside a Gherkin step) are listed under their parent, expanded when something inside failed.
 - **Video sync**: Steps that happened during a recording get a "Play from here" button, and the player's timeline marks each step.
 - **Browser evidence**: Failed browser tests show the page URL and title under the error; HAR files are listed as a request table; console errors are highlighted and counted in the test header.
 - **HTTP exchanges**: REST-assured requests and responses side by side, with status, headers and pretty-printed JSON bodies.

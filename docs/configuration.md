@@ -72,7 +72,7 @@ The current `ReporterConfig` implementation actively reads these keys:
 
 The masking keys are described in detail in [Sensitive Data Masking](#sensitive-data-masking).
 
-`reporter.assertions.capture` (default `true`) controls automatic assertion capture in Cucumber steps. When it's on, every JUnit, TestNG and Hamcrest assertion that runs inside a step appears under that step in the report, whether it passed or failed. It can also be set as a system property (`-Dreporter.assertions.capture=false`), which takes precedence. See [Assertion Capture](adapters-guide.md#assertion-capture) for details.
+`reporter.assertions.capture` (default `true`) controls automatic assertion capture in the Cucumber and TestNG adapters. When it's on, every JUnit, TestNG, Hamcrest and AssertJ assertion and every REST Assured response check appears in the report under the step, hook or test that made it, whether it passed or failed. It can also be set as a system property (`-Dreporter.assertions.capture=false`), which takes precedence. See [Assertion Capture](adapters-guide.md#assertion-capture) for details.
 
 `reporter.video.storage` controls how video evidence (Appium, and Selenium drivers wrapped with `track(...)`) is stored: `path` (default), `embed`, or `url`. For Selenium, `url` means each recording is handed to the uploader registered with `SeleniumAdapter.setVideoUploader(...)` (for example MinIO or S3) and the report plays the returned URL; without an uploader it behaves like `path`. Selenium videos larger than 50 MB, or beyond 200 MB of embedded video in one run, are linked instead of embedded.
 

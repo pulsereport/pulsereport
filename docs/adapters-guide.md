@@ -127,6 +127,18 @@ public void criticalTest() {
 // Groups and priorities are captured in the report
 ```
 
+#### Assertions
+
+Assertions in test methods are listed in the report with their expected and actual values, passing or failing, with no change to your tests. Each one is listed with the step it followed (the browser action, REST call or `step(...)` made just before it), so you can see what was checked after what. Assertions made before any step are listed in the test's **Assertions** section. Assertions in `@BeforeMethod`/`@AfterMethod` appear on that method's step. JUnit, TestNG, Hamcrest and AssertJ assertions and REST Assured `then()` checks are covered; see [Assertion Capture](#assertion-capture).
+
+```java
+@Test
+public void userIsCreated() {
+    assertEquals(response.statusCode(), 201, "status code");   // listed: expected 201, actual 201
+    assertThat(user.getName()).as("user name").isEqualTo("Ann");
+}
+```
+
 ### Adding Artifacts
 
 ```java
@@ -234,7 +246,7 @@ public class WebTest {
     @BeforeMethod
     public void setUp() {
         driver = adapter.track(new ChromeDriver());
-        driver.get("https://example.com/login");      // shown as the test's "Setup" step
+        driver.get("https://example.com/login");      // shown in the test's "@BeforeMethod setUp" step
     }
 
     @Test
@@ -262,9 +274,10 @@ What gets recorded:
   switches, `Actions` gestures (hover, drag, double/right click, key presses, scrolling) and
   closed windows, each with its element, locator, URL change and duration. Actions inside
   `step(...)` become that step's sub-steps; nested `step(...)` calls keep their own sub-steps.
-- **Setup and teardown**: actions in `@BeforeMethod`/`@AfterMethod` (and class, test, suite and
-  group configuration methods) appear as "Setup" and "Teardown" steps of the test. A failed setup
-  keeps its steps, screenshot and page details, so a skipped test shows why.
+- **Configuration methods**: actions in `@BeforeMethod`/`@AfterMethod` (and class, test, suite and
+  group configuration methods) appear as a step of the test named after the method, with the
+  annotation as its keyword (`@BeforeMethod setUp`, `@AfterClass closeBrowser`). A failed
+  configuration method keeps its steps, screenshot and page details, so a skipped test shows why.
 - **Failures**: when a test fails because an element was never found, the report adds a failed
   "Find element By.id: …" step; when a `WebDriverWait` timed out on a lookup, a "Wait for By.id: …"
   step. Failed tests also get a screenshot, the page URL, title and window size, browser console
@@ -626,12 +639,14 @@ Every exchange (and every artifact or metric added by hand) goes to whatever is 
 
 | Call made in | Lands in |
 |---|---|
-| A `@Test` method | The test |
-| `@BeforeMethod` / `@BeforeClass` | A **Setup** step, named after the method, on the next test |
-| `@AfterMethod` | A **Teardown** step on the test that just finished |
-| A Cucumber step | That step |
-| A Cucumber `@Before` / `@After` hook | A **Setup** / **Teardown** step on the scenario |
+| A `@Test` method | A step of its own, e.g. **GET /users/1**, holding the request and response |
+| `@BeforeMethod` / `@BeforeClass` | A call step inside the method's **@BeforeMethod** / **@BeforeClass** step, on the next test |
+| `@AfterMethod` | A call step inside the **@AfterMethod** step, on the test that just finished |
+| A Cucumber step | That step (the Gherkin step already names the action) |
+| A Cucumber `@Before` / `@After` hook | The hook's **@Before** / **@After** step on the scenario |
 | A Cucumber `@BeforeStep` / `@AfterStep` hook | The step that follows / the step it followed |
+
+In TestNG tests, the response checks and assertions made after a call are listed with that call, so each request shows what was verified about it.
 
 Metrics (`recordResponseTime`, `addMetric`, ...) go to the running test or scenario. A configuration method or hook that made no calls adds nothing to the report. Selenium actions follow the same rules, so a step that drives the browser and calls the API shows both.
 
@@ -879,7 +894,7 @@ public class CucumberRunner { }
 - **Data tables and doc strings** — Step arguments are captured and displayed in reports
 - **Parallel execution support** — Thread-safe via `ThreadLocal` scenario context
 - **Step-level artifacts** — HTTP artifacts captured by `RestAssuredAdapter` are automatically routed to the currently executing step (see below)
-- **Assertion capture** — Every JUnit, TestNG and Hamcrest assertion in a step is listed under that step, passing or failing, with no change to your step code (see below)
+- **Assertion capture** — Every JUnit, TestNG, Hamcrest and AssertJ assertion and every REST Assured response check in a step or hook is listed under it, passing or failing, with no change to your step code (see below)
 
 ### Assertion Capture
 
@@ -894,16 +909,29 @@ public void statusShouldBe(int expected) {
 
 The report lists each assertion under its step. Each entry shows the message, the method, the expected and actual values, and, for a failure, the library's error text. If any assertion in a step failed, its list opens automatically.
 
-**Supported libraries** (the static entry points are instrumented):
+The TestNG adapter captures assertions too, so this works the same in TestNG, Selenium and REST Assured suites. Each assertion goes to whatever was running when it was evaluated:
 
-| Library | Class | Notes |
+| Assertion made in | Listed under |
+| --- | --- |
+| A Cucumber step | That step |
+| A Cucumber `@Before` / `@After` hook | The hook's **@Before** / **@After** step |
+| A Cucumber `@BeforeStep` / `@AfterStep` hook | The step that follows / the step it followed |
+| A TestNG `@Test` method | The step it followed: the last browser action, REST call, mobile step or `step(...)` before it. Assertions made before any step go to the test's **Assertions** section |
+| TestNG `@BeforeMethod` / `@AfterMethod` (and the other configuration methods) | The call or action it followed inside the method's **@BeforeMethod** / **@AfterMethod** step, else that step |
+| Inside `SeleniumTracker.step("…", () -> …)` / `adapter.step(…)` | That step |
+
+**Supported libraries:**
+
+| Library | What is captured | Notes |
 | --- | --- | --- |
 | JUnit 5 | `org.junit.jupiter.api.Assertions` | Assertions inside `assertAll` are listed individually |
 | JUnit 4 | `org.junit.Assert` | |
 | TestNG | `org.testng.Assert` | Also covers `SoftAssert`, which delegates to `Assert` |
 | Hamcrest | `org.hamcrest.MatcherAssert.assertThat` | The matcher description is shown as the expected value |
+| AssertJ | Every check in a fluent chain: `assertThat(name).as("user name").isNotNull().startsWith("A")` is two entries | The `as(...)` text is the message. Soft assertions are listed as they are made. Checks inside `satisfies(...)` and similar are listed individually |
+| REST Assured | Response checks after `then()`: `statusCode`, `statusLine`, `contentType`, `header(s)`, `cookie(s)`, `body`, `time`, `spec` | The actual value is read from the response. `body("id", equalTo(1), "name", equalTo("Ann"))` is one entry per path, and only the path that failed is marked failed |
 
-**How it works.** When the adapter starts, it attaches a small Byte Buddy Java agent. The agent adds tracking code to the classes above so that each assertion call is recorded with its arguments and its result. Only the outermost call is recorded: a library calling its own overloads doesn't produce extra entries. Assertions in hooks are ignored. If recording fails for any reason, the assertion itself behaves exactly as before.
+**How it works.** When the adapter starts, it attaches a small Byte Buddy Java agent. The agent adds tracking code to the classes above so that each assertion call is recorded with its arguments and its result. Only the outermost call is recorded: a library calling its own overloads doesn't produce extra entries. If recording fails for any reason, the assertion itself behaves exactly as before.
 
 **Recommended: load the agent at JVM startup.** If you don't, the adapter attaches the agent while tests are already running. On JDK 21 and later that makes the JVM print `WARNING: A Java agent has been loaded dynamically`. A library can't hide this warning, because the JVM prints it itself ([JEP 451](https://openjdk.org/jeps/451)). OpenJDK also plans to block attaching agents at runtime by default ([draft JEP 8388877](https://openjdk.org/jeps/8388877)). No release has done so yet, and no target release has been set. When it does happen, capture switches itself off: the adapter logs a warning, your tests still run, and the report has no assertion lists. Loading the agent at startup avoids both problems. Mockito asks for the same setup:
 
@@ -934,8 +962,8 @@ If you'd rather keep runtime attach and only hide the warning, use `<argLine>-XX
 **Limitations:**
 
 - **Values, not source code.** The report shows the values that were passed. For example, `assertTrue(user.isActive())` is shown as expected `true`, actual `true`. A message such as `assertTrue(user.isActive(), "user is active")` makes the entry readable.
-- **Not yet covered:** AssertJ's fluent `assertThat(...)` chains, and checks inside other libraries such as REST-assured's `.then().statusCode(200)`.
-- **Same thread only.** Only assertions that run on the step's thread are captured.
+- **Not covered:** REST Assured's older `expect().statusCode(200).when().get(...)` style (use `then()`), and assertion libraries not listed above.
+- **Threads.** Assertions on a thread started during a step (directly, or by an executor created in the step) are listed under that step until it ends. Threads that already existed, and the shared fork/join pool used by parallel streams and `CompletableFuture`, are not captured: they serve other tests too.
 
 To turn capture off, set `reporter.assertions.capture=false` in `reporter.properties`, or pass `-Dreporter.assertions.capture=false`.
 
@@ -1015,7 +1043,7 @@ HTTP request/response artifacts captured by the REST-assured filter are automati
 
 Track the driver with `SeleniumTracker` (no TestNG needed). Browser actions in a step
 definition become sub-steps of that Gherkin step, actions in `@Before`/`@After` hooks become
-"Setup"/"Teardown" steps, and a failing step gets the failed lookup, a screenshot and the page
+"@Before"/"@After" steps named after the hook method, and a failing step gets the failed lookup, a screenshot and the page
 details:
 
 ```java
