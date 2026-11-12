@@ -198,6 +198,7 @@ public class AppiumAdapterTest {
                 () -> adapter.recordAppLaunchTime(null, 100.0));
         assertThrows(IllegalArgumentException.class,
                 () -> adapter.recordScreenTransitionTime(null, 100.0));
+        adapter.onTestSuccess(mockResult);
     }
 
     // ---------------------------------------------------------------
@@ -241,6 +242,7 @@ public class AppiumAdapterTest {
         adapter.onTestStart(mockResult);
         assertThrows(IllegalArgumentException.class, () -> adapter.recordStep(null, "step", 1));
         assertThrows(IllegalArgumentException.class, () -> adapter.recordStep("stepTest", null, 1));
+        adapter.onTestSuccess(mockResult);
     }
 
     @Test

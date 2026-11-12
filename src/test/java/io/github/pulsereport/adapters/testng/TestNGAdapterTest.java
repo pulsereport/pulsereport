@@ -345,6 +345,7 @@ public class TestNGAdapterTest {
         IllegalArgumentException thrown = assertThrows(IllegalArgumentException.class,
                 () -> adapter.addArtifact("test", null));
         assertNotNull(thrown);
+        adapter.onTestSuccess(mockResult);
     }
 
     @Test
@@ -355,6 +356,7 @@ public class TestNGAdapterTest {
         IllegalArgumentException thrown = assertThrows(IllegalArgumentException.class,
                 () -> adapter.addMetric("test", null));
         assertNotNull(thrown);
+        adapter.onTestSuccess(mockResult);
     }
 
     @Test

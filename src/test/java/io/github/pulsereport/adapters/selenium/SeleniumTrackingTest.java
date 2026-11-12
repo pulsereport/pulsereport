@@ -101,9 +101,14 @@ class SeleniumTrackingTest {
         System.clearProperty("pulsereport.selenium.stepDetail");
         System.clearProperty("pulsereport.screenshots.storage");
         System.clearProperty("pulsereport.screenshots.directory");
-        SeleniumTracker.setHooks(null);
         SeleniumAdapter.setVideoUploader(null);
         SeleniumAdapter.resetSettings();
+        // Most tests never quit their fake browser; stop tracking it so later
+        // test classes on this thread don't find a tracked driver.
+        SeleniumTracker.Tracked leftover = SeleniumTracker.active();
+        if (leftover != null) {
+            SeleniumTracker.untrack(leftover.raw());
+        }
     }
 
     @Test
