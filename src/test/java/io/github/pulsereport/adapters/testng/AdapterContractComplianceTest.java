@@ -3,9 +3,11 @@ package io.github.pulsereport.adapters.testng;
 import io.github.pulsereport.adapters.Adapter;
 import io.github.pulsereport.core.model.Artifact;
 import io.github.pulsereport.core.model.Metric;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.lang.reflect.Field;
 import java.time.Instant;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -24,6 +26,18 @@ public class AdapterContractComplianceTest {
     @BeforeEach
     public void setUp() {
         adapter = new TestNGAdapter();
+    }
+
+    /**
+     * onTestStart(String) marks a test as running on this thread, and only the
+     * ITestResult listener methods end it. Clear it so test classes that run
+     * later in this JVM don't see a TestNG test still running.
+     */
+    @AfterEach
+    public void tearDown() throws ReflectiveOperationException {
+        Field running = TestNGAdapter.class.getDeclaredField("currentTestKey");
+        running.setAccessible(true);
+        ((ThreadLocal<?>) running.get(null)).remove();
     }
 
     @Test
