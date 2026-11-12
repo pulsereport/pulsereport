@@ -156,11 +156,11 @@ ls -lh target/pulsereport/test-report.html
 
 **Problem**: Tests run but screenshots missing from report.
 
-**Cause**: The Selenium adapter captures screenshots automatically only for drivers wrapped with `adapter.track(driver)`, and by default only for failures (`reporter.screenshots.mode=failed`).
+**Cause**: The Selenium adapter captures screenshots automatically only for drivers wrapped with `adapter.track(driver)`, and by default only for failures (`pulsereport.screenshots.mode=failed`).
 
 **Solution**:
 
-Wrap the driver, and use `reporter.screenshots.mode=all` if you want a screenshot after every step:
+Wrap the driver, and use `pulsereport.screenshots.mode=all` if you want a screenshot after every step:
 
 ```java
 driver = adapter.track(new ChromeDriver());
@@ -335,7 +335,7 @@ curl -X POST -H 'Content-type: application/json' \
 
 ```bash
 git filter-branch --force --index-filter \
-  "git rm --cached --ignore-unmatch reporter.properties" \
+  "git rm --cached --ignore-unmatch pulsereport.properties" \
   --prune-empty --tag-name-filter cat -- --all
 ```
 
@@ -344,13 +344,13 @@ git filter-branch --force --index-filter \
 Always use environment variables:
 
 ```properties
-reporter.slack.webhookUrl=${SLACK_WEBHOOK_URL}
+pulsereport.slack.webhookUrl=${SLACK_WEBHOOK_URL}
 ```
 
 Add to `.gitignore`:
 
 ```text
-reporter.properties
+pulsereport.properties
 *.properties
 ```
 
@@ -429,20 +429,20 @@ try {
 **Step 1**: Verify the file you intend to load actually exists:
 
 ```bash
-ls -la config/reporter.properties
+ls -la config/pulsereport.properties
 ```
 
 **Step 2**: Validate that same file explicitly:
 
 ```bash
 java -jar target/pulsereport-${version}.jar validate \
-    --config config/reporter.properties
+    --config config/pulsereport.properties
 ```
 
 **Step 3**: If you are using the Java API, load the file directly:
 
 ```java
-ReporterConfig config = ReporterConfig.loadFromFile(new File("config/reporter.properties"));
+ReporterConfig config = ReporterConfig.loadFromFile(new File("config/pulsereport.properties"));
 ```
 
 **Step 4**: If you are using the CLI, pass `--config` on commands that support it:
@@ -450,7 +450,7 @@ ReporterConfig config = ReporterConfig.loadFromFile(new File("config/reporter.pr
 ```bash
 java -jar target/pulsereport-${version}.jar generate \
     --input target/test-results.json \
-    --config config/reporter.properties
+    --config config/pulsereport.properties
 ```
 
 ### Environment Variables Not Resolved
@@ -497,30 +497,30 @@ java -DSLACK_WEBHOOK_URL="https://..." -jar app.jar
 **Step 1**: Validate configuration:
 
 ```bash
-java -jar target/pulsereport-${version}.jar validate --config reporter.properties
+java -jar target/pulsereport-${version}.jar validate --config pulsereport.properties
 ```
 
 **Step 2**: Check data types:
 
 ```properties
 # Boolean: true/false (not yes/no, 1/0)
-reporter.s3.enabled=true
+pulsereport.s3.enabled=true
 
 # Number: Integer only (no decimals for counts)
-reporter.maxArtifactContentSize=51200
+pulsereport.maxArtifactContentSize=51200
 
 # List: Comma-separated (no spaces)
-reporter.output.formats=html,json,junit
+pulsereport.output.formats=html,json,junit
 
 # Enum-like: path | embed | url
-reporter.video.storage=path
+pulsereport.video.storage=path
 ```
 
 **Step 3**: Check URL formats:
 
 ```properties
 # Must include protocol
-reporter.http.url=https://api.example.com/reports
+pulsereport.http.url=https://api.example.com/reports
 # NOT: api.example.com/reports
 ```
 
@@ -538,17 +538,17 @@ reporter.http.url=https://api.example.com/reports
 
 **Cause**: The Cucumber and TestNG adapters resolve the output directory in this precedence order (highest first):
 
-1. `-Dreporter.output.directory` system property
-2. `reporter.output.directory` from an auto-detected `reporter.properties`
+1. `-Dpulsereport.output.directory` system property
+2. `pulsereport.output.directory` from an auto-detected `pulsereport.properties`
 3. Default `target/pulsereport`
 
-So either your `reporter.properties` was not auto-detected (it must be at `./reporter.properties`, `./src/main/resources/reporter.properties`, or `/reporter.properties` on the classpath), or a `-Dreporter.output.directory` system property is overriding the file.
+So either your `pulsereport.properties` was not auto-detected (it must be at `./pulsereport.properties`, `./src/main/resources/pulsereport.properties`, or `/pulsereport.properties` on the classpath), or a `-Dpulsereport.output.directory` system property is overriding the file.
 
 **Solution**:
 
 - Check the adapter logs at startup/run completion — the Cucumber and TestNG adapters log the absolute path of each generated report (`PulseReport: HTML report generated / Location: ...`).
-- Under Maven Surefire the working directory is the module directory, so `./reporter.properties` means the module root, not necessarily the repo root. Putting the file in `src/main/resources/` (classpath) is the most reliable location.
-- Check whether a `-Dreporter.output.directory` system property is set (e.g. in the Maven command line or `surefire` `<systemPropertyVariables>`); it overrides the file value.
+- Under Maven Surefire the working directory is the module directory, so `./pulsereport.properties` means the module root, not necessarily the repo root. Putting the file in `src/main/resources/` (classpath) is the most reliable location.
+- Check whether a `-Dpulsereport.output.directory` system property is set (e.g. in the Maven command line or `surefire` `<systemPropertyVariables>`); it overrides the file value.
 
 ---
 
@@ -606,7 +606,7 @@ mvn dependency:tree > dependencies.txt
 mvn test > test-output.txt 2>&1
 
 # Configuration
-cat src/main/resources/reporter.properties
+cat src/main/resources/pulsereport.properties
 ```
 
 ### Report Issues
@@ -653,13 +653,13 @@ Not yet. The HTML report currently uses a fixed built-in template with a dark/li
 Use environment variable interpolation (only `${VAR}` placeholders are supported; there is no `${date:...}` syntax):
 
 ```properties
-reporter.output.directory=target/pulsereport/${BUILD_ID}
+pulsereport.output.directory=target/pulsereport/${BUILD_ID}
 ```
 
 Or in the S3 key prefix:
 
 ```properties
-reporter.s3.keyPrefix=reports/${GIT_BRANCH}/${BUILD_NUMBER}/
+pulsereport.s3.keyPrefix=reports/${GIT_BRANCH}/${BUILD_NUMBER}/
 ```
 
 ---

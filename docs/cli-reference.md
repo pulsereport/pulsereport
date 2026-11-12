@@ -45,7 +45,7 @@ If build metadata is unavailable, the fallback value is `PulseReport unknown`.
 
 - There is no documented `help` subcommand in `ReporterCLI`; use `--help` on the root command or on a subcommand.
 - There are no global `--debug` or `--quiet` flags.
-- When `--config` is omitted, the CLI auto-detects `reporter.properties` from the project root, `src/main/resources/`, or the classpath. Pass `--config` explicitly to override.
+- When `--config` is omitted, the CLI auto-detects `pulsereport.properties` from the project root, `src/main/resources/`, or the classpath. Pass `--config` explicitly to override.
 
 ## `generate`
 
@@ -71,11 +71,11 @@ java -jar target/pulsereport-${version}.jar generate [OPTIONS]
 ### Generate Behavior Notes
 
 - `--input` must point to an existing file or the command exits with code `2`.
-- If `--config` is omitted, the CLI auto-detects `reporter.properties` from the project root, `src/main/resources/`, or the classpath.
+- If `--config` is omitted, the CLI auto-detects `pulsereport.properties` from the project root, `src/main/resources/`, or the classpath.
 - If no config is found and `--config` is omitted, the CLI falls back to a config built from command-line options, with `--output` defaulting to `target/pulsereport`.
 - `ReporterConfig.validate()` still requires at least one output format, so in practice you must either:
   - pass `--format`, or
-  - provide a config (auto-detected or explicit) with `reporter.output.formats` defined.
+  - provide a config (auto-detected or explicit) with `pulsereport.output.formats` defined.
 
 ### Generate Examples
 
@@ -93,7 +93,7 @@ Generate using an explicit configuration file:
 ```bash
 java -jar target/pulsereport-${version}.jar generate \
   --input target/test-results.json \
-  --config config/reporter.properties
+  --config config/pulsereport.properties
 ```
 
 Dry run with explicit formats:
@@ -119,14 +119,14 @@ Verbose generation with a config file:
 ```bash
 java -jar target/pulsereport-${version}.jar generate \
   --input target/test-results.json \
-  --config config/reporter.properties \
+  --config config/pulsereport.properties \
   --verbose
 ```
 
 Representative output:
 
 ```text
-Loading configuration from: config/reporter.properties
+Loading configuration from: config/pulsereport.properties
 Generating reports...
   Input: target/test-results.json
   Output: target/pulsereport
@@ -157,7 +157,7 @@ java -jar target/pulsereport-${version}.jar publish [OPTIONS]
 ### Publish Behavior Notes
 
 - `--input` must point to an existing file or the command exits with code `2`.
-- If `--config` is omitted, the CLI auto-detects `reporter.properties` from the project root, `src/main/resources/`, or the classpath. If no config is found, the command exits with code `2`.
+- If `--config` is omitted, the CLI auto-detects `pulsereport.properties` from the project root, `src/main/resources/`, or the classpath. If no config is found, the command exits with code `2`.
 
 ### Publish Examples
 
@@ -165,7 +165,7 @@ java -jar target/pulsereport-${version}.jar publish [OPTIONS]
 java -jar target/pulsereport-${version}.jar publish \
   --input target/pulsereport/test-report.html \
   --target s3 \
-  --config config/reporter.properties
+  --config config/pulsereport.properties
 ```
 
 Multiple targets:
@@ -174,7 +174,7 @@ Multiple targets:
 java -jar target/pulsereport-${version}.jar publish \
   --input target/pulsereport/test-report.html \
   --target s3,http,slack \
-  --config config/reporter.properties
+  --config config/pulsereport.properties
 ```
 
 Dry run:
@@ -183,7 +183,7 @@ Dry run:
 java -jar target/pulsereport-${version}.jar publish \
   --input target/pulsereport/test-report.html \
   --target s3,http \
-  --config config/reporter.properties \
+  --config config/pulsereport.properties \
   --dry-run
 ```
 
@@ -201,14 +201,14 @@ Verbose mode:
 java -jar target/pulsereport-${version}.jar publish \
   --input target/pulsereport/test-report.html \
   --target s3,slack \
-  --config config/reporter.properties \
+  --config config/pulsereport.properties \
   --verbose
 ```
 
 Representative output:
 
 ```text
-Loading configuration from: config/reporter.properties
+Loading configuration from: config/pulsereport.properties
 Publishing report...
   Input: target/pulsereport/test-report.html
   Targets: [s3, slack]
@@ -241,7 +241,7 @@ java -jar target/pulsereport-${version}.jar validate [OPTIONS]
 
 ```bash
 java -jar target/pulsereport-${version}.jar validate \
-  --config config/reporter.properties
+  --config config/pulsereport.properties
 ```
 
 Success output:
@@ -254,14 +254,14 @@ Verbose validation:
 
 ```bash
 java -jar target/pulsereport-${version}.jar validate \
-  --config config/reporter.properties \
+  --config config/pulsereport.properties \
   --verbose
 ```
 
 Representative verbose output:
 
 ```text
-Validating configuration: config/reporter.properties
+Validating configuration: config/pulsereport.properties
 Loaded configuration:
 ReporterConfig{outputFormats=[html, json], outputDirectory=target/pulsereport, ...}
 ✓ Configuration is valid
@@ -284,6 +284,6 @@ Invalid configuration output:
 
 ## Practical Notes
 
-- The CLI auto-detects `reporter.properties` when `--config` is omitted. Use `--config` to point to a specific file.
+- The CLI auto-detects `pulsereport.properties` when `--config` is omitted. Use `--config` to point to a specific file.
 - Use the Java integration APIs for concrete S3 and HTTP publishing behavior.
 - Keep examples consistent with the current supported output formats: `html`, `json`, and `junit`.

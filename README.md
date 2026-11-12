@@ -60,11 +60,11 @@ Reports are written to `target/pulsereport/` by default.
 
 ## Configuration
 
-Create `reporter.properties` in your classpath or configure via environment variables:
+Create `pulsereport.properties` in your classpath or configure via environment variables:
 
 ```properties
-reporter.output.formats=html,json,junit
-reporter.output.directory=target/pulsereport
+pulsereport.output.formats=html,json,junit
+pulsereport.output.directory=target/pulsereport
 ```
 
 See [Configuration Reference](docs/configuration.md) for all options.

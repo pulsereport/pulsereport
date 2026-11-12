@@ -14,17 +14,17 @@ PulseReport can emit human-readable and machine-readable outputs from the same r
 
 ### Enable Output Formats
 
-In the PulseReport configuration file (`reporter.properties`):
+In the PulseReport configuration file (`pulsereport.properties`):
 
 ```properties
 # Formats to generate (comma-separated: html, json, junit)
-reporter.output.formats=html,json,junit
+pulsereport.output.formats=html,json,junit
 
 # Output directory
-reporter.output.directory=target/pulsereport
+pulsereport.output.directory=target/pulsereport
 ```
 
-> **Note:** `reporter.output.formats` is honored **only by the PulseReport CLI**. The TestNG and Cucumber adapters always generate both `test-report.html` and `test-report.json`, regardless of this setting.
+> **Note:** `pulsereport.output.formats` is honored **only by the PulseReport CLI**. The TestNG and Cucumber adapters always generate both `test-report.html` and `test-report.json`, regardless of this setting.
 
 ---
 
@@ -74,7 +74,7 @@ start target/pulsereport/test-report.html
 
 #### Report Title
 
-The title in the top bar and browser tab defaults to the run name. Override it with `reporter.report.title` in `reporter.properties` or `-Dreporter.report.title=...`.
+The title in the top bar and browser tab defaults to the run name. Override it with `pulsereport.report.title` in `pulsereport.properties` or `-Dpulsereport.report.title=...`.
 
 #### Themes
 
@@ -442,9 +442,9 @@ Mask sensitive information in reports:
 ```properties
 # Masking is enabled by default; these are the master switch and
 # per-category controls for REST API tests
-reporter.maskSensitiveData=true
-reporter.maskHeaders.fields=Authorization,X-API-Key,Cookie,Set-Cookie
-reporter.maskBody.fields=password,secret,token
+pulsereport.maskSensitiveData=true
+pulsereport.maskHeaders.fields=Authorization,X-API-Key,Cookie,Set-Cookie
+pulsereport.maskBody.fields=password,secret,token
 ```
 
 ---

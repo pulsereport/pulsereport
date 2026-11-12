@@ -289,30 +289,30 @@ What gets recorded:
   `Chrome 131`.
 - **Sensitive data**: typed text is masked for password, one-time-code and card fields, and for
   fields whose name, id or label looks sensitive (`password`, `token`, `otp`, `pin`, `cvv`, plus
-  `reporter.maskBody.fields`). Credentials and sensitive query parameters (`token`, `code`,
+  `pulsereport.maskBody.fields`). Credentials and sensitive query parameters (`token`, `code`,
   `access_token`, …) are masked in URLs.
 
 Screenshots are embedded in the report as Base64 by default; with
-`reporter.screenshots.storage=path` they are written to `reporter.screenshots.directory` and shown
+`pulsereport.screenshots.storage=path` they are written to `pulsereport.screenshots.directory` and shown
 from there. Logs and page sources are written under the report folder (`artifacts/`), and videos to
-`reporter.video.directory` (default `<output>/videos`). The report links files by relative path, so
+`pulsereport.video.directory` (default `<output>/videos`). The report links files by relative path, so
 keep those folders in place relative to the report. The S3 publisher uploads linked files that sit
 inside the report folder.
 
 | Key | Values | Default |
 | --- | --- | --- |
-| `reporter.screenshots.mode` | `all`, `failed`, `last`, `none` | `failed` |
-| `reporter.video.mode` | `always`, `failed`, `none` (needs [ffmpeg](https://ffmpeg.org)) | `none` |
-| `reporter.video.fps` | 1–30 | `2` |
-| `reporter.screenshots.storage` | `embed` (Base64 in the report), `path` (files in `reporter.screenshots.directory`) | `embed` |
-| `reporter.screenshots.directory` | folder for screenshot files when `storage=path` | `<output>/artifacts/screenshots` |
-| `reporter.video.storage` | `path` (file in `reporter.video.directory`), `embed` (Base64 in the HTML, up to 50 MB per video and 200 MB in total), `url` (sent to the video uploader, see below) | `path` |
-| `reporter.video.directory` | folder for recorded videos | `<output>/videos` |
-| `reporter.selenium.stepDetail` | `full`, `minimal` (no extra browser calls per action; elements are named by locator) | `full` |
-| `reporter.selenium.maskInputs` | `sensitive`, `all`, `none` | `sensitive` |
-| `reporter.selenium.failureCapture` | any of `page`, `console`, `source`, or `none` | `page,console,source` |
-| `reporter.selenium.pageMetrics` | `true`, `false` | `true` |
-| `reporter.selenium.trackScripts` | record `executeScript` calls as steps | `false` |
+| `pulsereport.screenshots.mode` | `all`, `failed`, `last`, `none` | `failed` |
+| `pulsereport.video.mode` | `always`, `failed`, `none` (needs [ffmpeg](https://ffmpeg.org)) | `none` |
+| `pulsereport.video.fps` | 1–30 | `2` |
+| `pulsereport.screenshots.storage` | `embed` (Base64 in the report), `path` (files in `pulsereport.screenshots.directory`) | `embed` |
+| `pulsereport.screenshots.directory` | folder for screenshot files when `storage=path` | `<output>/artifacts/screenshots` |
+| `pulsereport.video.storage` | `path` (file in `pulsereport.video.directory`), `embed` (Base64 in the HTML, up to 50 MB per video and 200 MB in total), `url` (sent to the video uploader, see below) | `path` |
+| `pulsereport.video.directory` | folder for recorded videos | `<output>/videos` |
+| `pulsereport.selenium.stepDetail` | `full`, `minimal` (no extra browser calls per action; elements are named by locator) | `full` |
+| `pulsereport.selenium.maskInputs` | `sensitive`, `all`, `none` | `sensitive` |
+| `pulsereport.selenium.failureCapture` | any of `page`, `console`, `source`, or `none` | `page,console,source` |
+| `pulsereport.selenium.pageMetrics` | `true`, `false` | `true` |
+| `pulsereport.selenium.trackScripts` | record `executeScript` calls as steps | `false` |
 
 See [Configuration](configuration.md) for details. Video frames are captured from the same
 browser session; the adapter serializes them with your test's commands, and recording stops at
@@ -482,7 +482,7 @@ adapter.recordStep("tap login", TestStatus.FAILED, 40, "wrong screen");
 
 #### Screen Recording (Video)
 
-How the video is stored is **configurable** via `reporter.video.storage`:
+How the video is stored is **configurable** via `pulsereport.video.storage`:
 
 | Mode | `captureVideo` 3rd arg | Report behavior |
 | ---- | ---------------------- | --------------- |
@@ -491,8 +491,8 @@ How the video is stored is **configurable** via `reporter.video.storage`:
 | `embed` | raw Base64 video | bytes embedded in the HTML (self-contained, larger) |
 
 ```properties
-# reporter.properties
-reporter.video.storage=path   # or url, embed
+# pulsereport.properties
+pulsereport.video.storage=path   # or url, embed
 ```
 
 ```java
@@ -770,18 +770,18 @@ Response durations are automatically formatted in human-readable units (e.g., `2
 
 ### Configuration Options
 
-In the PulseReport configuration file (`reporter.properties`):
+In the PulseReport configuration file (`pulsereport.properties`):
 
 ```properties
 # Sensitive data masking (enabled by default; see configuration.md
 # for the full masking reference, including body, XML, and token masking)
-reporter.maskSensitiveData=true
-reporter.maskHeaders.enabled=true
-reporter.maskHeaders.fields=Authorization,X-API-Key,Cookie,Set-Cookie
-reporter.maskBody.enabled=true
-reporter.maskBody.fields=password,secret,token,access_token,refresh_token,id_token,client_secret,api_key,apiKey,authorization
-reporter.maskBody.maskTokens=true
-reporter.maskXml.enabled=true
+pulsereport.maskSensitiveData=true
+pulsereport.maskHeaders.enabled=true
+pulsereport.maskHeaders.fields=Authorization,X-API-Key,Cookie,Set-Cookie
+pulsereport.maskBody.enabled=true
+pulsereport.maskBody.fields=password,secret,token,access_token,refresh_token,id_token,client_secret,api_key,apiKey,authorization
+pulsereport.maskBody.maskTokens=true
+pulsereport.maskXml.enabled=true
 ```
 
 ### Example
@@ -965,7 +965,7 @@ If you'd rather keep runtime attach and only hide the warning, use `<argLine>-XX
 - **Not covered:** REST Assured's older `expect().statusCode(200).when().get(...)` style (use `then()`), and assertion libraries not listed above.
 - **Threads.** Assertions on a thread started during a step (directly, or by an executor created in the step) are listed under that step until it ends. Threads that already existed, and the shared fork/join pool used by parallel streams and `CompletableFuture`, are not captured: they serve other tests too.
 
-To turn capture off, set `reporter.assertions.capture=false` in `reporter.properties`, or pass `-Dreporter.assertions.capture=false`.
+To turn capture off, set `pulsereport.assertions.capture=false` in `pulsereport.properties`, or pass `-Dpulsereport.assertions.capture=false`.
 
 ### Attaching Artifacts to Steps
 
@@ -1074,13 +1074,13 @@ On test run completion, the adapter generates:
 
 ### Configuration
 
-The Cucumber adapter auto-detects `reporter.properties` from the working directory, `src/main/resources/`, or the classpath — no client-side configuration code is needed. To customize the output directory, set `reporter.output.directory` in that file, or override it with a system property (highest precedence):
+The Cucumber adapter auto-detects `pulsereport.properties` from the working directory, `src/main/resources/`, or the classpath — no client-side configuration code is needed. To customize the output directory, set `pulsereport.output.directory` in that file, or override it with a system property (highest precedence):
 
 ```bash
-mvn test -Dreporter.output.directory=custom/output/path
+mvn test -Dpulsereport.output.directory=custom/output/path
 ```
 
-Precedence: `-Dreporter.output.directory` system property > `reporter.properties` value > default `target/pulsereport`.
+Precedence: `-Dpulsereport.output.directory` system property > `pulsereport.properties` value > default `target/pulsereport`.
 
 ---
 
@@ -1181,7 +1181,7 @@ Artifact video = captureFullVideo(); // Avoid unless necessary
 **Solution**:
 
 - **Selenium** — screenshots are automatic only for drivers wrapped with
-  `adapter.track(driver)`, and only as `reporter.screenshots.mode` allows
+  `adapter.track(driver)`, and only as `pulsereport.screenshots.mode` allows
   (default: failures). `adapter.screenshot(name)` takes one on demand
   (see [Screenshots and Page Source](#screenshots-and-page-source)).
 - **Appium** — automatic failure capture requires registering the driver with
@@ -1195,8 +1195,8 @@ Artifact video = captureFullVideo(); // Avoid unless necessary
 **Solution**: Enable logging:
 
 ```properties
-reporter.restassured.logging.request=true
-reporter.restassured.logging.response=true
+pulsereport.restassured.logging.request=true
+pulsereport.restassured.logging.response=true
 ```
 
 ### Memory Issues with Large Suites
@@ -1206,8 +1206,8 @@ reporter.restassured.logging.response=true
 **Solution**: Use streaming aggregator:
 
 ```properties
-reporter.aggregator.type=streaming
-reporter.aggregator.streaming.flushInterval=100
+pulsereport.aggregator.type=streaming
+pulsereport.aggregator.streaming.flushInterval=100
 ```
 
 ---
