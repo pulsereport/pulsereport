@@ -186,10 +186,10 @@ public class TestNGAdapterTest {
     @Test
     public void generateReportsUsesPulseReportDefaultOutputDirectory() throws Exception {
         String previousUserDir = System.getProperty("user.dir");
-        String previousOutputDir = System.getProperty("reporter.output.directory");
+        String previousOutputDir = System.getProperty("pulsereport.output.directory");
 
         try {
-            System.clearProperty("reporter.output.directory");
+            System.clearProperty("pulsereport.output.directory");
             System.setProperty("user.dir", tempDir.toString());
 
             ISuite mockSuite = mock(ISuite.class);
@@ -229,9 +229,9 @@ public class TestNGAdapterTest {
                             "TestNG adapter should generate the JSON report in the PulseReport default directory"));
         } finally {
             if (previousOutputDir == null) {
-                System.clearProperty("reporter.output.directory");
+                System.clearProperty("pulsereport.output.directory");
             } else {
-                System.setProperty("reporter.output.directory", previousOutputDir);
+                System.setProperty("pulsereport.output.directory", previousOutputDir);
             }
 
             if (previousUserDir == null) {

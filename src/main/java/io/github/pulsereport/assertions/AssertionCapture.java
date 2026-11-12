@@ -1,8 +1,13 @@
 package io.github.pulsereport.assertions;
 
+import static net.bytebuddy.matcher.ElementMatchers.hasSuperType;
+import static net.bytebuddy.matcher.ElementMatchers.isAbstract;
+import static net.bytebuddy.matcher.ElementMatchers.isBridge;
+import static net.bytebuddy.matcher.ElementMatchers.isInterface;
 import static net.bytebuddy.matcher.ElementMatchers.isPublic;
 import static net.bytebuddy.matcher.ElementMatchers.isStatic;
 import static net.bytebuddy.matcher.ElementMatchers.named;
+import static net.bytebuddy.matcher.ElementMatchers.nameContains;
 import static net.bytebuddy.matcher.ElementMatchers.nameStartsWith;
 import static net.bytebuddy.matcher.ElementMatchers.namedOneOf;
 import static net.bytebuddy.matcher.ElementMatchers.not;
@@ -26,9 +31,12 @@ import net.bytebuddy.utility.JavaModule;
  *
  * <p>Instruments the static assertion entry points of JUnit 5
  * ({@code org.junit.jupiter.api.Assertions}), JUnit 4 ({@code org.junit.Assert}),
- * TestNG ({@code org.testng.Assert}, which also backs {@code SoftAssert}) and
- * Hamcrest ({@code org.hamcrest.MatcherAssert}). Each call is recorded into the
- * thread's {@link AssertionCollector}, which adapters open around every step.</p>
+ * TestNG ({@code org.testng.Assert}, which also backs {@code SoftAssert}),
+ * Hamcrest ({@code org.hamcrest.MatcherAssert}) and AssertJ's {@code fail}, plus
+ * the checks of AssertJ's fluent assert classes ({@code assertThat(x).isEqualTo(y)})
+ * and REST Assured's response checks ({@code then().statusCode(200)}). Each call
+ * is recorded into the thread's {@link AssertionCollector}, which adapters open
+ * around every step, hook and test.</p>
  *
  * <p>Two ways to enable it:</p>
  * <ul>
@@ -41,8 +49,8 @@ import net.bytebuddy.utility.JavaModule;
  * dynamic attach and prints no warning.</li>
  * </ul>
  *
- * <p>Disable with the {@code reporter.assertions.capture=false} system property
- * or {@code reporter.properties} entry.</p>
+ * <p>Disable with the {@code pulsereport.assertions.capture=false} system property
+ * or {@code pulsereport.properties} entry.</p>
  */
 public final class AssertionCapture {
 
@@ -52,7 +60,8 @@ public final class AssertionCapture {
         AssertionInterpreter.JUNIT5,
         AssertionInterpreter.JUNIT4,
         AssertionInterpreter.TESTNG,
-        AssertionInterpreter.HAMCREST
+        AssertionInterpreter.HAMCREST,
+        AssertionInterpreter.ASSERTJ_FAIL
     };
 
     /**
@@ -64,6 +73,30 @@ public final class AssertionCapture {
             .and(isPublic())
             .and(nameStartsWith("assert").or(named("fail")).or(named("expectThrows")))
             .and(not(namedOneOf("assertAll", "assertTimeout", "assertTimeoutPreemptively", "assertDoesNotThrow")));
+
+    /**
+     * AssertJ checks: the public instance methods of its assert classes that
+     * verify something ({@code isEqualTo}, {@code hasSize}, {@code contains}...).
+     * Methods that run user code ({@code satisfies}, {@code allSatisfy}...) are
+     * skipped, like {@code assertAll}, so the assertions inside them show.
+     */
+    private static final ElementMatcher.Junction<MethodDescription> ASSERTJ_CHECKS = isPublic()
+            .and(not(isStatic()))
+            .and(not(isAbstract()))
+            .and(not(isBridge()))
+            .and(nameStartsWith("is").or(nameStartsWith("has")).or(nameStartsWith("contains"))
+                    .or(nameStartsWith("does")).or(nameStartsWith("startsWith")).or(nameStartsWith("endsWith"))
+                    .or(nameStartsWith("matches")).or(nameStartsWith("are")).or(nameStartsWith("have"))
+                    .or(nameStartsWith("allMatch")).or(nameStartsWith("anyMatch")).or(nameStartsWith("noneMatch"))
+                    .or(nameStartsWith("accepts")).or(nameStartsWith("rejects")).or(named("returns")))
+            .and(not(nameContains("Satisf")))
+            .and(not(named("hashCode")));
+
+    /** REST Assured response checks made after {@code then()}. */
+    private static final ElementMatcher.Junction<MethodDescription> REST_ASSURED_CHECKS = isPublic()
+            .and(not(isStatic()))
+            .and(namedOneOf("statusCode", "statusLine", "contentType", "header", "headers", "cookie", "cookies",
+                    "body", "content", "time", "spec"));
 
     private static volatile boolean installed;
     private static volatile boolean attempted;
@@ -135,6 +168,19 @@ public final class AssertionCapture {
                     .with(new ErrorListener())
                     .type(namedOneOf(TARGET_TYPES), AssertionCapture::seesRecorder)
                     .transform(AssertionCapture::weave)
+                    // AssertJ's assert classes; not the proxies it generates for soft assertions and
+                    // assumptions, which catch the failure: the check they delegate to records it
+                    .type(nameStartsWith(FluentAssertionInterpreter.ASSERTJ_PACKAGE)
+                            .and(not(isInterface()))
+                            .and(not(nameContains("$ByteBuddy$")))
+                            .and(not(nameContains("$$")))
+                            .and(hasSuperType(named(FluentAssertionInterpreter.ASSERTJ_ROOT))),
+                            AssertionCapture::seesRecorder)
+                    .transform((builder, type, loader, module, domain) ->
+                            builder.visit(Advice.to(InstanceAssertionAdvice.class).on(ASSERTJ_CHECKS)))
+                    .type(named(FluentAssertionInterpreter.REST_ASSURED_CHECKS), AssertionCapture::seesRecorder)
+                    .transform((builder, type, loader, module, domain) ->
+                            builder.visit(Advice.to(InstanceAssertionAdvice.class).on(REST_ASSURED_CHECKS)))
                     .assureReadEdgeTo(instrumentation, AssertionRecorder.class)
                     .installOn(instrumentation);
             installed = true;

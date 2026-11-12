@@ -57,6 +57,7 @@ final class SeleniumVideoRecorder {
     private final AtomicBoolean stopped = new AtomicBoolean();
     private volatile boolean running = true;
     private volatile long stoppedAt;
+    private volatile long videoStart;
     private long frameBytes;
     private boolean discarded;
 
@@ -94,7 +95,7 @@ final class SeleniumVideoRecorder {
                 }
             }
             logger.warn("PulseReport: video recording is enabled but ffmpeg was not found at '{}'. "
-                    + "Install ffmpeg or set reporter.video.ffmpegPath. Videos will be skipped.", path);
+                    + "Install ffmpeg or set pulsereport.video.ffmpegPath. Videos will be skipped.", path);
             return false;
         });
     }
@@ -259,6 +260,14 @@ final class SeleniumVideoRecorder {
         return frameDir;
     }
 
+    /**
+     * @return wall-clock time (epoch ms) of the video's first frame, once
+     * {@link #encode} has run; 0 before
+     */
+    long videoStartMillis() {
+        return videoStart;
+    }
+
     /** Writes the ffmpeg concat list, or returns null when no frames were captured. */
     Path writeFrameList() throws IOException {
         List<Long> times;
@@ -309,6 +318,7 @@ final class SeleniumVideoRecorder {
 
     private Path writeConcatList(List<Long> times, int first) throws IOException {
         long end = stoppedAt > 0 ? stoppedAt : System.currentTimeMillis();
+        videoStart = times.get(first);
         StringBuilder sb = new StringBuilder();
         for (int i = first; i < times.size(); i++) {
             double seconds = i + 1 < times.size()

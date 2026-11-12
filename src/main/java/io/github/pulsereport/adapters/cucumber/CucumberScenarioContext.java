@@ -155,4 +155,23 @@ class CucumberScenarioContext {
     void addBackgroundStep(TestStep step) {
         backgroundSteps.add(step);
     }
+
+    /** Adds what an after-step hook captured to the step it followed. */
+    void appendToLastStep(List<TestStep> children, List<io.github.pulsereport.core.model.Artifact> artifacts,
+            List<io.github.pulsereport.core.model.AssertionResult> assertions) {
+        List<TestStep> target = !steps.isEmpty() ? steps : backgroundSteps;
+        if (target.isEmpty()) {
+            return;
+        }
+        int last = target.size() - 1;
+        TestStep step = target.get(last);
+        List<TestStep> mergedChildren = new ArrayList<>(step.getChildren());
+        mergedChildren.addAll(children);
+        List<io.github.pulsereport.core.model.Artifact> mergedArtifacts = new ArrayList<>(step.getArtifacts());
+        mergedArtifacts.addAll(artifacts);
+        List<io.github.pulsereport.core.model.AssertionResult> mergedAssertions = new ArrayList<>(step.getAssertions());
+        mergedAssertions.addAll(assertions);
+        target.set(last, step.toBuilder().children(mergedChildren).artifacts(mergedArtifacts)
+                .assertions(mergedAssertions).build());
+    }
 }

@@ -15,7 +15,7 @@ A unified test reporting library for Java. PulseReport captures results from Tes
 <dependency>
     <groupId>io.github.pulsereport</groupId>
     <artifactId>pulsereport</artifactId>
-    <version>1.2.0</version>
+    <version>1.3.0</version>
 </dependency>
 ```
 
@@ -60,11 +60,11 @@ Reports are written to `target/pulsereport/` by default.
 
 ## Configuration
 
-Create `reporter.properties` in your classpath or configure via environment variables:
+Create `pulsereport.properties` in your classpath or configure via environment variables:
 
 ```properties
-reporter.output.formats=html,json,junit
-reporter.output.directory=target/pulsereport
+pulsereport.output.formats=html,json,junit
+pulsereport.output.directory=target/pulsereport
 ```
 
 See [Configuration Reference](docs/configuration.md) for all options.

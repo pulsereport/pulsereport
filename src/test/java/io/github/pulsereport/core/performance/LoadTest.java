@@ -25,14 +25,14 @@ import io.github.pulsereport.core.model.TestCase;
 import io.github.pulsereport.core.model.TestRun;
 
 /**
- * Load tests for performance and scaling validation. Tests the reporter's
+ * Load tests for performance and scaling validation. Tests PulseReport's
  * ability to handle large test suites (100k+ tests) without memory issues.
  *
  * Performance targets: - Small datasets (< 1k tests): < 100MB memory, < 5s -
  * Medium datasets (1k-10k tests): < 500MB memory, < 30s - Large datasets
  * (10k-100k tests): < 2GB memory, < 5min (with streaming)
  *
- * @author Custom Reporter Team
+ * @author PulseReport Team
  * @since 1.0.0
  */
 public class LoadTest {

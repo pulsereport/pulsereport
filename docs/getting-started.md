@@ -61,15 +61,15 @@ That is enough to start collecting the evidence PulseReport uses to report run h
 
 ### Step 4: (Optional) Configure Output Formats
 
-Create the PulseReport configuration file at `src/main/resources/reporter.properties`:
+Create the PulseReport configuration file at `src/main/resources/pulsereport.properties`:
 
 ```properties
 # Enable output formats
-reporter.output.formats=html,json,junit
-reporter.output.directory=target/pulsereport
+pulsereport.output.formats=html,json,junit
+pulsereport.output.directory=target/pulsereport
 ```
 
-All adapters and the CLI auto-detect this file (working directory, `src/main/resources/`, or classpath), so no client-side configuration code is needed. If present, `-Dreporter.output.directory` overrides the file's `reporter.output.directory`; otherwise reports go to the directory in the file, falling back to `target/pulsereport`.
+All adapters and the CLI auto-detect this file (working directory, `src/main/resources/`, or classpath), so no client-side configuration code is needed. If present, `-Dpulsereport.output.directory` overrides the file's `pulsereport.output.directory`; otherwise reports go to the directory in the file, falling back to `target/pulsereport`.
 
 ### Step 5: (Optional) View HTML Reports
 
@@ -238,7 +238,7 @@ public void testWithScreenshot() {
 }
 ```
 
-> **Tip:** If you use the `SeleniumAdapter`, it does this for you — call `adapter.captureBrowserScreenshot(testName, fileName, filePath, fileSize)` instead of building the `Artifact` by hand. See the [Selenium Example](../examples/selenium-example/README.md).
+> **Tip:** If you use the `SeleniumAdapter`, it does this for you — wrap the driver with `adapter.track(driver)` and call `adapter.screenshot("name")` instead of building the `Artifact` by hand; failed tests get a screenshot automatically. See the [Selenium Example](../examples/selenium-example/README.md).
 
 ### Record Metrics
 
@@ -270,36 +270,36 @@ public void testWithMetric() {
 
 ### To Slack
 
-Configure the PulseReport configuration file (`reporter.properties`):
+Configure the PulseReport configuration file (`pulsereport.properties`):
 
 ```properties
-reporter.slack.enabled=true
-reporter.slack.webhookUrl=https://hooks.slack.com/services/YOUR/WEBHOOK/URL
-reporter.slack.channel=#test-results
-reporter.slack.mentionOnFailure=@qa-team
+pulsereport.slack.enabled=true
+pulsereport.slack.webhookUrl=https://hooks.slack.com/services/YOUR/WEBHOOK/URL
+pulsereport.slack.channel=#test-results
+pulsereport.slack.mentionOnFailure=@qa-team
 ```
 
 ### To S3
 
-Configure the PulseReport configuration file (`reporter.properties`):
+Configure the PulseReport configuration file (`pulsereport.properties`):
 
 ```properties
-reporter.s3.enabled=true
-reporter.s3.bucket=my-test-reports
-reporter.s3.region=us-east-1
-reporter.s3.keyPrefix=builds/${BUILD_ID}/
+pulsereport.s3.enabled=true
+pulsereport.s3.bucket=my-test-reports
+pulsereport.s3.region=us-east-1
+pulsereport.s3.keyPrefix=builds/${BUILD_ID}/
 ```
 
 ### Via HTTP
 
-Configure the PulseReport configuration file (`reporter.properties`):
+Configure the PulseReport configuration file (`pulsereport.properties`):
 
 ```properties
-reporter.http.enabled=true
-reporter.http.url=https://api.example.com/reports
-reporter.http.method=POST
-reporter.http.auth.type=bearer
-reporter.http.auth.token=${API_TOKEN}
+pulsereport.http.enabled=true
+pulsereport.http.url=https://api.example.com/reports
+pulsereport.http.method=POST
+pulsereport.http.auth.type=bearer
+pulsereport.http.auth.token=${API_TOKEN}
 ```
 
 See the [Integrations Guide](integrations.md) for detailed setup instructions.
@@ -320,11 +320,11 @@ See the [Integrations Guide](integrations.md) for detailed setup instructions.
 
 1. **Verify the listener actually ran** — confirm the adapter is registered in `testng.xml` (or via `@Listeners`) and that TestNG picked up that suite file. For programmatic runs, make sure the listener was added via `testng.addListener(...)`.
 2. **Verify tests executed** — a report is only written when the suite finishes; check the Maven/Gradle output for `Tests run:` lines.
-3. **Check the output directory** — reports land in `target/pulsereport` by default (or the `reporter.output.directory` value from `reporter.properties` / `-Dreporter.output.directory`).
-4. **Validate your configuration** — if you use a `reporter.properties` file, run the CLI to catch typos or invalid values:
+3. **Check the output directory** — reports land in `target/pulsereport` by default (or the `pulsereport.output.directory` value from `pulsereport.properties` / `-Dpulsereport.output.directory`).
+4. **Validate your configuration** — if you use a `pulsereport.properties` file, run the CLI to catch typos or invalid values:
 
 ```bash
-pulsereport validate --config path/to/reporter.properties
+pulsereport validate --config path/to/pulsereport.properties
 ```
 
 ### ClassNotFoundException

@@ -295,7 +295,7 @@ public class AppiumAdapter extends TestNGAdapter {
      * Attaches a screen recording (video) to the specified test.
      *
      * <p>How the third argument is interpreted depends on the configured video
-     * storage mode ({@code reporter.video.storage}):</p>
+     * storage mode ({@code pulsereport.video.storage}):</p>
      * <ul>
      *   <li><b>path</b> (default) — {@code source} is a local/hosted file path;
      *       the report renders an inline {@code <video>} player streaming from it.</li>
@@ -346,7 +346,7 @@ public class AppiumAdapter extends TestNGAdapter {
                 return cfg.getVideoStorage();
             }
         } catch (Exception e) {
-            logger.debug("Could not load reporter config for video storage mode: {}", e.getMessage());
+            logger.debug("Could not load PulseReport config for video storage mode: {}", e.getMessage());
         }
         return "path";
     }
@@ -527,20 +527,7 @@ public class AppiumAdapter extends TestNGAdapter {
         }
         mergedEnvironment.putAll(metadata);
 
-        return TestRun.builder()
-                .id(builtTestRun.getId())
-                .name(builtTestRun.getName())
-                .startTime(builtTestRun.getStartTime())
-                .endTime(builtTestRun.getEndTime())
-                .duration(builtTestRun.getDuration())
-                .status(builtTestRun.getStatus())
-                .suites(builtTestRun.getSuites())
-                .environment(mergedEnvironment)
-                .totalTests(builtTestRun.getTotalTests())
-                .passedTests(builtTestRun.getPassedTests())
-                .failedTests(builtTestRun.getFailedTests())
-                .skippedTests(builtTestRun.getSkippedTests())
-                .build();
+        return builtTestRun.toBuilder().environment(mergedEnvironment).build();
     }
 
     /**

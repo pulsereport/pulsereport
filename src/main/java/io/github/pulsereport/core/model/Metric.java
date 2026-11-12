@@ -22,17 +22,20 @@ public final class Metric {
     private final double value;
     private final String unit;
     private final Instant timestamp;
+    private final String label;
 
     @JsonCreator
     private Metric(
             @JsonProperty("name") String name,
             @JsonProperty("value") double value,
             @JsonProperty("unit") String unit,
-            @JsonProperty("timestamp") Instant timestamp) {
+            @JsonProperty("timestamp") Instant timestamp,
+            @JsonProperty("label") String label) {
         this.name = name;
         this.value = value;
         this.unit = unit;
         this.timestamp = timestamp;
+        this.label = label;
     }
 
     /**
@@ -68,6 +71,14 @@ public final class Metric {
     }
 
     /**
+     * Gets what the measurement was taken on, e.g. the page URL of a page load time.
+     * @return the label (optional)
+     */
+    public String getLabel() {
+        return label;
+    }
+
+    /**
      * Creates a new builder for Metric.
      * @return a new builder instance
      */
@@ -88,7 +99,8 @@ public final class Metric {
         return Double.compare(metric.value, value) == 0 &&
                 Objects.equals(name, metric.name) &&
                 Objects.equals(unit, metric.unit) &&
-                Objects.equals(timestamp, metric.timestamp);
+                Objects.equals(timestamp, metric.timestamp) &&
+                Objects.equals(label, metric.label);
     }
 
     /**
@@ -97,7 +109,7 @@ public final class Metric {
      */
     @Override
     public int hashCode() {
-        return Objects.hash(name, value, unit, timestamp);
+        return Objects.hash(name, value, unit, timestamp, label);
     }
 
     /**
@@ -111,6 +123,7 @@ public final class Metric {
                 ", value=" + value +
                 ", unit='" + unit + '\'' +
                 ", timestamp=" + timestamp +
+                (label != null ? ", label='" + label + '\'' : "") +
                 '}';
     }
 
@@ -122,6 +135,7 @@ public final class Metric {
         private double value;
         private String unit;
         private Instant timestamp;
+        private String label;
 
         private Builder() {
         }
@@ -171,6 +185,20 @@ public final class Metric {
          * @return a new Metric
          * @throws IllegalArgumentException if required fields are missing
          */
+        /**
+         * Sets what the measurement was taken on, e.g. the page URL of a page load time.
+         * @param label the label (optional)
+         * @return this builder
+         */
+        public Builder label(String label) {
+            this.label = label;
+            return this;
+        }
+
+        /**
+         * Builds the Metric instance.
+         * @return a new Metric
+         */
         public Metric build() {
             if (name == null || name.trim().isEmpty()) {
                 throw new IllegalArgumentException("name is required");
@@ -181,7 +209,7 @@ public final class Metric {
             if (timestamp == null) {
                 throw new IllegalArgumentException("timestamp is required");
             }
-            return new Metric(name, value, unit, timestamp);
+            return new Metric(name, value, unit, timestamp, label);
         }
     }
 }

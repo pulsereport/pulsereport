@@ -55,4 +55,31 @@ public final class AssertionRecorder {
             depth[0] = Math.max(0, depth[0] - 1);
         }
     }
+
+    /**
+     * Like {@link #exit}, for fluent checks (AssertJ, REST Assured) whose actual
+     * value lives on the object the check runs on.
+     *
+     * @param outermost value returned by the matching {@link #enter()}
+     * @param owner declaring class name
+     * @param method method name
+     * @param descriptor JVM method descriptor
+     * @param self the assert or response object the check ran on
+     * @param args the call's arguments
+     * @param thrown the throwable raised by the check, or null if it passed
+     */
+    public static void exitFluent(boolean outermost, String owner, String method, String descriptor,
+                                  Object self, Object[] args, Throwable thrown) {
+        int[] depth = DEPTH.get();
+        try {
+            if (outermost && AssertionCollector.isActive()) {
+                FluentAssertionInterpreter.interpret(owner, method, descriptor, self, args, thrown)
+                        .forEach(AssertionCollector::add);
+            }
+        } catch (Throwable ignored) {
+            // Never let reporting break the user's assertion.
+        } finally {
+            depth[0] = Math.max(0, depth[0] - 1);
+        }
+    }
 }

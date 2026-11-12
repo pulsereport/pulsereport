@@ -45,16 +45,16 @@ Upload test reports to Amazon S3 for centralized storage and access.
 
 ### S3 Configuration
 
-In an explicitly loaded PulseReport configuration file (`reporter.properties`):
+In an explicitly loaded PulseReport configuration file (`pulsereport.properties`):
 
 ```properties
 # Enable S3 publishing
-reporter.s3.enabled=true
+pulsereport.s3.enabled=true
 
 # S3 bucket details
-reporter.s3.bucket=my-test-reports
-reporter.s3.region=us-east-1
-reporter.s3.keyPrefix=builds/${BUILD_ID}/
+pulsereport.s3.bucket=my-test-reports
+pulsereport.s3.region=us-east-1
+pulsereport.s3.keyPrefix=builds/${BUILD_ID}/
 ```
 
 `ReporterConfig` currently reads the S3 enabled flag, bucket, region, and key prefix from the file. AWS credentials and any custom endpoint configuration are handled by the `S3Client` you create in code.
@@ -104,10 +104,18 @@ S3PublishConfig config = S3PublishConfig.builder()
 S3Publisher publisher = new S3Publisher(s3Client);
 
 File reportFile = new File("target/pulsereport/test-report.html");
-publisher.publish(reportFile, config);
+publisher.publish(reportFile, config);   // also uploads the screenshots, videos and logs it links to
 
 System.out.println("Report published to bucket: " + config.getBucketName());
 ```
+
+### Linked Files
+
+Publishing a report file also uploads the files it links to by relative path (screenshots,
+videos, logs and page sources under `artifacts/` and `videos/`), under the same key prefix and
+with their content types, so the published report's links keep working. The files are found
+through the report's JSON (`test-report.json` next to an HTML report). To upload only the
+report, use `S3PublishConfig.builder().uploadArtifacts(false)`.
 
 ### Key Prefix Patterns
 
@@ -115,13 +123,13 @@ Use dynamic key patterns for organization:
 
 ```properties
 # By build ID and date
-reporter.s3.keyPrefix=builds/${BUILD_ID}/${DATE}/
+pulsereport.s3.keyPrefix=builds/${BUILD_ID}/${DATE}/
 
 # By branch and build
-reporter.s3.keyPrefix=${GIT_BRANCH}/${BUILD_NUMBER}/
+pulsereport.s3.keyPrefix=${GIT_BRANCH}/${BUILD_NUMBER}/
 
 # By date hierarchy
-reporter.s3.keyPrefix=${YEAR}/${MONTH}/${DAY}/${BUILD_ID}/
+pulsereport.s3.keyPrefix=${YEAR}/${MONTH}/${DAY}/${BUILD_ID}/
 
 # Variables resolved from environment
 ```
@@ -149,22 +157,22 @@ POST test reports to any HTTP endpoint for custom processing.
 
 ### HTTP Configuration
 
-In an explicitly loaded PulseReport configuration file (`reporter.properties`):
+In an explicitly loaded PulseReport configuration file (`pulsereport.properties`):
 
 ```properties
 # Enable HTTP publishing
-reporter.http.enabled=true
+pulsereport.http.enabled=true
 
 # Endpoint URL
-reporter.http.url=https://api.example.com/test-reports
+pulsereport.http.url=https://api.example.com/test-reports
 
 # HTTP method
-reporter.http.method=POST
+pulsereport.http.method=POST
 # Options: POST, PUT
 
 # Bearer token auth, if used
-reporter.http.auth.type=bearer
-reporter.http.auth.token=${API_TOKEN}
+pulsereport.http.auth.type=bearer
+pulsereport.http.auth.token=${API_TOKEN}
 ```
 
 `ReporterConfig` currently reads the HTTP enabled flag, endpoint URL, method, auth type, and bearer token from the file. If you need custom headers or basic authentication, set those on `HttpPublishConfig` in code.
@@ -174,13 +182,13 @@ reporter.http.auth.token=${API_TOKEN}
 #### Bearer Token
 
 ```properties
-reporter.http.auth.type=bearer
-reporter.http.auth.token=${API_TOKEN}
+pulsereport.http.auth.type=bearer
+pulsereport.http.auth.token=${API_TOKEN}
 ```
 
 #### Basic Authentication and Custom Headers
 
-The configuration file only reads `reporter.http.auth.type` and `reporter.http.auth.token` (bearer token). Basic authentication, API-key headers, and any other custom headers are configured in code on `HttpPublishConfig`:
+The configuration file only reads `pulsereport.http.auth.type` and `pulsereport.http.auth.token` (bearer token). Basic authentication, API-key headers, and any other custom headers are configured in code on `HttpPublishConfig`:
 
 ```java
 HttpPublishConfig config = HttpPublishConfig.builder()
@@ -244,8 +252,8 @@ try {
 
 ```properties
 # Test HTTP publishing with webhook.site
-reporter.http.url=https://webhook.site/your-unique-url
-reporter.http.method=POST
+pulsereport.http.url=https://webhook.site/your-unique-url
+pulsereport.http.method=POST
 ```
 
 #### Custom API Server
@@ -288,7 +296,7 @@ Send test result notifications to Slack channels.
 1. Go to <https://api.slack.com/apps>
 2. Click "Create New App"
 3. Choose "From scratch"
-4. Name your app (e.g., "Test Reporter Bot")
+4. Name your app (e.g., "PulseReport Bot")
 5. Select your workspace
 6. Navigate to "Incoming Webhooks"
 7. Activate Incoming Webhooks
@@ -298,24 +306,24 @@ Send test result notifications to Slack channels.
 
 ### Slack Configuration
 
-In the PulseReport configuration file (`reporter.properties`):
+In the PulseReport configuration file (`pulsereport.properties`):
 
 ```properties
 # Enable Slack notifications
-reporter.slack.enabled=true
+pulsereport.slack.enabled=true
 
 # Webhook URL (use environment variable for security)
-reporter.slack.webhookUrl=${SLACK_WEBHOOK_URL}
+pulsereport.slack.webhookUrl=${SLACK_WEBHOOK_URL}
 
 # Channel override (optional - webhook has default channel)
-reporter.slack.channel=#test-results
+pulsereport.slack.channel=#test-results
 
 # Mention a user or group when the run fails (optional)
-reporter.slack.mentionOnFailure=@qa-team
-# Or user: reporter.slack.mentionOnFailure=@john.doe
+pulsereport.slack.mentionOnFailure=@qa-team
+# Or user: pulsereport.slack.mentionOnFailure=@john.doe
 
 # Optional report URL attached to the message as a "View Report" button
-reporter.slack.reportUrl=https://reports.example.com/build-123/test-report.html
+pulsereport.slack.reportUrl=https://reports.example.com/build-123/test-report.html
 ```
 
 `ReporterConfig` currently reads the Slack enabled flag, webhook URL, channel, mention-on-failure value, and report URL from the file. Retry behavior is tuned on `SlackConfig` in code.
@@ -427,7 +435,7 @@ httpPublisher.publish(reportFile, httpConfig);   // HTTP endpoint
 slackNotifier.notify(testRun, slackConfig);      // Slack notification
 ```
 
-There is no automatic publish pipeline: setting `reporter.s3.enabled`, `reporter.http.enabled`, or `reporter.slack.enabled` in a configuration file does not trigger publishing on its own. Your build helper decides the order and the error handling.
+There is no automatic publish pipeline: setting `pulsereport.s3.enabled`, `pulsereport.http.enabled`, or `pulsereport.slack.enabled` in a configuration file does not trigger publishing on its own. Your build helper decides the order and the error handling.
 
 ### With Report URL in Slack
 
@@ -460,7 +468,7 @@ export REPORT_URL="https://my-reports.s3.amazonaws.com/builds/${BUILD_ID}/test-r
 # Run tests
 mvn test
 
-# Publishing is still an explicit step. Creating `reporter.properties` alone does not auto-publish reports.
+# Publishing is still an explicit step. Creating `pulsereport.properties` alone does not auto-publish reports.
 # Call the S3Publisher, HttpPublisher, or SlackNotifier APIs from your build helper after reports are generated.
 
 # Exit with test status
@@ -523,11 +531,11 @@ Never hardcode credentials:
 
 ```properties
 # Good
-reporter.slack.webhookUrl=${SLACK_WEBHOOK_URL}
-reporter.http.auth.token=${API_TOKEN}
+pulsereport.slack.webhookUrl=${SLACK_WEBHOOK_URL}
+pulsereport.http.auth.token=${API_TOKEN}
 
 # Bad
-reporter.slack.webhookUrl=https://hooks.slack.com/services/T00/B00/xxxx
+pulsereport.slack.webhookUrl=https://hooks.slack.com/services/T00/B00/xxxx
 ```
 
 AWS credentials are not read from the properties file at all — provide them through the standard AWS SDK credential chain (environment variables, system properties, shared credentials file, or IAM roles).

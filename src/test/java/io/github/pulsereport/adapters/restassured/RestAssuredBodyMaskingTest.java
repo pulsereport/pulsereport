@@ -344,16 +344,16 @@ public class RestAssuredBodyMaskingTest {
 
     @Test
     public void defaultConstructor_loadsAutoDetectedPropertiesFile() throws Exception {
-        Path cwdProps = Paths.get("reporter.properties");
+        Path cwdProps = Paths.get("pulsereport.properties");
         assertFalse(Files.exists(cwdProps),
-                "precondition: no working-directory reporter.properties should exist");
+                "precondition: no working-directory pulsereport.properties should exist");
         try {
             Files.write(cwdProps, Arrays.asList(
-                    "reporter.output.formats=json",
-                    "reporter.output.directory=target/custom-reports",
-                    "reporter.maskSensitiveData=true",
-                    "reporter.maskBody.enabled=true",
-                    "reporter.maskBody.fields=customfield"));
+                    "pulsereport.output.formats=json",
+                    "pulsereport.output.directory=target/custom-reports",
+                    "pulsereport.maskSensitiveData=true",
+                    "pulsereport.maskBody.enabled=true",
+                    "pulsereport.maskBody.fields=customfield"));
 
             RestAssuredAdapter autoAdapter = new RestAssuredAdapter();
 
@@ -365,7 +365,7 @@ public class RestAssuredBodyMaskingTest {
             assertNotNull(artifact);
             assertNotNull(artifact.getContent());
             assertFalse(artifact.getContent().contains("v1"),
-                    "custom field from auto-detected reporter.properties should be masked");
+                    "custom field from auto-detected pulsereport.properties should be masked");
             assertTrue(artifact.getContent().contains("p1"),
                     "password is not in the auto-detected field list, so it must remain visible");
         } finally {
@@ -378,15 +378,15 @@ public class RestAssuredBodyMaskingTest {
     @Test
     public void defaultConstructor_fallsBackToDefaultsWhenNoFile() {
         // DEVIATION: ReporterConfig.autoDetect() also checks the classpath
-        // /reporter.properties, which is always present in the test classpath
-        // (src/main/resources/reporter.properties), so the literal fallback
+        // /pulsereport.properties, which is always present in the test classpath
+        // (src/main/resources/pulsereport.properties), so the literal fallback
         // branch cannot be exercised here. The classpath file's masking
         // defaults match createDefaultConfig(), so the observable behavior
         // asserted below is identical in both cases: with no working-directory
         // properties file, default fields like "password" are masked.
-        Path cwdProps = Paths.get("reporter.properties");
+        Path cwdProps = Paths.get("pulsereport.properties");
         assertFalse(Files.exists(cwdProps),
-                "precondition: no working-directory reporter.properties should exist");
+                "precondition: no working-directory pulsereport.properties should exist");
 
         RestAssuredAdapter defaultAdapter = new RestAssuredAdapter();
 

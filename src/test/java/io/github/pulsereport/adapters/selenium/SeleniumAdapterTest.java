@@ -1,11 +1,13 @@
 package io.github.pulsereport.adapters.selenium;
 
+import java.time.Instant;
 import java.util.Date;
 
 import org.junit.jupiter.api.AfterEach;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.BeforeEach;
@@ -19,13 +21,14 @@ import org.testng.ITestResult;
 
 import io.github.pulsereport.adapters.Adapter;
 import io.github.pulsereport.adapters.testng.TestNGAdapter;
+import io.github.pulsereport.core.model.Metric;
 import io.github.pulsereport.core.model.TestRun;
 
 /**
  * Tests for SeleniumAdapter implementation. Verifies web-specific
  * artifact/metric capture for Selenium WebDriver.
  *
- * @author Custom Reporter Team
+ * @author PulseReport Team
  * @since 1.0.0
  */
 public class SeleniumAdapterTest {
@@ -39,7 +42,7 @@ public class SeleniumAdapterTest {
 
     @AfterEach
     public void tearDown() {
-        System.clearProperty("reporter.output.directory");
+        System.clearProperty("pulsereport.output.directory");
     }
 
     @Test
@@ -53,22 +56,12 @@ public class SeleniumAdapterTest {
     }
 
     @Test
-    public void captureBrowserScreenshot() {
-        ITestResult mockResult = createMockTestResult("testWebApp", ITestResult.SUCCESS);
-        adapter.onTestStart(mockResult);
-
-        assertDoesNotThrow(() -> adapter.captureBrowserScreenshot("testWebApp", "page.png", "/screenshots/page.png", 20000L));
-
-        adapter.onTestSuccess(mockResult);
-    }
-
-    @Test
     public void captureBrowserLogs() {
         ITestResult mockResult = createMockTestResult("testWebApp", ITestResult.SUCCESS);
         adapter.onTestStart(mockResult);
 
         String logContent = "[INFO] Page loaded\n[WARNING] Deprecated API used";
-        assertDoesNotThrow(() -> adapter.captureBrowserLogs("testWebApp", "browser.log", logContent));
+        assertDoesNotThrow(() -> adapter.captureBrowserLogs("browser.log", logContent));
 
         adapter.onTestSuccess(mockResult);
     }
@@ -79,7 +72,7 @@ public class SeleniumAdapterTest {
         adapter.onTestStart(mockResult);
 
         String consoleContent = "console.log: Application initialized\nconsole.warn: Network slow";
-        assertDoesNotThrow(() -> adapter.captureConsoleLogs("testWebApp", "console.log", consoleContent));
+        assertDoesNotThrow(() -> adapter.captureConsoleLogs("console.log", consoleContent));
 
         adapter.onTestSuccess(mockResult);
     }
@@ -90,38 +83,18 @@ public class SeleniumAdapterTest {
         adapter.onTestStart(mockResult);
 
         String harContent = "{\"log\":{\"version\":\"1.2\",\"entries\":[]}}";
-        assertDoesNotThrow(() -> adapter.captureHarFile("testWebApp", "network.har", harContent));
+        assertDoesNotThrow(() -> adapter.captureHarFile("network.har", harContent));
 
         adapter.onTestSuccess(mockResult);
     }
 
     @Test
-    public void recordPageLoadTime() {
-        ITestResult mockResult = createMockTestResult("testPageLoad", ITestResult.SUCCESS);
+    public void screenshotWithoutATrackedDriverIsSkipped() {
+        ITestResult mockResult = createMockTestResult("testNoDriver", ITestResult.SUCCESS);
         adapter.onTestStart(mockResult);
 
-        assertDoesNotThrow(() -> adapter.recordPageLoadTime("testPageLoad", 2500.5));
-
-        adapter.onTestSuccess(mockResult);
-    }
-
-    @Test
-    public void recordDomReadyTime() {
-        ITestResult mockResult = createMockTestResult("testDomReady", ITestResult.SUCCESS);
-        adapter.onTestStart(mockResult);
-
-        assertDoesNotThrow(() -> adapter.recordDomReadyTime("testDomReady", 1200.0));
-
-        adapter.onTestSuccess(mockResult);
-    }
-
-    @Test
-    public void recordNetworkTiming() {
-        ITestResult mockResult = createMockTestResult("testNetwork", ITestResult.SUCCESS);
-        adapter.onTestStart(mockResult);
-
-        assertDoesNotThrow(() -> adapter.recordNetworkTiming("testNetwork", "dns", 50.0));
-        assertDoesNotThrow(() -> adapter.recordNetworkTiming("testNetwork", "tcp", 100.0));
+        assertNull(adapter.screenshot("page"));
+        assertNull(adapter.capturePageSource());
 
         adapter.onTestSuccess(mockResult);
     }
@@ -138,11 +111,9 @@ public class SeleniumAdapterTest {
         adapter.onStart(mockContext);
         adapter.onTestStart(mockResult);
 
-        adapter.captureBrowserScreenshot("testWithMultipleArtifacts", "screenshot1.png", "/screenshots/screenshot1.png", 15000L);
-        adapter.captureBrowserScreenshot("testWithMultipleArtifacts", "screenshot2.png", "/screenshots/screenshot2.png", 16000L);
-        adapter.captureBrowserLogs("testWithMultipleArtifacts", "browser.log", "Browser log content");
-        adapter.captureConsoleLogs("testWithMultipleArtifacts", "console.log", "Console log content");
-        adapter.captureHarFile("testWithMultipleArtifacts", "network.har", "{\"log\":{}}");
+        adapter.captureBrowserLogs("browser.log", "Browser log content");
+        adapter.captureConsoleLogs("console.log", "Console log content");
+        adapter.captureHarFile("network.har", "{\"log\":{}}");
 
         adapter.onTestSuccess(mockResult);
         adapter.onFinish(mockContext);
@@ -164,11 +135,9 @@ public class SeleniumAdapterTest {
         adapter.onStart(mockContext);
         adapter.onTestStart(mockResult);
 
-        adapter.recordPageLoadTime("testWithMultipleMetrics", 2500.0);
-        adapter.recordDomReadyTime("testWithMultipleMetrics", 1200.0);
-        adapter.recordNetworkTiming("testWithMultipleMetrics", "dns", 50.0);
-        adapter.recordNetworkTiming("testWithMultipleMetrics", "tcp", 100.0);
-        adapter.recordNetworkTiming("testWithMultipleMetrics", "request", 200.0);
+        adapter.addMetric("testWithMultipleMetrics", metric("page.load.time", 2500.0));
+        adapter.addMetric("testWithMultipleMetrics", metric("dom.ready.time", 1200.0));
+        adapter.addMetric("testWithMultipleMetrics", metric("network.dns.time", 50.0));
 
         adapter.onTestSuccess(mockResult);
         adapter.onFinish(mockContext);
@@ -186,13 +155,12 @@ public class SeleniumAdapterTest {
         ITestContext mockContext = createMockTestContext("WebTests");
         ITestResult mockResult = createMockTestResult("testBrowserMetadata", ITestResult.SUCCESS);
 
-        System.setProperty("reporter.output.directory", "target/pulsereport/test-selenium-adapter");
+        System.setProperty("pulsereport.output.directory", "target/pulsereport/test-selenium-adapter");
 
         adapter.onStart(mockSuite);
         adapter.onStart(mockContext);
         adapter.onTestStart(mockResult);
         adapter.recordBrowserMetadata("Chrome", "124", "macOS 14");
-        adapter.recordPageLoadTime("testBrowserMetadata", 842.0);
         adapter.onTestSuccess(mockResult);
         adapter.onFinish(mockContext);
         adapter.onFinish(mockSuite);
@@ -210,16 +178,16 @@ public class SeleniumAdapterTest {
         Runnable test1 = () -> {
             ITestResult result = createMockTestResult("web_test1", ITestResult.SUCCESS);
             adapter.onTestStart(result);
-            adapter.captureBrowserScreenshot("web_test1", "test1.png", "/screenshots/test1.png", 15000L);
-            adapter.recordPageLoadTime("web_test1", 2000.0);
+            adapter.captureConsoleLogs("console1.log", "one");
+            adapter.addMetric("web_test1", metric("page.load.time", 2000.0));
             adapter.onTestSuccess(result);
         };
 
         Runnable test2 = () -> {
             ITestResult result = createMockTestResult("web_test2", ITestResult.SUCCESS);
             adapter.onTestStart(result);
-            adapter.captureBrowserScreenshot("web_test2", "test2.png", "/screenshots/test2.png", 16000L);
-            adapter.recordPageLoadTime("web_test2", 2100.0);
+            adapter.captureConsoleLogs("console2.log", "two");
+            adapter.addMetric("web_test2", metric("page.load.time", 2100.0));
             adapter.onTestSuccess(result);
         };
 
@@ -240,34 +208,18 @@ public class SeleniumAdapterTest {
         ITestResult mockResult = createMockTestResult("test", ITestResult.SUCCESS);
         adapter.onTestStart(mockResult);
 
-        assertThrows(IllegalArgumentException.class,
-                () -> adapter.captureBrowserScreenshot(null, "test.png", "/path/test.png", 1000L));
-        assertThrows(IllegalArgumentException.class,
-                () -> adapter.captureBrowserScreenshot("test", null, "/path/test.png", 1000L));
+        assertThrows(IllegalArgumentException.class, () -> adapter.captureBrowserLogs(null, "content"));
+        assertThrows(IllegalArgumentException.class, () -> adapter.captureBrowserLogs("log.txt", null));
+        assertThrows(IllegalArgumentException.class, () -> adapter.captureConsoleLogs(" ", "content"));
+        assertThrows(IllegalArgumentException.class, () -> adapter.captureHarFile(null, "content"));
+        assertThrows(IllegalArgumentException.class, () -> adapter.track(null));
+        assertThrows(IllegalArgumentException.class, () -> adapter.step("x", (SeleniumAdapter.StepAction) null));
 
-        assertThrows(IllegalArgumentException.class,
-                () -> adapter.captureBrowserLogs(null, "log.txt", "content"));
-        assertThrows(IllegalArgumentException.class,
-                () -> adapter.captureBrowserLogs("test", null, "content"));
+        adapter.onTestSuccess(mockResult);
+    }
 
-        assertThrows(IllegalArgumentException.class,
-                () -> adapter.captureConsoleLogs(null, "console.log", "content"));
-        assertThrows(IllegalArgumentException.class,
-                () -> adapter.captureConsoleLogs("test", null, "content"));
-
-        assertThrows(IllegalArgumentException.class,
-                () -> adapter.captureHarFile(null, "network.har", "content"));
-        assertThrows(IllegalArgumentException.class,
-                () -> adapter.captureHarFile("test", null, "content"));
-
-        assertThrows(IllegalArgumentException.class,
-                () -> adapter.recordPageLoadTime(null, 100.0));
-        assertThrows(IllegalArgumentException.class,
-                () -> adapter.recordDomReadyTime(null, 100.0));
-        assertThrows(IllegalArgumentException.class,
-                () -> adapter.recordNetworkTiming(null, "dns", 100.0));
-        assertThrows(IllegalArgumentException.class,
-                () -> adapter.recordNetworkTiming("test", null, 100.0));
+    private static Metric metric(String name, double value) {
+        return Metric.builder().name(name).value(value).unit("ms").timestamp(Instant.now()).build();
     }
 
     private ITestResult createMockTestResult(String methodName, int status) {

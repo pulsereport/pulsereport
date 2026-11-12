@@ -1,6 +1,7 @@
 package io.github.pulsereport.adapters.restassured;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -11,10 +12,13 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import io.github.pulsereport.adapters.CaptureBridge;
 import io.github.pulsereport.adapters.cucumber.CucumberStepContext;
 import io.github.pulsereport.config.ReporterConfig;
 import io.github.pulsereport.core.model.Artifact;
 import io.github.pulsereport.core.model.Metric;
+import io.github.pulsereport.core.model.TestStatus;
+import io.github.pulsereport.core.model.TestStep;
 import io.restassured.filter.Filter;
 import io.restassured.filter.FilterContext;
 import io.restassured.http.Headers;
@@ -120,6 +124,9 @@ public class RestAssuredAdapter implements Filter {
     // the outermost instance records artifacts.
     private static final ThreadLocal<Boolean> capturing = ThreadLocal.withInitial(() -> false);
 
+    // Artifacts of the HTTP call being recorded as a step on this thread; null when calls aren't steps
+    private static final ThreadLocal<List<Artifact>> pendingCall = new ThreadLocal<>();
+
     private static final ConcurrentHashMap<String, List<Artifact>> artifactsByTest = new ConcurrentHashMap<>();
     private static final ConcurrentHashMap<String, List<Metric>> metricsByTest = new ConcurrentHashMap<>();
 
@@ -128,9 +135,9 @@ public class RestAssuredAdapter implements Filter {
     /**
      * Constructs a new RestAssuredAdapter. Configuration is auto-detected via
      * {@link ReporterConfig#autoDetect()} (working-directory
-     * {@code reporter.properties}, then
-     * {@code src/main/resources/reporter.properties}, then the classpath
-     * {@code /reporter.properties}); if nothing is found, a built-in default
+     * {@code pulsereport.properties}, then
+     * {@code src/main/resources/pulsereport.properties}, then the classpath
+     * {@code /pulsereport.properties}); if nothing is found, a built-in default
      * configuration is used.
      */
     public RestAssuredAdapter() {
@@ -138,18 +145,18 @@ public class RestAssuredAdapter implements Filter {
         if (detected != null) {
             this.config = detected;
             logger.info("RestAssuredAdapter initialized with auto-detected config"
-                    + " (reporter.properties from working directory or classpath)");
+                    + " (pulsereport.properties from working directory or classpath)");
         } else {
             this.config = createDefaultConfig();
             logger.info("RestAssuredAdapter initialized with default config"
-                    + " (no reporter.properties found, using built-in defaults)");
+                    + " (no pulsereport.properties found, using built-in defaults)");
         }
     }
 
     /**
      * Constructs a new RestAssuredAdapter with custom configuration.
      *
-     * @param config the reporter configuration
+     * @param config the PulseReport configuration
      */
     public RestAssuredAdapter(ReporterConfig config) {
         this.config = config != null ? config : createDefaultConfig();
@@ -157,9 +164,10 @@ public class RestAssuredAdapter implements Filter {
     }
 
     /**
-     * Routes an artifact to the active Cucumber step buffer when a Cucumber
-     * step is executing on the current thread; otherwise stores in the internal
-     * map.
+     * Adds an artifact to whatever is running on this thread, through
+     * {@link CaptureBridge}: the Cucumber step or hook, the TestNG test, or the
+     * Setup/Teardown step of a TestNG configuration method. Without a running
+     * test it is stored under the test name, for {@link #getArtifacts(String)}.
      *
      * @param testName the name of the test to attach the artifact to
      * @param artifact the artifact to add
@@ -168,6 +176,17 @@ public class RestAssuredAdapter implements Filter {
     public void addArtifact(String testName, Artifact artifact) {
         if (artifact == null) {
             throw new IllegalArgumentException("Artifact cannot be null");
+        }
+        List<Artifact> call = pendingCall.get();
+        if (call != null) {
+            call.add(artifact);
+            return;
+        }
+        CaptureBridge.Sink sink = CaptureBridge.current();
+        if (sink != null) {
+            sink.addArtifact(artifact);
+            logger.debug("Added artifact '{}' to the running test", artifact.getName());
+            return;
         }
         List<Artifact> cucumberBuf = CucumberStepContext.currentStepArtifacts.get();
         if (cucumberBuf != null) {
@@ -184,7 +203,10 @@ public class RestAssuredAdapter implements Filter {
     }
 
     /**
-     * Adds a metric to a test.
+     * Adds a metric to whatever is running on this thread, through
+     * {@link CaptureBridge} (the Cucumber scenario or the TestNG test). Without
+     * a running test it is stored under the test name, for
+     * {@link #getMetrics(String)}.
      *
      * @param testName the name of the test to attach the metric to
      * @param metric the metric to add
@@ -193,6 +215,12 @@ public class RestAssuredAdapter implements Filter {
     public void addMetric(String testName, Metric metric) {
         if (metric == null) {
             throw new IllegalArgumentException("Metric cannot be null");
+        }
+        CaptureBridge.Sink sink = CaptureBridge.current();
+        if (sink != null) {
+            sink.addMetric(metric);
+            logger.debug("Added metric '{}' to the running test", metric.getName());
+            return;
         }
         String key = currentTestName.get();
         if (key == null) {
@@ -333,38 +361,92 @@ public class RestAssuredAdapter implements Filter {
     public Response filter(FilterableRequestSpecification requestSpec,
             FilterableResponseSpecification responseSpec,
             FilterContext ctx) {
-        // Get current test name from thread local (set by onTestStart for TestNG).
-        // For Cucumber runs there is no TestNG listener, so testName is null — but
-        // CucumberStepContext.currentStepArtifacts is non-null when a step is active.
-        // Use a sentinel name so the capture methods are invoked; addArtifact() will
-        // route the artifacts to the active Cucumber step buffer automatically.
+        // Capture when something will receive it: a test or hook reachable through CaptureBridge
+        // (a Cucumber step or hook, a TestNG test or configuration method, where no test name is
+        // set yet), or a test name set by another framework. addArtifact() routes the artifacts.
         String testName = currentTestName.get();
-        boolean inCucumberStep = (testName == null)
-                && (CucumberStepContext.currentStepArtifacts.get() != null);
-        String effectiveName = testName != null ? testName : (inCucumberStep ? "__cucumber__" : null);
+        boolean running = testName == null
+                && (CaptureBridge.current() != null || CucumberStepContext.currentStepArtifacts.get() != null);
+        String effectiveName = testName != null ? testName : (running ? "__running__" : null);
 
         // Guard: only the first (outermost) filter instance on this thread captures.
         // Subsequent duplicate instances skip capture but still call ctx.next().
         boolean shouldCapture = effectiveName != null && !capturing.get();
-        if (shouldCapture) {
-            capturing.set(true);
-            captureRequestFromSpec(effectiveName, requestSpec);
+        // In a TestNG test or configuration method the call becomes a step of its own, so the
+        // checks made on its response are listed with it; in a Cucumber step it stays on that step
+        CaptureBridge.Sink sink = shouldCapture ? CaptureBridge.current() : null;
+        boolean asStep = sink != null && sink.recordsCallsAsSteps();
+        Instant startedAt = Instant.now();
+        long started = System.nanoTime();
+        if (asStep) {
+            pendingCall.set(new CopyOnWriteArrayList<>());
         }
-
-        Response response;
+        Response response = null;
+        Throwable failure = null;
         try {
-            response = ctx.next(requestSpec, responseSpec);
-        } finally {
             if (shouldCapture) {
-                capturing.set(false);
+                capturing.set(true);
+                captureRequestFromSpec(effectiveName, requestSpec);
+            }
+            try {
+                response = ctx.next(requestSpec, responseSpec);
+            } finally {
+                if (shouldCapture) {
+                    capturing.set(false);
+                }
+            }
+            if (shouldCapture) {
+                captureResponseFromSpec(effectiveName, response);
+            }
+            return response;
+        } catch (RuntimeException | Error e) {
+            failure = e;
+            throw e;
+        } finally {
+            if (asStep) {
+                List<Artifact> artifacts = pendingCall.get();
+                pendingCall.remove();
+                recordCallStep(sink, requestSpec, artifacts, failure, startedAt, started);
             }
         }
+    }
 
-        if (shouldCapture) {
-            captureResponseFromSpec(effectiveName, response);
+    /** Records one HTTP call as a step named after it, holding its request and response. */
+    private static void recordCallStep(CaptureBridge.Sink sink, FilterableRequestSpecification requestSpec,
+            List<Artifact> artifacts, Throwable failure, Instant startedAt, long startedNanos) {
+        try {
+            long durationMs = (System.nanoTime() - startedNanos) / 1_000_000;
+            TestStep.Builder step = TestStep.builder()
+                    .name(callName(requestSpec))
+                    .status(failure == null ? TestStatus.PASSED : TestStatus.FAILED)
+                    .startTime(startedAt)
+                    .endTime(startedAt.plusMillis(durationMs))
+                    .duration(durationMs)
+                    .artifacts(artifacts == null ? List.of() : new ArrayList<>(artifacts));
+            if (failure != null) {
+                step.errorMessage(failure.getMessage() != null ? failure.getMessage() : failure.getClass().getName());
+            }
+            sink.addStep(step.build());
+        } catch (RuntimeException e) {
+            logger.debug("Could not record the HTTP call as a step", e);
         }
+    }
 
-        return response;
+    /** "GET /users/1": the method and path, without the query string (it may carry secrets). */
+    static String callName(FilterableRequestSpecification requestSpec) {
+        String method = requestSpec.getMethod();
+        String uri = requestSpec.getURI();
+        String path = uri;
+        try {
+            java.net.URI parsed = java.net.URI.create(uri);
+            if (parsed.getRawPath() != null && !parsed.getRawPath().isEmpty()) {
+                path = parsed.getRawPath();
+            }
+        } catch (RuntimeException e) {
+            int query = uri == null ? -1 : uri.indexOf('?');
+            path = query >= 0 ? uri.substring(0, query) : uri;
+        }
+        return (method == null ? "HTTP" : method) + " " + (path == null || path.isEmpty() ? "/" : path);
     }
 
     /**

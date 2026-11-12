@@ -14,7 +14,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * Tests for the Adapter interface contract.
  * Verifies that any adapter implementation conforms to expected behavior.
  * 
- * @author Custom Reporter Team
+ * @author PulseReport Team
  * @since 1.0.0
  */
 public class AdapterTest {

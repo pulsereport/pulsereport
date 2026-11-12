@@ -906,6 +906,21 @@
             color: var(--ink);
         }
 
+        button.pill {
+            border: 0;
+            cursor: pointer;
+        }
+
+        .pill.pill-err {
+            background: var(--fail-bg);
+            color: var(--fail);
+            font-weight: 600;
+        }
+
+        button.pill.pill-err:hover {
+            box-shadow: inset 0 0 0 1px currentColor;
+        }
+
         .tags {
             display: flex;
             flex-wrap: wrap;
@@ -1000,6 +1015,22 @@
             margin-top: 8px;
         }
 
+        /* Browser state at the failure (page-info), between the message and the trace */
+        .kv.page-info {
+            gap: 3px 16px;
+            padding: 10px 16px;
+            border-bottom: 1px solid var(--border);
+            font-size: 12px;
+        }
+
+        .kv.page-info dd {
+            font-size: 11.5px;
+        }
+
+        .page-info a {
+            color: var(--accent-ink);
+        }
+
         .trace {
             padding: 10px 0 12px;
             font: 12px/1.65 var(--font-mono);
@@ -1042,9 +1073,10 @@
             padding: 0px 0;
         }
 
+        /* --kw-w widens the keyword column for a whole list (e.g. @BeforeMethod), so step names stay aligned */
         .step {
             display: grid;
-            grid-template-columns: 16px 46px minmax(0, 1fr) auto;
+            grid-template-columns: 16px var(--kw-w, 46px) minmax(0, 1fr) auto;
             gap: 10px;
             align-items: baseline;
             padding: 6px 16px;
@@ -1091,6 +1123,52 @@
             height: 22px;
             padding: 0 3px;
             font: 11px var(--font-mono);
+        }
+
+        .ghost.step-play {
+            width: 22px;
+            height: 22px;
+        }
+
+        .step-play .ic {
+            width: 12px;
+            height: 12px;
+        }
+
+        .ghost.step-play:hover {
+            color: var(--accent-ink);
+        }
+
+        .substeps > summary {
+            width: fit-content;
+            font-size: 12px;
+            color: var(--ink-muted);
+        }
+
+        .substeps > summary .s-fail {
+            font-weight: 600;
+        }
+
+        /* Sub-steps hang off a guide line under their parent's name */
+        .steps.sub {
+            --kw-w: 46px;
+            margin: 4px 0 0 4px;
+            padding-left: 8px;
+            border-left: 1px solid var(--border);
+        }
+
+        .steps.sub > .step {
+            grid-template-columns: 16px minmax(0, 1fr) auto;
+            gap: 8px;
+            padding: 3px 0 3px 2px;
+        }
+
+        .steps.sub.has-kw > .step {
+            grid-template-columns: 16px var(--kw-w, 46px) minmax(0, 1fr) auto;
+        }
+
+        .steps.sub:not(.has-kw) > .step > .step-extra {
+            grid-column: 2/-1;
         }
 
         .step-desc {
@@ -1524,6 +1602,10 @@
                 border-top: 1px solid var(--border);
             }
 
+            .har-detail .har-hdrs {
+                grid-template-columns: 1fr;
+            }
+
             /* Narrow panes stack each assertion: method, then labelled values and message. */
             .dt.at,
             .at tbody,
@@ -1691,18 +1773,24 @@
             border-radius: var(--radius);
         }
 
-        /* Drawn on the frame, not the image, so it stays put while screenshots slide */
-        .car-frame::after {
-            content: '';
-            position: absolute;
-            inset: 0;
+        /* The outline is its own layer over the frame's cell, painted after the image and outside the
+           frame's clip. The browser rounds the image and a border to device pixels separately, so at some
+           zoom levels and scroll positions an image would cover its own bottom edge (invisible on light
+           screenshots, a missing edge on dark ones). Not on the image either, so it stays put while
+           screenshots slide. */
+        .car-edge {
+            position: relative;
+            z-index: 1;
+            grid-row: 1;
+            grid-column: 2;
+            align-self: stretch;
             border: 1px solid var(--shot-edge);
-            border-radius: inherit;
+            border-radius: var(--radius);
             pointer-events: none;
         }
 
-        .is-expanded .car-frame::after {
-            border-color: rgb(255 255 255 / 0.22);
+        .is-expanded .car-edge {
+            border-color: rgb(255 255 255 / 0.3);
         }
 
         .car-ghost {
@@ -1829,9 +1917,19 @@
             min-width: 40px;
             max-width: 240px;
             object-fit: contain;
-            border: 1px solid var(--border);
+            /* Keeps the space; the visible edge is drawn over the image by ::after, like the frame's */
+            border: 1px solid transparent;
             border-radius: var(--radius);
             background: var(--sunken);
+        }
+
+        .car-thumb::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            pointer-events: none;
         }
 
         .car-thumb:hover,
@@ -1839,7 +1937,7 @@
             opacity: 1;
         }
 
-        .car-thumb[aria-current] img {
+        .car-thumb[aria-current]::after {
             border-color: var(--accent);
             box-shadow: 0 0 0 1px var(--accent);
         }
@@ -1887,7 +1985,7 @@
             min-width: 0;
         }
 
-        .car-thumb.is-fail img {
+        .car-thumb.is-fail::after {
             border-color: var(--fail);
             box-shadow: 0 0 0 1px var(--fail);
         }
@@ -1913,7 +2011,7 @@
             background: var(--fail);
         }
 
-        .car-thumb.is-fail[aria-current] img {
+        .car-thumb.is-fail[aria-current]::after {
             box-shadow: 0 0 0 2px var(--fail);
         }
 
@@ -2011,12 +2109,15 @@
             scale: 0.9;
         }
 
+        /* Positioned with its own background so the video can never paint over the controls */
         .pl-bar {
+            position: relative;
             display: flex;
             align-items: center;
             gap: 8px;
             padding: 6px 8px;
             border-top: 1px solid var(--border);
+            background: var(--raised);
         }
 
         .pl-btn {
@@ -2141,6 +2242,58 @@
             background: var(--accent);
         }
 
+        /* Seek bar with step markers: the wrapper takes over the bar's flex sizing */
+        .pl-track {
+            position: relative;
+            display: flex;
+            align-items: center;
+            flex: 1;
+            min-width: 40px;
+            margin: 0 4px;
+        }
+
+        .pl-track .pl-seek {
+            min-width: 0;
+            margin: 0;
+        }
+
+        .pl-marks {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+        }
+
+        /* Placed like the thumb's centre, which travels 12px less than the track */
+        .pl-mark {
+            position: absolute;
+            top: 50%;
+            left: calc(6px + (100% - 12px) * var(--at, 0));
+            width: 2px;
+            height: 10px;
+            padding: 0;
+            border: 0;
+            border-radius: 1px;
+            background: var(--ink-muted);
+            translate: -50% -50%;
+            pointer-events: auto;
+            cursor: pointer;
+        }
+
+        /* Bigger hit area than the 2px tick */
+        .pl-mark::before {
+            content: '';
+            position: absolute;
+            inset: -4px -5px;
+        }
+
+        .pl-mark:hover {
+            background: var(--ink);
+        }
+
+        .pl-mark.is-fail {
+            background: var(--fail);
+        }
+
         /* Full screen is always dark, whatever the report theme */
         .player:fullscreen {
             --raised: #181b1e;
@@ -2155,14 +2308,29 @@
             border-radius: 0;
         }
 
+        /* Pinned to the screen area: sized by its own aspect ratio, a recording of a whole browser
+           window comes out taller than the space above the controls and pushes over them */
+        .player:fullscreen .pl-screen {
+            overflow: hidden;
+        }
+
         .player:fullscreen video {
+            position: absolute;
+            inset: 0;
+            width: 100%;
             height: 100%;
             max-height: none;
+            object-fit: contain;
         }
 
         .files {
             display: grid;
             gap: 6px;
+        }
+
+        /* Wide content (the HAR table) scrolls inside its own box instead of widening every attachment */
+        .files > * {
+            min-width: 0;
         }
 
         .file-row {
@@ -2183,6 +2351,192 @@
         .file > summary .ftype {
             font: 11px var(--font-mono);
             color: var(--ink-muted);
+        }
+
+        .file > summary .fbadge {
+            display: inline-flex;
+            align-items: center;
+            height: 18px;
+            padding: 0 7px;
+            border-radius: 999px;
+            background: var(--fail-bg);
+            color: var(--fail);
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        /* Console / browser logs: one block per line, tinted by severity */
+        .body.logv .ll {
+            display: block;
+            min-height: 1.55em;
+            margin: 0 -12px;
+            padding: 0 12px;
+        }
+
+        .body.logv .ll-err {
+            background: var(--fail-bg);
+            color: var(--fail);
+        }
+
+        .body.logv .ll-warn {
+            background: var(--skip-bg);
+            color: var(--skip);
+        }
+
+        /* Narrow panes wrap whole items (badge, type, size) rather than breaking inside them */
+        .file.har > summary,
+        .file.log > summary {
+            flex-wrap: wrap;
+            row-gap: 2px;
+        }
+
+        .file.har > summary > :first-child,
+        .file.log > summary > :first-child {
+            min-width: 0;
+            overflow-wrap: anywhere;
+        }
+
+        .file.har > summary > :not(:first-child),
+        .file.log > summary > :not(:first-child) {
+            white-space: nowrap;
+        }
+
+        /* HAR: request table */
+
+        .har-sum {
+            font-size: 12px;
+            color: var(--ink-muted);
+        }
+
+        .har-body {
+            margin-top: 8px;
+        }
+
+        .dt.har {
+            width: 100%;
+            min-width: 560px;
+            table-layout: fixed;
+        }
+
+        .har .c-method,
+        .har .c-status {
+            width: 68px;
+        }
+
+        .har .c-type,
+        .har .c-size,
+        .har .c-time {
+            width: 76px;
+        }
+
+        .dt.har th,
+        .dt.har td {
+            padding-right: 12px;
+            overflow: hidden;
+            white-space: nowrap;
+            text-overflow: ellipsis;
+        }
+
+        .dt.har th:last-child,
+        .dt.har td:last-child {
+            padding-right: 0;
+        }
+
+        .dt .num {
+            text-align: right;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .har .har-s {
+            font-weight: 600;
+        }
+
+        .har-url {
+            position: relative;
+            display: block;
+            width: 100%;
+            padding: 0 0 0 14px;
+            overflow: hidden;
+            border: 0;
+            background: none;
+            font: inherit;
+            text-align: left;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            cursor: pointer;
+        }
+
+        .har-url::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 2px;
+            width: 5px;
+            height: 5px;
+            margin-top: -4px;
+            border-right: 1.5px solid var(--ink-muted);
+            border-bottom: 1.5px solid var(--ink-muted);
+            transform: rotate(-45deg);
+        }
+
+        .har-url[aria-expanded='true']::before {
+            margin-top: -5px;
+            transform: rotate(45deg);
+        }
+
+        .har-url:hover {
+            color: var(--accent-ink);
+        }
+
+        .dt.har .har-detail > td {
+            padding: 8px 12px 10px;
+            overflow: visible;
+            white-space: normal;
+            background: var(--sunken);
+        }
+
+        .har-detail .xline {
+            margin-bottom: 8px;
+        }
+
+        .har-hdrs {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px 20px;
+        }
+
+        .har-hdrs dl {
+            display: grid;
+            grid-template-columns: max-content minmax(0, 1fr);
+            gap: 2px 12px;
+            margin: 0;
+            font: 11.5px var(--font-mono);
+        }
+
+        .har-hdrs dt {
+            color: var(--ink-muted);
+        }
+
+        .har-hdrs dd {
+            margin: 0;
+            overflow-wrap: anywhere;
+        }
+
+        /* Metrics */
+        .dt.metrics td {
+            overflow-wrap: anywhere;
+        }
+
+        .dt.metrics .num {
+            white-space: nowrap;
+        }
+
+        .dt.metrics .trunc {
+            display: block;
+            max-width: min(64ch, 42cqi);
+            overflow: hidden;
+            white-space: nowrap;
+            text-overflow: ellipsis;
         }
 
         .kv {
@@ -2304,21 +2658,25 @@
         }
 
         .is-expanded .car-thumb img {
-            border-color: rgb(255 255 255 / 0.16);
             background: rgb(255 255 255 / 0.06);
         }
 
-        .is-expanded .car-thumb[aria-current] img {
+        /* Unselected thumbnails are faded to 60%, so the edge starts brighter than the frame's */
+        .is-expanded .car-thumb::after {
+            border-color: rgb(255 255 255 / 0.3);
+        }
+
+        .is-expanded .car-thumb[aria-current]::after {
             border-color: #5cc8ca;
             box-shadow: 0 0 0 1px #5cc8ca;
         }
 
-        .is-expanded .car-thumb.is-fail img {
+        .is-expanded .car-thumb.is-fail::after {
             border-color: #f07171;
             box-shadow: 0 0 0 1px #f07171;
         }
 
-        .is-expanded .car-thumb.is-fail[aria-current] img {
+        .is-expanded .car-thumb.is-fail[aria-current]::after {
             box-shadow: 0 0 0 2px #f07171;
         }
 
@@ -2370,7 +2728,7 @@
             }
 
             .car-thumb,
-            .car-thumb img {
+            .car-thumb::after {
                 transition:
                     opacity 150ms,
                     border-color 150ms,
@@ -2483,6 +2841,19 @@
 
             .step-extra {
                 grid-column: 2/-1;
+            }
+
+            .steps.sub.has-kw > .step {
+                grid-template-columns: 16px minmax(0, 1fr) auto;
+            }
+
+            /* Hook steps (@BeforeMethod...) keep their keyword: the method name alone doesn't say it ran outside the test */
+            .step.is-hook {
+                grid-template-columns: 16px auto minmax(0, 1fr) auto;
+            }
+
+            .step.is-hook .kw {
+                display: inline;
             }
         }
 
@@ -2781,12 +3152,20 @@
                 tip.replaceChildren(h('strong', null, head));
                 if (rest.length) tip.append(h('span', { class: 'tip-sub' }, rest.join('\n')));
                 tipFor = el;
+                // A modal dialog (expanded screenshots) or a fullscreen player is drawn above the page,
+                // so the tooltip has to live inside it to be seen
+                const fs = document.fullscreenElement;
+                const host = el.closest('dialog[open]') || (fs && fs.contains(el) ? fs : null) || document.body;
+                if (tip.parentNode !== host) host.append(tip);
+                tip.style.transform = 'translate(0, 0)';
+                // Where "fixed" 0,0 lands; a transformed host moves it off the viewport origin
+                const origin = tip.getBoundingClientRect();
                 const r = el.getBoundingClientRect();
-                const { width, height } = tip.getBoundingClientRect();
+                const { width, height } = origin;
                 let top = r.bottom + 8;
                 if (top + height > innerHeight - 8) top = r.top - height - 8;
                 const left = Math.min(Math.max(8, r.left + r.width / 2 - width / 2), innerWidth - width - 8);
-                tip.style.transform = `translate(${Math.round(left)}px, ${Math.round(top)}px)`;
+                tip.style.transform = `translate(${Math.round(left - origin.left)}px, ${Math.round(top - origin.top)}px)`;
                 tip.classList.add('on');
             }
 
@@ -2990,16 +3369,28 @@
             const isImage = a => a.type === 'screenshot' || /^image\//i.test(a.mimeType || '');
             const isVideo = a => a.type === 'video' || /^video\//i.test(a.mimeType || '');
             const isHttp = a => a.type === 'http-request' || a.type === 'http-response';
+            const isLog = a => a.type === 'console-log' || a.type === 'browser-log';
+            const isPageInfo = a => a.type === 'page-info';
 
-            function allArtifacts(tc) {
-                return [
-                    ...(tc.artifacts || []),
-                    ...[...(tc.backgroundSteps || []), ...(tc.steps || [])].flatMap(s => s.artifacts || [])
-                ];
+            // Steps in execution order, each parent before its sub-steps
+            function flatSteps(steps, out = []) {
+                for (const s of steps || []) {
+                    out.push(s);
+                    flatSteps(s.children, out);
+                }
+                return out;
             }
 
-            // Until the model records the adapter, infer it from what the test captured.
+            const testSteps = tc => flatSteps([...(tc.backgroundSteps || []), ...(tc.steps || [])]);
+            const hasFailure = s => s.status === 'FAILED' || (s.children || []).some(hasFailure);
+
+            function allArtifacts(tc) {
+                return [...(tc.artifacts || []), ...testSteps(tc).flatMap(s => s.artifacts || [])];
+            }
+
+            // Newer reports name the adapter; older ones are inferred from what the test captured.
             function adapterOf(tc) {
+                if (tc.adapter) return tc.adapter;
                 if (tc.bddType) return 'Cucumber';
                 const arts = allArtifacts(tc);
                 if (arts.some(isHttp)) return 'REST-assured';
@@ -3440,11 +3831,15 @@
                 const failure = renderFailure(tc);
                 if (failure) d.append(section(tc.status === 'SKIPPED' ? 'Skip reason' : 'Failure', failure));
                 gallery = galleryOf(tc);
-                const steps = renderSteps(tc);
+                const sync = videoSync(tc);
+                const steps = renderSteps(tc, sync);
                 if (steps)
                     d.append(
                         section('Steps', tc.featureDescription ? h('p', { class: 'desc' }, tc.featureDescription) : null, steps)
                     );
+                // Assertions the test made outside of any step (a TestNG test method)
+                const testAsserts = assertionList(tc.assertions || []);
+                if (testAsserts) d.append(section('Assertions', testAsserts));
                 const arts = tc.artifacts || [];
                 const exchanges = pairExchanges(arts);
                 if (exchanges.length)
@@ -3457,10 +3852,15 @@
                 inlineViewer = gallery.length ? createViewer(gallery, { start: startShot(tc, gallery) }) : null;
                 const shots = inlineViewer ? inlineViewer.root : renderShots(arts);
                 if (shots) d.append(section('Screenshots', shots));
-                const videos = renderVideos(arts);
+                const videos = renderVideos(arts, sync);
                 if (videos) d.append(section('Recordings', videos));
                 const files = renderFiles(arts);
                 if (files) d.append(section('Attachments', files));
+                // page-info belongs under the failure; without one it still shouldn't vanish
+                const info = failure ? null : renderPageInfo(tc);
+                if (info) d.append(section('Page', info));
+                const metrics = renderMetrics(tc.metrics || []);
+                if (metrics) d.append(section('Metrics', metrics));
                 d.append(section('Details', renderKv(tc, suite)));
 
                 const pane = $('#detail');
@@ -3472,6 +3872,8 @@
             function renderHead(tc, suite) {
                 const s = st(tc.status);
                 const tags = tc.tags || [];
+                const errLogs = allArtifacts(tc).filter(a => isLog(a) && a.content && logLines(a).errors);
+                const errs = errLogs.reduce((n, a) => n + logLines(a).errors, 0);
                 return h(
                     'header',
                     { class: 'd-head' },
@@ -3482,7 +3884,19 @@
                         h('span', { class: 'pill' }, adapterOf(tc)),
                         h('span', { class: 'mono' }, locationOf(tc, suite)),
                         h('span', { class: 'mono' }, fmtDur(tc.duration)),
-                        tc.retryCount ? h('span', null, `Retried ${tc.retryCount}×`) : null
+                        tc.retryCount ? h('span', null, `Retried ${tc.retryCount}×`) : null,
+                        errs
+                            ? h(
+                                    'button',
+                                    {
+                                        type: 'button',
+                                        class: 'pill pill-err',
+                                        'data-tip': errLogs.length > 1 ? 'Show the first log with errors' : 'Show the log',
+                                        onclick: () => revealLog(errLogs[0])
+                                    },
+                                    `${errs} console ${errs === 1 ? 'error' : 'errors'}`
+                                )
+                            : null
                     ),
                     tags.length
                         ? h(
@@ -3531,9 +3945,47 @@
                     });
                     box.append(more);
                 }
-                const panel = h('div', { class: `panel failure${tc.status === 'SKIPPED' ? ' is-skip' : ''}` }, box);
+                const panel = h('div', { class: `panel failure${tc.status === 'SKIPPED' ? ' is-skip' : ''}` }, box, renderPageInfo(tc));
                 if (frames.length) panel.append(renderTrace(tc.stackTrace, frames, open));
                 return panel;
+            }
+
+            // page-info (Selenium failure handler): "URL: …", "Title: …", one "Key: value" per line
+            function renderPageInfo(tc) {
+                const a = allArtifacts(tc).find(x => isPageInfo(x) && x.content);
+                if (!a) return null;
+                const rows = String(a.content)
+                    .split(/\r?\n/)
+                    .map(l => l.trim())
+                    .filter(Boolean)
+                    .map(l => {
+                        const i = l.indexOf(':');
+                        return i > 0 ? [l.slice(0, i).trim(), l.slice(i + 1).trim()] : ['', l];
+                    });
+                if (!rows.length) return null;
+                return h(
+                    'dl',
+                    { class: 'kv page-info' },
+                    rows.flatMap(([k, v]) => {
+                        // Leaves the report, so only absolute http(s) URLs become links
+                        const href = /\burl\b/i.test(k) ? safeHref(v) : null;
+                        return [
+                            h('dt', null, k),
+                            h(
+                                'dd',
+                                null,
+                                href
+                                    ? h(
+                                            'a',
+                                            { href, target: '_blank', rel: 'noopener noreferrer' },
+                                            v,
+                                            h('span', { class: 'sr-only' }, ' (opens in a new tab)')
+                                        )
+                                    : v
+                            )
+                        ];
+                    })
+                );
             }
 
             function renderTrace(raw, frames, open) {
@@ -3575,11 +4027,18 @@
             }
 
             // ---------- Steps ----------
-            function renderSteps(tc) {
+            // Hook keywords (@BeforeMethod...) outgrow the Gherkin keyword column, so the whole list widens to keep names aligned
+            function kwStyle(list) {
+                const n = Math.max(0, ...list.map(s => (s.keyword || '').trim().length));
+                return n > 5 ? `--kw-w: ${n}ch` : null;
+            }
+
+            function renderSteps(tc, sync) {
                 const bg = tc.backgroundSteps || [],
                     steps = tc.steps || [];
                 if (!bg.length && !steps.length) return null;
-                const ctx = { testError: tc.errorMessage };
+                // errors: messages already shown by an enclosing step, so sub-steps don't repeat them
+                const ctx = { testError: tc.errorMessage, errors: [], sync, kw: true };
                 const panel = h('div', { class: 'panel' });
                 if (bg.length) {
                     const bgOk = bg.every(s => s.status === 'PASSED');
@@ -3591,7 +4050,7 @@
                             h('summary', null, label),
                             h(
                                 'ol',
-                                { class: 'steps' },
+                                { class: 'steps', style: kwStyle(bg) },
                                 bg.map(s => stepEl(s, ctx))
                             )
                         )
@@ -3601,7 +4060,7 @@
                     panel.append(
                         h(
                             'ol',
-                            { class: 'steps' },
+                            { class: 'steps', style: kwStyle(steps) },
                             steps.map(s => stepEl(s, ctx))
                         )
                     );
@@ -3619,11 +4078,20 @@
 
             function stepEl(s, ctx) {
                 const failed = s.status === 'FAILED';
+                // @BeforeMethod, @After...; Setup/Teardown in reports from older versions
+                const hook = /^(setup|teardown|@(before|after)\w*)$/i.test((s.keyword || '').trim());
+                const arts = s.artifacts || [];
+                const kids = s.children || [];
+                const own = stepShotBtn(arts);
+                // While the sub-steps are collapsed, the parent's icon also opens their screenshots
+                const nested = kids.length && flatSteps(kids).some(k => (k.artifacts || []).some(a => isImage(a) && mediaSrc(a, 'image')))
+                    ? stepShotBtn([...arts, ...flatSteps(kids).flatMap(k => k.artifacts || [])])
+                    : null;
                 const li = h(
                     'li',
-                    { class: `step${failed ? ' is-fail' : ''}` },
+                    { class: `step${failed ? ' is-fail' : ''}${hook ? ' is-hook' : ''}` },
                     glyph(s.status),
-                    h('span', { class: 'kw' }, s.keyword || ''),
+                    ctx.kw ? h('span', { class: 'kw' }, s.keyword || '') : null,
                     h(
                         'span',
                         { class: 'stext' },
@@ -3631,13 +4099,27 @@
                         stepText(s.name || ''),
                         s.description ? h('span', { class: 'step-desc' }, s.description) : null
                     ),
-                    h('span', { class: 'step-end' }, stepShotBtn(s.artifacts || []), h('span', { class: 'dur' }, s.duration ? fmtDur(s.duration) : ''))
+                    h('span', { class: 'step-end' }, playBtn(s, ctx.sync), own, nested, h('span', { class: 'dur' }, s.duration ? fmtDur(s.duration) : ''))
                 );
-                const arts = s.artifacts || [];
                 const asserts = s.assertions || [];
                 const extra = [];
-                const errShown = s.errorMessage === ctx.testError || asserts.some(a => a.errorMessage === s.errorMessage);
+                const errShown =
+                    s.errorMessage === ctx.testError ||
+                    ctx.errors.includes(s.errorMessage) ||
+                    asserts.some(a => a.errorMessage === s.errorMessage);
                 if (s.errorMessage && !errShown) extra.push(h('pre', { class: 'step-err' }, s.errorMessage));
+                if (kids.length) {
+                    const sub = subSteps(kids, { ...ctx, errors: s.errorMessage ? [...ctx.errors, s.errorMessage] : ctx.errors });
+                    if (nested) {
+                        const syncShots = () => {
+                            nested.hidden = sub.open;
+                            if (own) own.hidden = !sub.open;
+                        };
+                        sub.addEventListener('toggle', syncShots);
+                        syncShots();
+                    }
+                    extra.push(sub);
+                }
                 if (s.dataTable?.length) extra.push(dataTable(s.dataTable));
                 if (s.docString) extra.push(h('pre', { class: 'body' }, s.docString));
                 extra.push(assertionList(asserts));
@@ -3647,6 +4129,63 @@
                 if (present.length) li.append(h('div', { class: 'step-extra' }, present));
                 stepEls.set(s, li);
                 return li;
+            }
+
+            // Collapsed unless something inside failed
+            function subSteps(kids, ctx) {
+                const n = kids.length;
+                const failed = kids.filter(k => k.status === 'FAILED').length;
+                const kw = kids.some(k => (k.keyword || '').trim());
+                return h(
+                    'details',
+                    { class: 'dz substeps', open: kids.some(hasFailure) },
+                    h(
+                        'summary',
+                        null,
+                        h('span', null, `${n} ${n === 1 ? 'step' : 'steps'}`, failed ? h('span', { class: 's-fail' }, `, ${failed} failed`) : null)
+                    ),
+                    h(
+                        'ol',
+                        { class: `steps sub${kw ? ' has-kw' : ''}`, style: kw ? kwStyle(kids) : null },
+                        kids.map(k => stepEl(k, { ...ctx, kw }))
+                    )
+                );
+            }
+
+            // Seeks the test's recording to the moment the step started
+            function playBtn(s, sync) {
+                const t = Date.parse(s.startTime || '');
+                if (!sync || !Number.isFinite(t) || t < sync.start || t > sync.end) return null;
+                const at = (t - sync.start) / 1000;
+                const btn = h(
+                    'button',
+                    {
+                        type: 'button',
+                        class: 'ghost step-play',
+                        'aria-label': `Play recording from ${fmtClock(at)}`,
+                        'data-tip': `Play from here\n${fmtClock(at)} in the recording`,
+                        onclick: () => sync.player?.playFrom(at)
+                    },
+                    icon('play')
+                );
+                sync.btns.push({ btn, at });
+                return btn;
+            }
+
+            // A test-level recording whose first frame has a wall-clock time lines up with the steps
+            function videoSync(tc) {
+                const a = (tc.artifacts || []).find(
+                    x => isVideo(x) && mediaSrc(x, 'video') && Number.isFinite(Date.parse(x.timestamp || ''))
+                );
+                if (!a) return null;
+                const start = Date.parse(a.timestamp);
+                // Until the video reports its length, the test's end bounds which steps it can show
+                let end = Date.parse(tc.endTime || '');
+                if (!Number.isFinite(end) && tc.duration) end = Date.parse(tc.startTime || '') + tc.duration;
+                const marks = [...(tc.backgroundSteps || []), ...(tc.steps || [])]
+                    .map(s => ({ at: (Date.parse(s.startTime || '') - start) / 1000, name: s.name || 'Step', status: s.status }))
+                    .filter(m => m.at >= 0);
+                return { a, start, end: Number.isFinite(end) ? end : Infinity, marks, btns: [], player: null };
             }
 
             function assertionList(list) {
@@ -3747,11 +4286,15 @@
                 if (e.key === 'Escape' && tr?.classList.contains('is-open')) setClipRow(tr, false);
             });
 
+            // Opens every <details> around el, and el itself if it is one (sub-steps, Background, a log)
+            function openAround(el) {
+                for (let d = el.closest('details'); d; d = d.parentElement?.closest('details')) d.open = true;
+            }
+
             function goToStep(step) {
                 const li = stepEls.get(step);
                 if (!li?.isConnected) return;
-                const bg = li.closest('details');
-                if (bg) bg.open = true;
+                openAround(li);
                 li.tabIndex = -1;
                 li.scrollIntoView({ block: 'center' });
                 li.focus({ preventScroll: true });
@@ -4034,6 +4577,50 @@
                 close.addEventListener('click', () => api.close(true));
             }
 
+            // Copy and find-in-text tools over a scrolling <pre class="body">
+            function bodyBox(body, label, placeholder = 'Find in body') {
+                const copy = copyButton('Copy ' + label, () => body.textContent, null);
+                copy.classList.add('xbtn');
+                const rowId = `xs-${++xsSeq}`;
+                const tool = (aria, ic, disabled = true) =>
+                    h('button', { type: 'button', class: 'ghost xbtn', 'aria-label': aria, disabled }, icon(ic));
+                const ui = {
+                    btn: h(
+                        'button',
+                        {
+                            type: 'button',
+                            class: 'ghost xbtn',
+                            'aria-label': 'Search ' + label,
+                            'aria-expanded': 'false',
+                            'aria-controls': rowId
+                        },
+                        icon('search')
+                    ),
+                    input: h('input', {
+                        type: 'search',
+                        'aria-label': 'Find in ' + label,
+                        placeholder,
+                        autocomplete: 'off',
+                        spellcheck: 'false'
+                    }),
+                    count: h('span', { class: 'xs-count', role: 'status' }),
+                    prev: tool('Previous match (Shift+Enter)', 'chev-up'),
+                    next: tool('Next match (Enter)', 'chev-down'),
+                    close: tool('Close search (Escape)', 'close', false)
+                };
+                ui.row = h(
+                    'div',
+                    { class: 'xsearch', id: rowId, hidden: true },
+                    h('div', { class: 'search-wrap' }, icon('search'), ui.input),
+                    ui.count,
+                    ui.prev,
+                    ui.next,
+                    ui.close
+                );
+                bodySearch(body, ui);
+                return h('div', { class: 'body-box' }, ui.row, h('div', { class: 'xtools' }, copy, ui.btn), body);
+            }
+
             function httpSide(label, p, isResponse) {
                 if (!p)
                     return h(
@@ -4050,49 +4637,7 @@
                     line = h('div', { class: 'xline' }, p.line);
                 }
                 const body = p.body ? h('pre', { class: 'body' }, prettyBody(p.body)) : null;
-                let box = null;
-                if (body) {
-                    const copy = copyButton('Copy ' + label, () => body.textContent, null);
-                    copy.classList.add('xbtn');
-                    const rowId = `xs-${++xsSeq}`;
-                    const tool = (aria, ic, disabled = true) =>
-                        h('button', { type: 'button', class: 'ghost xbtn', 'aria-label': aria, disabled }, icon(ic));
-                    const ui = {
-                        btn: h(
-                            'button',
-                            {
-                                type: 'button',
-                                class: 'ghost xbtn',
-                                'aria-label': 'Search ' + label,
-                                'aria-expanded': 'false',
-                                'aria-controls': rowId
-                            },
-                            icon('search')
-                        ),
-                        input: h('input', {
-                            type: 'search',
-                            'aria-label': 'Find in ' + label,
-                            placeholder: 'Find in body',
-                            autocomplete: 'off',
-                            spellcheck: 'false'
-                        }),
-                        count: h('span', { class: 'xs-count', role: 'status' }),
-                        prev: tool('Previous match (Shift+Enter)', 'chev-up'),
-                        next: tool('Next match (Enter)', 'chev-down'),
-                        close: tool('Close search (Escape)', 'close', false)
-                    };
-                    ui.row = h(
-                        'div',
-                        { class: 'xsearch', id: rowId, hidden: true },
-                        h('div', { class: 'search-wrap' }, icon('search'), ui.input),
-                        ui.count,
-                        ui.prev,
-                        ui.next,
-                        ui.close
-                    );
-                    bodySearch(body, ui);
-                    box = h('div', { class: 'body-box' }, ui.row, h('div', { class: 'xtools' }, copy, ui.btn), body);
-                }
+                const box = body ? bodyBox(body, label) : null;
                 return h(
                     'div',
                     { class: 'xside' },
@@ -4111,7 +4656,7 @@
                             )
                         : null,
                     box,
-                    p.note ? h('p', { class: 'xnote' }, `${p.note}. Raise reporter.maxArtifactContentSize to capture more.`) : null
+                    p.note ? h('p', { class: 'xnote' }, `${p.note}. Raise pulsereport.maxArtifactContentSize to capture more.`) : null
                 );
             }
 
@@ -4176,8 +4721,9 @@
                         'aria-label': label,
                         'data-tip': label,
                         onclick: () => {
-                            const i = gallery.findIndex(g => g.a === shots[0]);
-                            if (i >= 0) showLightbox(gallery, i);
+                            // Earliest of the step's screenshots in the gallery (sub-steps' included)
+                            const at = shots.map(a => gallery.findIndex(g => g.a === a)).filter(i => i >= 0);
+                            if (at.length) showLightbox(gallery, Math.min(...at));
                             else showLightbox(shots.map(a => ({ src: mediaSrc(a, 'image'), name: a.name || 'screenshot' })), 0);
                         }
                     },
@@ -4206,7 +4752,7 @@
                         });
                     }
                 };
-                for (const s of [...(tc.backgroundSteps || []), ...(tc.steps || [])]) add(s.artifacts, s);
+                for (const s of testSteps(tc)) add(s.artifacts, s);
                 add(tc.artifacts, null);
                 if (items.every(it => Number.isFinite(it.ts))) items.sort((x, y) => x.ts - y.ts || x.order - y.order);
                 return items;
@@ -4259,7 +4805,8 @@
                 const close = expanded ? sideBtn('close', 'Close', 'close', closeLightbox) : null;
                 const zoomBadge = expanded ? h('span', { class: 'car-zoom', 'aria-hidden': 'true' }) : null;
                 const frame = h('div', { class: 'car-frame' }, view, zoomBadge);
-                const stage = h('div', { class: 'car-stage' }, prev, frame, next);
+                const edge = h('span', { class: 'car-edge', 'aria-hidden': 'true' });
+                const stage = h('div', { class: 'car-stage' }, prev, frame, edge, next);
 
                 const count = h('span', { class: 'car-count' });
                 const fail = h('span', { class: 'shot-fail', hidden: true }, 'Failure');
@@ -4525,12 +5072,16 @@
             // Listed top to bottom, so the menu reads 0.5× up to 2× from the button
             const RATES = [2, 1.5, 1, 0.5];
 
-            function createPlayer(src, name) {
+            // marks: [{ at (seconds), name, status }] ticked on the seek bar once the duration is known.
+            // Returns { root, playFrom(seconds) }.
+            function createPlayer(src, name, { marks = [], onDuration, onFail } = {}) {
                 const video = h('video', { src, preload: 'metadata', playsinline: true });
                 const screen = h('div', { class: 'pl-screen' }, video, h('span', { class: 'pl-big', 'aria-hidden': 'true' }, icon('play')));
                 const playBtn = h('button', { type: 'button', class: 'pl-btn', 'aria-label': 'Play' }, icon('play'));
                 const time = h('span', { class: 'pl-time' }, '0:00');
                 const seek = h('input', { type: 'range', class: 'pl-seek', min: 0, max: 0, step: 'any', value: 0, 'aria-label': 'Seek' });
+                const markLayer = marks.length ? h('div', { class: 'pl-marks' }) : null;
+                const track = markLayer ? h('div', { class: 'pl-track' }, seek, markLayer) : seek;
                 const rateBtn = h(
                     'button',
                     { type: 'button', class: 'pl-btn pl-rate', 'aria-label': 'Playback speed 1×', 'aria-haspopup': 'menu', 'aria-expanded': 'false' },
@@ -4552,7 +5103,7 @@
                     'div',
                     { class: 'player', role: 'group', 'aria-label': `Recording ${name}`, tabindex: '0' },
                     screen,
-                    h('div', { class: 'pl-bar' }, playBtn, time, seek, rateWrap, fsBtn)
+                    h('div', { class: 'pl-bar' }, playBtn, time, track, rateWrap, fsBtn)
                 );
 
                 const dur = () => (Number.isFinite(video.duration) ? video.duration : 0);
@@ -4561,6 +5112,61 @@
                     video.currentTime = Math.min(dur(), Math.max(0, video.currentTime + d));
                     paintTime();
                 };
+
+                // Seeking before the metadata arrives would be dropped, so wait for it
+                function seekTo(t, play = false) {
+                    const go = () => {
+                        video.currentTime = Math.min(dur() || t, Math.max(0, t));
+                        paintTime();
+                        if (play) video.play().catch(() => {});
+                    };
+                    if (video.readyState >= 1) go();
+                    else video.addEventListener('loadedmetadata', go, { once: true });
+                }
+
+                function playFrom(t) {
+                    if (!root.isConnected) return;
+                    root.scrollIntoView({ block: 'center', behavior: reduceMotion() ? 'auto' : 'smooth' });
+                    root.focus({ preventScroll: true });
+                    seekTo(t, true);
+                }
+
+                let known = 0;
+                let placed = [];
+
+                function onMeta() {
+                    const d = dur();
+                    if (!d || d === known) return;
+                    known = d;
+                    if (markLayer) {
+                        placed = marks.filter(m => m.at <= d).sort((x, y) => x.at - y.at);
+                        markLayer.replaceChildren(
+                            ...placed.map(m => {
+                                const failed = m.status === 'FAILED';
+                                const b = h('button', {
+                                    type: 'button',
+                                    class: `pl-mark${failed ? ' is-fail' : ''}`,
+                                    tabindex: '-1',
+                                    'aria-label': `Seek to step ${m.name}`,
+                                    'data-tip': `${m.name}\n${st(m.status).label}, ${fmtClock(m.at)}`,
+                                    // Keeps focus (and the player's shortcuts) where it was
+                                    onmousedown: e => e.preventDefault(),
+                                    onclick: () => seekTo(m.at)
+                                });
+                                b.style.setProperty('--at', m.at / d);
+                                return b;
+                            })
+                        );
+                    }
+                    onDuration?.(d);
+                }
+
+                // Shift+arrows step between markers; a press shortly after one goes to the one before
+                function jumpMark(dir) {
+                    const t = video.currentTime;
+                    const m = dir > 0 ? placed.find(x => x.at > t + 0.25) : [...placed].reverse().find(x => x.at < t - 0.25);
+                    if (m) seekTo(m.at);
+                }
 
                 function paintTime() {
                     const d = dur();
@@ -4617,7 +5223,11 @@
                 });
                 video.addEventListener('pause', paintState);
                 ['loadedmetadata', 'durationchange', 'timeupdate'].forEach(ev => video.addEventListener(ev, paintTime));
-                video.addEventListener('error', () => root.replaceWith(h('div', { class: 'shot-missing' }, 'Recording could not be played')));
+                ['loadedmetadata', 'durationchange'].forEach(ev => video.addEventListener(ev, onMeta));
+                video.addEventListener('error', () => {
+                    root.replaceWith(h('div', { class: 'shot-missing' }, 'Recording could not be played'));
+                    onFail?.();
+                });
 
                 screen.addEventListener('click', toggle);
                 screen.addEventListener('dblclick', toggleFullscreen);
@@ -4663,6 +5273,8 @@
                     if (e.metaKey || e.ctrlKey || e.altKey) return;
                     const onButton = e.target.tagName === 'BUTTON';
                     if (e.key === 'k' || (e.key === ' ' && !onButton)) toggle();
+                    else if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && e.shiftKey && placed.length)
+                        jumpMark(e.key === 'ArrowLeft' ? -1 : 1);
                     else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') seekBy(e.key === 'ArrowLeft' ? -1 : 1);
                     else if (e.key === 'f' && !fsBtn.hidden) toggleFullscreen();
                     else return;
@@ -4671,10 +5283,11 @@
                     e.stopPropagation();
                 });
 
-                return root;
+                return { root, playFrom };
             }
 
-            function renderVideos(arts) {
+            // sync (from videoSync) marks the recording that the steps' "Play from here" buttons drive
+            function renderVideos(arts, sync) {
                 const videos = arts.filter(isVideo);
                 if (!videos.length) return null;
                 return h(
@@ -4682,24 +5295,290 @@
                     { class: 'videos' },
                     videos.map(a => {
                         const src = mediaSrc(a, 'video');
+                        let player = null;
+                        if (src && sync?.a === a) {
+                            player = sync.player = createPlayer(src, a.name || 'recording', {
+                                marks: sync.marks,
+                                onDuration: d => sync.btns.forEach(b => (b.btn.hidden = b.at > d)),
+                                onFail: () => sync.btns.forEach(b => (b.btn.hidden = true))
+                            });
+                        } else if (src) player = createPlayer(src, a.name || 'recording');
                         return h(
                             'div',
                             { class: 'video' },
-                            src ? createPlayer(src, a.name || 'recording') : h('div', { class: 'shot-missing' }, 'Video not available'),
+                            player ? player.root : h('div', { class: 'shot-missing' }, 'Video not available'),
                             h('span', { class: 'cap', 'data-tip': a.path || '' }, a.name || 'recording')
                         );
                     })
                 );
             }
 
+            // ---------- Console / browser logs ----------
+            const LOG_ERROR = /\b(SEVERE|ERROR)\b|Uncaught|TypeError|ReferenceError/i;
+            const LOG_WARN = /\bWARN(ING)?\b/i;
+            const logCache = new WeakMap();
+            const logEls = new WeakMap();
+
+            function logLines(a) {
+                let info = logCache.get(a);
+                if (!info) {
+                    const lines = String(a.content || '')
+                        .replace(/\r\n?/g, '\n')
+                        .replace(/\n$/, '')
+                        .split('\n')
+                        .map(text => ({ text, level: LOG_ERROR.test(text) ? 'err' : LOG_WARN.test(text) ? 'warn' : '' }));
+                    info = { lines, errors: lines.filter(l => l.level === 'err').length };
+                    logCache.set(a, info);
+                }
+                return info;
+            }
+
+            function logFile(a, name) {
+                const { lines, errors } = logLines(a);
+                const el = h(
+                    'details',
+                    { class: 'dz file log', open: errors > 0 },
+                    h(
+                        'summary',
+                        null,
+                        h('span', null, name),
+                        h('span', { class: 'ftype' }, a.type),
+                        errors ? h('span', { class: 'fbadge' }, `${errors} ${errors === 1 ? 'error' : 'errors'}`) : null,
+                        h('span', { class: 'muted' }, fmtBytes(a.size))
+                    ),
+                    h(
+                        'pre',
+                        { class: 'body logv' },
+                        lines.map(l => h('span', { class: l.level ? `ll ll-${l.level}` : 'll' }, l.text))
+                    )
+                );
+                logEls.set(a, el);
+                return el;
+            }
+
+            function revealLog(a) {
+                const el = logEls.get(a);
+                if (!el?.isConnected) return;
+                openAround(el);
+                el.scrollIntoView({ block: 'start', behavior: reduceMotion() ? 'auto' : 'smooth' });
+                el.querySelector('summary').focus({ preventScroll: true });
+            }
+
+            // ---------- HAR ----------
+            const HAR_MAX_ROWS = 500;
+            const HAR_COLS = [
+                ['c-method', 'Method'],
+                ['c-url', 'URL'],
+                ['c-status', 'Status'],
+                ['c-type', 'Type'],
+                ['c-size', 'Size'],
+                ['c-time', 'Time']
+            ];
+            let harSeq = 0;
+
+            const clipText = (s, n) => (s.length > n ? s.slice(0, n) + '…' : s);
+            const headerPairs = list => (Array.isArray(list) ? list : []).map(x => [String(x?.name ?? ''), String(x?.value ?? '')]);
+
+            function urlPath(url) {
+                try {
+                    const u = new URL(url);
+                    if (u.protocol === 'http:' || u.protocol === 'https:') return u.pathname + u.search;
+                } catch {
+                    /* keep raw */
+                }
+                return clipText(url, 120);
+            }
+
+            // "application/json; charset=utf-8" → json, "image/svg+xml" → svg, "text/javascript" → js
+            function shortMime(m) {
+                const sub = String(m || '').split(';')[0].trim().toLowerCase().split('/')[1] || '';
+                const [base, suffix] = sub.replace(/^(x-|vnd\.)/, '').split('+');
+                if (/^(java|ecma)script$/.test(base)) return 'js';
+                if (base === 'plain') return 'text';
+                return suffix && base !== 'svg' ? suffix : base;
+            }
+
+            function harEntry(e) {
+                const req = e?.request || {},
+                    res = e?.response || {};
+                const url = String(req.url || '');
+                const status = Number(res.status) || 0;
+                const err = String(res._error || '');
+                const time = Number(e?.time);
+                return {
+                    method: String(req.method || ''),
+                    url,
+                    path: urlPath(url),
+                    status,
+                    label: status ? String(status) : /blocked/i.test(err) ? 'blocked' : 'failed',
+                    reason: status ? String(res.statusText || REASONS[status] || '') : err || 'No response',
+                    failed: status >= 400 || status === 0,
+                    type: shortMime(res.content?.mimeType) || String(e?._resourceType || ''),
+                    size: [res._transferSize, res.bodySize, res.content?.size].map(Number).find(n => n > 0) || 0,
+                    time: Number.isFinite(time) && time >= 0 ? time : null,
+                    reqHeaders: headerPairs(req.headers),
+                    resHeaders: headerPairs(res.headers)
+                };
+            }
+
+            function harDetail(r, id) {
+                const side = (label, pairs) =>
+                    h(
+                        'div',
+                        null,
+                        h('div', { class: 'xlabel' }, `${label} (${pairs.length})`),
+                        pairs.length
+                            ? h('dl', null, pairs.flatMap(([k, v]) => [h('dt', null, k), h('dd', null, v)]))
+                            : h('p', { class: 'xnone' }, 'None recorded.')
+                    );
+                return h(
+                    'tr',
+                    { class: 'har-detail', id },
+                    h(
+                        'td',
+                        { colspan: HAR_COLS.length },
+                        h('div', { class: 'xline' }, `${r.method} ${clipText(r.url, 2000)}`),
+                        h('div', { class: 'har-hdrs' }, side('Request headers', r.reqHeaders), side('Response headers', r.resHeaders))
+                    )
+                );
+            }
+
+            // Header rows are built the first time a request is expanded
+            function harRow(r) {
+                const toggle = h(
+                    'button',
+                    { type: 'button', class: 'har-url', 'aria-expanded': 'false', 'data-tip': clipText(r.url, 500) || null },
+                    r.path || '(no URL)'
+                );
+                const tr = h(
+                    'tr',
+                    null,
+                    h('td', null, r.method),
+                    h('td', null, toggle),
+                    h('td', { class: `har-s${r.failed ? ' s-fail' : ''}`, 'data-tip': r.reason || null }, r.label),
+                    h('td', null, r.type),
+                    h('td', { class: 'num' }, fmtBytes(r.size)),
+                    h('td', { class: 'num' }, r.time == null ? '' : `${Math.round(r.time).toLocaleString()} ms`)
+                );
+                let detail = null;
+                toggle.addEventListener('click', () => {
+                    const open = toggle.getAttribute('aria-expanded') !== 'true';
+                    if (!detail) {
+                        detail = harDetail(r, `har-${++harSeq}`);
+                        toggle.setAttribute('aria-controls', detail.id);
+                        tr.after(detail);
+                    }
+                    detail.hidden = !open;
+                    toggle.setAttribute('aria-expanded', String(open));
+                });
+                return tr;
+            }
+
+            // null when the content isn't a HAR, so the caller falls back to the plain text view
+            function harFile(a, name) {
+                let list;
+                try {
+                    const entries = JSON.parse(a.content)?.log?.entries;
+                    if (!Array.isArray(entries)) return null;
+                    list = entries.map(harEntry);
+                } catch {
+                    return null;
+                }
+                const n = list.length;
+                const failed = list.filter(r => r.failed).length;
+                const total = list.reduce((sum, r) => sum + r.size, 0);
+                const body = h('div', { class: 'har-body' });
+                const det = h(
+                    'details',
+                    { class: 'dz file har' },
+                    h(
+                        'summary',
+                        null,
+                        h('span', null, name),
+                        h('span', { class: 'ftype' }, a.type),
+                        h(
+                            'span',
+                            { class: 'har-sum' },
+                            `${n} ${n === 1 ? 'request' : 'requests'} · `,
+                            h('span', { class: failed ? 's-fail' : null }, `${failed} failed`),
+                            total ? ` · ${fmtBytes(total)}` : null
+                        )
+                    ),
+                    body
+                );
+                // Rows are built on first open, so large archives cost nothing until looked at
+                det.addEventListener('toggle', () => {
+                    if (!det.open || body.firstChild) return;
+                    if (!n) {
+                        body.append(h('p', { class: 'xnone' }, 'No requests were recorded.'));
+                        return;
+                    }
+                    body.append(
+                        h(
+                            'div',
+                            { class: 'dt-scroll' },
+                            h(
+                                'table',
+                                { class: 'dt har' },
+                                h('colgroup', null, HAR_COLS.map(([c]) => h('col', { class: c }))),
+                                h(
+                                    'thead',
+                                    null,
+                                    h(
+                                        'tr',
+                                        null,
+                                        HAR_COLS.map(([c, t]) => h('th', { scope: 'col', class: c === 'c-size' || c === 'c-time' ? 'num' : null }, t))
+                                    )
+                                ),
+                                h('tbody', null, list.slice(0, HAR_MAX_ROWS).map(harRow))
+                            )
+                        )
+                    );
+                    if (n > HAR_MAX_ROWS) {
+                        const href = safeUrl(a.path);
+                        body.append(
+                            h(
+                                'p',
+                                { class: 'xnote' },
+                                `Showing the first ${HAR_MAX_ROWS} of ${n} requests.`,
+                                href ? [' ', h('a', { href, download: a.name || true }, 'Download the HAR file'), ' for the rest.'] : null
+                            )
+                        );
+                    }
+                });
+                return det;
+            }
+
             function renderFiles(arts) {
-                const files = arts.filter(a => !isImage(a) && !isVideo(a) && !isHttp(a));
+                // page-info is shown under the failure instead
+                const files = arts.filter(a => !isImage(a) && !isVideo(a) && !isHttp(a) && !isPageInfo(a));
                 if (!files.length) return null;
                 return h(
                     'div',
                     { class: 'files' },
                     files.map(a => {
                         const name = a.name || a.path || 'attachment';
+                        if (a.content && a.type === 'har') {
+                            const har = harFile(a, name);
+                            if (har) return har;
+                        }
+                        if (a.content && isLog(a)) return logFile(a, name);
+                        if (a.content && a.type === 'page-source') {
+                            // A text node: the markup is shown, never parsed
+                            const pre = h('pre', { class: 'body' }, a.content);
+                            return h(
+                                'details',
+                                { class: 'dz file' },
+                                h(
+                                    'summary',
+                                    null,
+                                    h('span', null, name),
+                                    h('span', { class: 'ftype' }, a.type),
+                                    h('span', { class: 'muted' }, fmtBytes(a.size))
+                                ),
+                                bodyBox(pre, 'page source', 'Find in source')
+                            );
+                        }
                         if (a.content) {
                             return h(
                                 'details',
@@ -4734,13 +5613,69 @@
                 if (tc.startTime) rows.push(['Started', new Date(tc.startTime).toLocaleString()]);
                 rows.push(['Duration', fmtDur(tc.duration)]);
                 if (tc.retryCount) rows.push(['Retries', String(tc.retryCount)]);
-                for (const m of tc.metrics || []) rows.push([m.name, `${m.value} ${m.unit || ''}`.trim()]);
                 return h(
                     'dl',
                     { class: 'kv' },
                     rows.flatMap(([k, v]) => [h('dt', null, k), h('dd', null, v)])
                 );
             }
+
+            // ---------- Metrics ----------
+            function fmtMetric(m) {
+                const v = Number(m.value);
+                const num = Number.isFinite(v) ? v.toLocaleString(undefined, { maximumFractionDigits: 2 }) : String(m.value ?? '');
+                return `${num} ${m.unit || ''}`.trim();
+            }
+
+            function renderMetrics(list) {
+                if (!list.length) return null;
+                const labelled = list.some(m => m.label);
+                const pages = list.every(m => !m.label || /^https?:\/\//i.test(m.label));
+                return h(
+                    'div',
+                    { class: 'dt-scroll' },
+                    h(
+                        'table',
+                        { class: 'dt metrics' },
+                        h(
+                            'thead',
+                            null,
+                            h(
+                                'tr',
+                                null,
+                                h('th', { scope: 'col' }, 'Metric'),
+                                h('th', { scope: 'col', class: 'num' }, 'Value'),
+                                labelled ? h('th', { scope: 'col' }, pages ? 'Page' : 'Label') : null
+                            )
+                        ),
+                        h(
+                            'tbody',
+                            null,
+                            list.map(m =>
+                                h(
+                                    'tr',
+                                    null,
+                                    h('td', null, m.name),
+                                    h('td', { class: 'num' }, fmtMetric(m)),
+                                    labelled ? h('td', null, m.label ? h('span', { class: 'trunc' }, m.label) : null) : null
+                                )
+                            )
+                        )
+                    )
+                );
+            }
+
+            // Truncated text (.trunc) gets its full text as a tooltip; capture runs before the tooltip handler
+            document.addEventListener(
+                'pointerover',
+                e => {
+                    const el = e.target.closest?.('.trunc');
+                    if (!el) return;
+                    if (el.scrollWidth > el.clientWidth) el.dataset.tip = el.textContent;
+                    else delete el.dataset.tip;
+                },
+                true
+            );
 
             // ---------- Overview / empty ----------
             function renderOverview() {
@@ -4760,7 +5695,7 @@
                                 ' as a listener in ',
                                 h('code', null, 'testng.xml'),
                                 ', and that ',
-                                h('code', null, 'reporter.output.formats'),
+                                h('code', null, 'pulsereport.output.formats'),
                                 ' includes ',
                                 h('code', null, 'html'),
                                 '.'

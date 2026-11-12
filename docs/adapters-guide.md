@@ -127,6 +127,18 @@ public void criticalTest() {
 // Groups and priorities are captured in the report
 ```
 
+#### Assertions
+
+Assertions in test methods are listed in the report with their expected and actual values, passing or failing, with no change to your tests. Each one is listed with the step it followed (the browser action, REST call or `step(...)` made just before it), so you can see what was checked after what. Assertions made before any step are listed in the test's **Assertions** section. Assertions in `@BeforeMethod`/`@AfterMethod` appear on that method's step. JUnit, TestNG, Hamcrest and AssertJ assertions and REST Assured `then()` checks are covered; see [Assertion Capture](#assertion-capture).
+
+```java
+@Test
+public void userIsCreated() {
+    assertEquals(response.statusCode(), 201, "status code");   // listed: expected 201, actual 201
+    assertThat(user.getName()).as("user name").isEqualTo("Ann");
+}
+```
+
 ### Adding Artifacts
 
 ```java
@@ -191,7 +203,9 @@ public void testPerformance() {
 
 ## Selenium Adapter
 
-Extends TestNGAdapter with Selenium WebDriver-specific features.
+Extends TestNGAdapter with Selenium WebDriver-specific features. The tracking
+itself lives in `SeleniumTracker`, which also works in Cucumber step
+definitions (see [Combining with Selenium](#combining-with-selenium)).
 
 ### Installation
 
@@ -221,10 +235,7 @@ so add your own; 4.15.0 or newer is supported (built against 4.15.0, tested up t
 
 #### Automatic Capture with `track(...)`
 
-Wrap the driver once and use the returned driver everywhere. Every open, click,
-type, clear and submit becomes a report step (element, locator, URL change, page
-load time, outcome; password fields are masked), and screenshots and video are
-captured according to configuration:
+Wrap the driver once and use the returned driver everywhere:
 
 ```java
 @Listeners(SeleniumAdapter.class)
@@ -235,15 +246,19 @@ public class WebTest {
     @BeforeMethod
     public void setUp() {
         driver = adapter.track(new ChromeDriver());
+        driver.get("https://example.com/login");      // shown in the test's "@BeforeMethod setUp" step
     }
 
     @Test
     public void login() {
-        driver.get("https://example.com/login");
-        adapter.step("Log in", () -> {             // optional: groups actions under one step
+        adapter.step("Log in", () -> {                // one step, the actions as its sub-steps
             driver.findElement(By.id("user")).sendKeys("demo");
+            driver.findElement(By.id("password")).sendKeys(secret);   // shown as ••••••
             driver.findElement(By.id("login")).click();
         });
+        adapter.waitFor("dashboard", Duration.ofSeconds(10),
+                ExpectedConditions.visibilityOfElementLocated(By.id("dashboard")));
+        adapter.screenshot("Dashboard");
     }
 
     @AfterMethod(alwaysRun = true)
@@ -253,113 +268,115 @@ public class WebTest {
 }
 ```
 
+What gets recorded:
+
+- **Actions as steps**: clicks, typing, clearing, submitting, navigation, frame/window/alert
+  switches, `Actions` gestures (hover, drag, double/right click, key presses, scrolling) and
+  closed windows, each with its element, locator, URL change and duration. Actions inside
+  `step(...)` become that step's sub-steps; nested `step(...)` calls keep their own sub-steps.
+- **Configuration methods**: actions in `@BeforeMethod`/`@AfterMethod` (and class, test, suite and
+  group configuration methods) appear as a step of the test named after the method, with the
+  annotation as its keyword (`@BeforeMethod setUp`, `@AfterClass closeBrowser`). A failed
+  configuration method keeps its steps, screenshot and page details, so a skipped test shows why.
+- **Failures**: when a test fails because an element was never found, the report adds a failed
+  "Find element By.id: …" step; when a `WebDriverWait` timed out on a lookup, a "Wait for By.id: …"
+  step. Failed tests also get a screenshot, the page URL, title and window size, browser console
+  errors (Chromium-based browsers) and the page source.
+- **Page load times**: every navigation that loads a new document records `page.load.time` and
+  `page.ttfb` metrics, labelled with the URL. Single-page-app route changes are not counted.
+- **Browser**: name, version and platform are read from the driver's capabilities and shown in
+  the run metadata (all browsers, for cross-browser runs) and as a tag on each test, e.g.
+  `Chrome 131`.
+- **Sensitive data**: typed text is masked for password, one-time-code and card fields, and for
+  fields whose name, id or label looks sensitive (`password`, `token`, `otp`, `pin`, `cvv`, plus
+  `pulsereport.maskBody.fields`). Credentials and sensitive query parameters (`token`, `code`,
+  `access_token`, …) are masked in URLs.
+
+Screenshots are embedded in the report as Base64 by default; with
+`pulsereport.screenshots.storage=path` they are written to `pulsereport.screenshots.directory` and shown
+from there. Logs and page sources are written under the report folder (`artifacts/`), and videos to
+`pulsereport.video.directory` (default `<output>/videos`). The report links files by relative path, so
+keep those folders in place relative to the report. The S3 publisher uploads linked files that sit
+inside the report folder.
+
 | Key | Values | Default |
 | --- | --- | --- |
-| `reporter.screenshots.mode` | `all`, `failed`, `last`, `none` | `failed` |
-| `reporter.video.mode` | `always`, `failed`, `none` (needs [ffmpeg](https://ffmpeg.org)) | `none` |
-| `reporter.video.fps` | 1–30 | `2` |
-| `reporter.video.storage` | `path` (file under `<output>/videos/`), `embed` (Base64 in the HTML, up to 50 MB per video) | `path` |
+| `pulsereport.screenshots.mode` | `all`, `failed`, `last`, `none` | `failed` |
+| `pulsereport.video.mode` | `always`, `failed`, `none` (needs [ffmpeg](https://ffmpeg.org)) | `none` |
+| `pulsereport.video.fps` | 1–30 | `2` |
+| `pulsereport.screenshots.storage` | `embed` (Base64 in the report), `path` (files in `pulsereport.screenshots.directory`) | `embed` |
+| `pulsereport.screenshots.directory` | folder for screenshot files when `storage=path` | `<output>/artifacts/screenshots` |
+| `pulsereport.video.storage` | `path` (file in `pulsereport.video.directory`), `embed` (Base64 in the HTML, up to 50 MB per video and 200 MB in total), `url` (sent to the video uploader, see below) | `path` |
+| `pulsereport.video.directory` | folder for recorded videos | `<output>/videos` |
+| `pulsereport.selenium.stepDetail` | `full`, `minimal` (no extra browser calls per action; elements are named by locator) | `full` |
+| `pulsereport.selenium.maskInputs` | `sensitive`, `all`, `none` | `sensitive` |
+| `pulsereport.selenium.failureCapture` | any of `page`, `console`, `source`, or `none` | `page,console,source` |
+| `pulsereport.selenium.pageMetrics` | `true`, `false` | `true` |
+| `pulsereport.selenium.trackScripts` | record `executeScript` calls as steps | `false` |
 
-See [Configuration](configuration.md) for details. Videos stored as `path`
-must be kept next to the report (copy the whole output directory). Video frames
-are captured from the same browser session; the adapter serializes them with
-your test's commands, and recording stops at 1 GB of frames per test.
+See [Configuration](configuration.md) for details. Video frames are captured from the same
+browser session; the adapter serializes them with your test's commands, and recording stops at
+1 GB of frames per test. Videos are encoded in the background after each test, so neither the
+next test nor `driver.quit()` waits for ffmpeg; the report waits for them when the suite ends.
+In the report, steps that happened during a recording get a "Play from here" button.
 
-The manual capture methods below remain available for anything `track(...)`
-doesn't cover, or for drivers you don't wrap.
+> **Note:** The adapter's stores are **static**, so any `SeleniumAdapter` instance you create in
+> test code shares data with the TestNG-registered listener — no singleton plumbing required.
 
-> **Note:** The adapter's artifact/metric stores are **static**, so any
-> `SeleniumAdapter` instance you create in test code shares data with the
-> TestNG-registered listener — no singleton plumbing required.
+#### Videos Stored Elsewhere (MinIO, S3, Selenium Grid)
 
-#### Screenshot Capture
-
-Take the screenshot with WebDriver's `TakesScreenshot`, save it to disk, then
-attach it with `captureBrowserScreenshot(testName, fileName, filePath, fileSize)`:
+To keep recordings out of the report folder, register an uploader. Each video PulseReport records is
+passed to it after encoding; the report plays the URL it returns, and the local file is deleted:
 
 ```java
-import org.openqa.selenium.OutputType;
-import org.openqa.selenium.TakesScreenshot;
-import java.io.File;
+SeleniumAdapter.setVideoUploader((video, testKey) -> {
+    String key = "runs/" + runId + "/" + video.getName();
+    minio.uploadObject(UploadObjectArgs.builder().bucket("videos").object(key)
+            .filename(video.getAbsolutePath()).contentType("video/mp4").build());
+    return "https://minio.example.com/videos/" + key;   // or a presigned URL
+});
+```
 
-@Listeners(SeleniumAdapter.class)
-public class WebTest {
-    private WebDriver driver;
-    private final SeleniumAdapter adapter = new SeleniumAdapter();
-    
-    @BeforeMethod
-    public void setup() {
-        driver = new ChromeDriver();
-    }
-    
-    @Test
-    public void testLogin() {
-        driver.get("https://example.com");
-        // Test logic...
-    }
-    
-    @AfterMethod(alwaysRun = true)
-    public void teardown(ITestResult result) {
-        // Capture a screenshot after each test (e.g. on failure)
-        if (!result.isSuccess()) {
-            File file = ((TakesScreenshot) driver)
-                .getScreenshotAs(OutputType.FILE);
-            adapter.captureBrowserScreenshot(
-                result.getMethod().getMethodName(),
-                "failure-screenshot.png",
-                file.getAbsolutePath(),
-                file.length());
-        }
-        driver.quit();
-    }
-}
+If the upload throws or returns nothing, the local file is kept and linked instead.
+
+Recordings made by something else (Selenium Grid, Selenoid, a cloud provider) can be attached by URL,
+as many per test as you like:
+
+```java
+adapter.attachVideo("https://minio.example.com/videos/run-42/login.mp4");
+adapter.attachVideo("Grid recording", gridVideoUrl, recordingStartedAt);  // start time lines steps up
+```
+
+Pass the recording's start time to get "Play from here" buttons on the steps it covers.
+`SeleniumTracker.attachVideo(...)` does the same without TestNG, e.g. in Cucumber. A recording is
+always attached to the test or scenario, even when attached from `@AfterMethod` or a Cucumber `@After`
+hook (the usual place to upload one after the browser closes), so its steps still line up with it.
+
+#### Screenshots and Page Source
+
+```java
+adapter.screenshot("After login");    // from the tracked driver, attached to the current step or test
+adapter.capturePageSource();
 ```
 
 #### Browser and Console Logs
 
-Attach browser-level logs, JavaScript console output, or HAR network captures.
-Each is written to `<output>/artifacts/<type>/` and shown inline in the report
-when it is 1 MB or smaller (larger files are linked):
+Attach browser-level logs, JavaScript console output, or HAR network captures to the current
+step or test. Each is written to `<output>/artifacts/<type>/` and shown inline in the report
+when it is 1 MB or smaller (larger files are linked). HAR files are shown as a request table;
+error lines in logs are highlighted and counted in the test header:
 
 ```java
-adapter.captureBrowserLogs("testLogin", "browser.log", logContent);
-adapter.captureConsoleLogs("testLogin", "console.log", consoleContent);
-adapter.captureHarFile("testLogin", "network.har", harContent);
-```
-
-#### Page Load Metrics
-
-Record page timing metrics with `recordPageLoadTime`, `recordDomReadyTime`, and
-`recordNetworkTiming`:
-
-```java
-@Test
-public void testPageLoad() {
-    long start = System.currentTimeMillis();
-    driver.get("https://example.com");
-    long loadTime = System.currentTimeMillis() - start;
-    
-    adapter.recordPageLoadTime("testPageLoad", loadTime);
-    adapter.recordNetworkTiming("testPageLoad", "dns", dnsLookupMs);
-}
+adapter.captureBrowserLogs("browser.log", logContent);
+adapter.captureConsoleLogs("console.log", consoleContent);
+adapter.captureHarFile("network.har", harContent);
 ```
 
 #### Browser Information
 
-Record browser metadata for the run's environment section with
-`recordBrowserMetadata(browserName, browserVersion, platform)` — typically once
-per run, from the driver's capabilities:
-
-```java
-@BeforeSuite
-public void recordBrowserInfo() {
-    Capabilities caps = ((RemoteWebDriver) driver).getCapabilities();
-    adapter.recordBrowserMetadata(
-        caps.getBrowserName(),
-        caps.getBrowserVersion(),
-        System.getProperty("os.name"));
-}
-```
+Usually nothing to do: `track(...)` reads the browser from the driver's capabilities. To
+override what the report header shows, call `recordBrowserMetadata(browserName, browserVersion,
+platform)`; values given here win over detected ones.
 
 ### Example
 
@@ -465,7 +482,7 @@ adapter.recordStep("tap login", TestStatus.FAILED, 40, "wrong screen");
 
 #### Screen Recording (Video)
 
-How the video is stored is **configurable** via `reporter.video.storage`:
+How the video is stored is **configurable** via `pulsereport.video.storage`:
 
 | Mode | `captureVideo` 3rd arg | Report behavior |
 | ---- | ---------------------- | --------------- |
@@ -474,8 +491,8 @@ How the video is stored is **configurable** via `reporter.video.storage`:
 | `embed` | raw Base64 video | bytes embedded in the HTML (self-contained, larger) |
 
 ```properties
-# reporter.properties
-reporter.video.storage=path   # or url, embed
+# pulsereport.properties
+pulsereport.video.storage=path   # or url, embed
 ```
 
 ```java
@@ -616,6 +633,25 @@ public void setUp() {
 }
 ```
 
+### Where Captures Go
+
+Every exchange (and every artifact or metric added by hand) goes to whatever is running on the thread when the call is made:
+
+| Call made in | Lands in |
+|---|---|
+| A `@Test` method | A step of its own, e.g. **GET /users/1**, holding the request and response |
+| `@BeforeMethod` / `@BeforeClass` | A call step inside the method's **@BeforeMethod** / **@BeforeClass** step, on the next test |
+| `@AfterMethod` | A call step inside the **@AfterMethod** step, on the test that just finished |
+| A Cucumber step | That step (the Gherkin step already names the action) |
+| A Cucumber `@Before` / `@After` hook | The hook's **@Before** / **@After** step on the scenario |
+| A Cucumber `@BeforeStep` / `@AfterStep` hook | The step that follows / the step it followed |
+
+In TestNG tests, the response checks and assertions made after a call are listed with that call, so each request shows what was verified about it.
+
+Metrics (`recordResponseTime`, `addMetric`, ...) go to the running test or scenario. A configuration method or hook that made no calls adds nothing to the report. Selenium actions follow the same rules, so a step that drives the browser and calls the API shows both.
+
+Outside of any test (no TestNG or Cucumber adapter running on the thread), captures are kept under the test name you pass, for `RestAssuredAdapter.getArtifacts(name)` and `getMetrics(name)`.
+
 ### Features
 
 #### Automatic Request/Response Capture
@@ -734,18 +770,18 @@ Response durations are automatically formatted in human-readable units (e.g., `2
 
 ### Configuration Options
 
-In the PulseReport configuration file (`reporter.properties`):
+In the PulseReport configuration file (`pulsereport.properties`):
 
 ```properties
 # Sensitive data masking (enabled by default; see configuration.md
 # for the full masking reference, including body, XML, and token masking)
-reporter.maskSensitiveData=true
-reporter.maskHeaders.enabled=true
-reporter.maskHeaders.fields=Authorization,X-API-Key,Cookie,Set-Cookie
-reporter.maskBody.enabled=true
-reporter.maskBody.fields=password,secret,token,access_token,refresh_token,id_token,client_secret,api_key,apiKey,authorization
-reporter.maskBody.maskTokens=true
-reporter.maskXml.enabled=true
+pulsereport.maskSensitiveData=true
+pulsereport.maskHeaders.enabled=true
+pulsereport.maskHeaders.fields=Authorization,X-API-Key,Cookie,Set-Cookie
+pulsereport.maskBody.enabled=true
+pulsereport.maskBody.fields=password,secret,token,access_token,refresh_token,id_token,client_secret,api_key,apiKey,authorization
+pulsereport.maskBody.maskTokens=true
+pulsereport.maskXml.enabled=true
 ```
 
 ### Example
@@ -858,7 +894,7 @@ public class CucumberRunner { }
 - **Data tables and doc strings** — Step arguments are captured and displayed in reports
 - **Parallel execution support** — Thread-safe via `ThreadLocal` scenario context
 - **Step-level artifacts** — HTTP artifacts captured by `RestAssuredAdapter` are automatically routed to the currently executing step (see below)
-- **Assertion capture** — Every JUnit, TestNG and Hamcrest assertion in a step is listed under that step, passing or failing, with no change to your step code (see below)
+- **Assertion capture** — Every JUnit, TestNG, Hamcrest and AssertJ assertion and every REST Assured response check in a step or hook is listed under it, passing or failing, with no change to your step code (see below)
 
 ### Assertion Capture
 
@@ -873,16 +909,29 @@ public void statusShouldBe(int expected) {
 
 The report lists each assertion under its step. Each entry shows the message, the method, the expected and actual values, and, for a failure, the library's error text. If any assertion in a step failed, its list opens automatically.
 
-**Supported libraries** (the static entry points are instrumented):
+The TestNG adapter captures assertions too, so this works the same in TestNG, Selenium and REST Assured suites. Each assertion goes to whatever was running when it was evaluated:
 
-| Library | Class | Notes |
+| Assertion made in | Listed under |
+| --- | --- |
+| A Cucumber step | That step |
+| A Cucumber `@Before` / `@After` hook | The hook's **@Before** / **@After** step |
+| A Cucumber `@BeforeStep` / `@AfterStep` hook | The step that follows / the step it followed |
+| A TestNG `@Test` method | The step it followed: the last browser action, REST call, mobile step or `step(...)` before it. Assertions made before any step go to the test's **Assertions** section |
+| TestNG `@BeforeMethod` / `@AfterMethod` (and the other configuration methods) | The call or action it followed inside the method's **@BeforeMethod** / **@AfterMethod** step, else that step |
+| Inside `SeleniumTracker.step("…", () -> …)` / `adapter.step(…)` | That step |
+
+**Supported libraries:**
+
+| Library | What is captured | Notes |
 | --- | --- | --- |
 | JUnit 5 | `org.junit.jupiter.api.Assertions` | Assertions inside `assertAll` are listed individually |
 | JUnit 4 | `org.junit.Assert` | |
 | TestNG | `org.testng.Assert` | Also covers `SoftAssert`, which delegates to `Assert` |
 | Hamcrest | `org.hamcrest.MatcherAssert.assertThat` | The matcher description is shown as the expected value |
+| AssertJ | Every check in a fluent chain: `assertThat(name).as("user name").isNotNull().startsWith("A")` is two entries | The `as(...)` text is the message. Soft assertions are listed as they are made. Checks inside `satisfies(...)` and similar are listed individually |
+| REST Assured | Response checks after `then()`: `statusCode`, `statusLine`, `contentType`, `header(s)`, `cookie(s)`, `body`, `time`, `spec` | The actual value is read from the response. `body("id", equalTo(1), "name", equalTo("Ann"))` is one entry per path, and only the path that failed is marked failed |
 
-**How it works.** When the adapter starts, it attaches a small Byte Buddy Java agent. The agent adds tracking code to the classes above so that each assertion call is recorded with its arguments and its result. Only the outermost call is recorded: a library calling its own overloads doesn't produce extra entries. Assertions in hooks are ignored. If recording fails for any reason, the assertion itself behaves exactly as before.
+**How it works.** When the adapter starts, it attaches a small Byte Buddy Java agent. The agent adds tracking code to the classes above so that each assertion call is recorded with its arguments and its result. Only the outermost call is recorded: a library calling its own overloads doesn't produce extra entries. If recording fails for any reason, the assertion itself behaves exactly as before.
 
 **Recommended: load the agent at JVM startup.** If you don't, the adapter attaches the agent while tests are already running. On JDK 21 and later that makes the JVM print `WARNING: A Java agent has been loaded dynamically`. A library can't hide this warning, because the JVM prints it itself ([JEP 451](https://openjdk.org/jeps/451)). OpenJDK also plans to block attaching agents at runtime by default ([draft JEP 8388877](https://openjdk.org/jeps/8388877)). No release has done so yet, and no target release has been set. When it does happen, capture switches itself off: the adapter logs a warning, your tests still run, and the report has no assertion lists. Loading the agent at startup avoids both problems. Mockito asks for the same setup:
 
@@ -913,10 +962,10 @@ If you'd rather keep runtime attach and only hide the warning, use `<argLine>-XX
 **Limitations:**
 
 - **Values, not source code.** The report shows the values that were passed. For example, `assertTrue(user.isActive())` is shown as expected `true`, actual `true`. A message such as `assertTrue(user.isActive(), "user is active")` makes the entry readable.
-- **Not yet covered:** AssertJ's fluent `assertThat(...)` chains, and checks inside other libraries such as REST-assured's `.then().statusCode(200)`.
-- **Same thread only.** Only assertions that run on the step's thread are captured.
+- **Not covered:** REST Assured's older `expect().statusCode(200).when().get(...)` style (use `then()`), and assertion libraries not listed above.
+- **Threads.** Assertions on a thread started during a step (directly, or by an executor created in the step) are listed under that step until it ends. Threads that already existed, and the shared fork/join pool used by parallel streams and `CompletableFuture`, are not captured: they serve other tests too.
 
-To turn capture off, set `reporter.assertions.capture=false` in `reporter.properties`, or pass `-Dreporter.assertions.capture=false`.
+To turn capture off, set `pulsereport.assertions.capture=false` in `pulsereport.properties`, or pass `-Dpulsereport.assertions.capture=false`.
 
 ### Attaching Artifacts to Steps
 
@@ -990,6 +1039,32 @@ public void setUp() {
 
 HTTP request/response artifacts captured by the REST-assured filter are automatically attached to the current BDD step. Sensitive headers (`Authorization`, `X-API-Key`, `Cookie`, `Set-Cookie`) are masked by default.
 
+### Combining with Selenium
+
+Track the driver with `SeleniumTracker` (no TestNG needed). Browser actions in a step
+definition become sub-steps of that Gherkin step, actions in `@Before`/`@After` hooks become
+"@Before"/"@After" steps named after the hook method, and a failing step gets the failed lookup, a screenshot and the page
+details:
+
+```java
+import io.github.pulsereport.adapters.selenium.SeleniumTracker;
+
+@Before
+public void openBrowser() {
+    driver = SeleniumTracker.track(new ChromeDriver());
+}
+
+@When("I log in as {string}")
+public void logIn(String user) {
+    driver.findElement(By.id("user")).sendKeys(user);
+    driver.findElement(By.id("login")).click();
+}
+```
+
+`SeleniumTracker.step(...)`, `waitFor(...)`, `screenshot(...)` and `capturePageSource()` work
+the same as on `SeleniumAdapter`. Video recording and the `last` screenshot mode need the TestNG
+`SeleniumAdapter`.
+
 ### Report Output
 
 On test run completion, the adapter generates:
@@ -999,13 +1074,13 @@ On test run completion, the adapter generates:
 
 ### Configuration
 
-The Cucumber adapter auto-detects `reporter.properties` from the working directory, `src/main/resources/`, or the classpath — no client-side configuration code is needed. To customize the output directory, set `reporter.output.directory` in that file, or override it with a system property (highest precedence):
+The Cucumber adapter auto-detects `pulsereport.properties` from the working directory, `src/main/resources/`, or the classpath — no client-side configuration code is needed. To customize the output directory, set `pulsereport.output.directory` in that file, or override it with a system property (highest precedence):
 
 ```bash
-mvn test -Dreporter.output.directory=custom/output/path
+mvn test -Dpulsereport.output.directory=custom/output/path
 ```
 
-Precedence: `-Dreporter.output.directory` system property > `reporter.properties` value > default `target/pulsereport`.
+Precedence: `-Dpulsereport.output.directory` system property > `pulsereport.properties` value > default `target/pulsereport`.
 
 ---
 
@@ -1106,9 +1181,9 @@ Artifact video = captureFullVideo(); // Avoid unless necessary
 **Solution**:
 
 - **Selenium** — screenshots are automatic only for drivers wrapped with
-  `adapter.track(driver)`, and only as `reporter.screenshots.mode` allows
-  (default: failures). For unwrapped drivers, call `captureBrowserScreenshot(...)`
-  (see [Screenshot Capture](#screenshot-capture)).
+  `adapter.track(driver)`, and only as `pulsereport.screenshots.mode` allows
+  (default: failures). `adapter.screenshot(name)` takes one on demand
+  (see [Screenshots and Page Source](#screenshots-and-page-source)).
 - **Appium** — automatic failure capture requires registering the driver with
   `MobileDriverHolder.set(driver)` in setup (and `MobileDriverHolder.remove()`
   in teardown).
@@ -1120,8 +1195,8 @@ Artifact video = captureFullVideo(); // Avoid unless necessary
 **Solution**: Enable logging:
 
 ```properties
-reporter.restassured.logging.request=true
-reporter.restassured.logging.response=true
+pulsereport.restassured.logging.request=true
+pulsereport.restassured.logging.response=true
 ```
 
 ### Memory Issues with Large Suites
@@ -1131,8 +1206,8 @@ reporter.restassured.logging.response=true
 **Solution**: Use streaming aggregator:
 
 ```properties
-reporter.aggregator.type=streaming
-reporter.aggregator.streaming.flushInterval=100
+pulsereport.aggregator.type=streaming
+pulsereport.aggregator.streaming.flushInterval=100
 ```
 
 ---

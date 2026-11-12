@@ -4,23 +4,23 @@ Use PulseReport configuration to control how the reporting layer captures eviden
 
 ## Configuration Files
 
-### PulseReport configuration file (`reporter.properties`)
+### PulseReport configuration file (`pulsereport.properties`)
 
-PulseReport includes `src/main/resources/reporter.properties` as a sample starter file. **All adapters** (RestAssured, Cucumber, TestNG, Appium) and the CLI auto-detect this file — no client-side configuration code is needed when `reporter.properties` is on the classpath or in the working directory. Auto-detection searches in:
+PulseReport includes `src/main/resources/pulsereport.properties` as a sample starter file. **All adapters** (RestAssured, Cucumber, TestNG, Appium) and the CLI auto-detect this file — no client-side configuration code is needed when `pulsereport.properties` is on the classpath or in the working directory. Auto-detection searches in:
 
-1. `./reporter.properties` (working directory / project root)
-2. `./src/main/resources/reporter.properties`
-3. The classpath (`/reporter.properties`)
+1. `./pulsereport.properties` (working directory / project root)
+2. `./src/main/resources/pulsereport.properties`
+3. The classpath (`/pulsereport.properties`)
 
 You can also load it explicitly:
 
-1. Pass it to the CLI with `--config /path/to/reporter.properties`
-2. Load it in Java with `ReporterConfig.loadFromFile(new File("/path/to/reporter.properties"))`
+1. Pass it to the CLI with `--config /path/to/pulsereport.properties`
+2. Load it in Java with `ReporterConfig.loadFromFile(new File("/path/to/pulsereport.properties"))`
 
 ```properties
-# Example reporter.properties
-reporter.output.formats=html,json,junit
-reporter.output.directory=target/pulsereport
+# Example pulsereport.properties
+pulsereport.output.formats=html,json,junit
+pulsereport.output.directory=target/pulsereport
 ```
 
 ### Loading Configuration
@@ -37,73 +37,85 @@ When loading a file, missing keys keep the class defaults. Placeholder values su
 
 The current `ReporterConfig` implementation actively reads these keys:
 
-- `reporter.output.formats`
-- `reporter.output.directory`
-- `reporter.report.title`
-- `reporter.s3.enabled`
-- `reporter.s3.bucket`
-- `reporter.s3.region`
-- `reporter.s3.keyPrefix`
-- `reporter.http.enabled`
-- `reporter.http.url`
-- `reporter.http.method`
-- `reporter.http.auth.type`
-- `reporter.http.auth.token`
-- `reporter.slack.enabled`
-- `reporter.slack.webhookUrl`
-- `reporter.slack.channel`
-- `reporter.slack.mentionOnFailure`
-- `reporter.slack.reportUrl`
-- `reporter.maxArtifactContentSize`
-- `reporter.video.storage`
-- `reporter.screenshots.mode`
-- `reporter.video.mode`
-- `reporter.video.fps`
-- `reporter.video.ffmpegPath`
-- `reporter.maskSensitiveData`
-- `reporter.maskHeaders.enabled`
-- `reporter.maskHeaders.fields`
-- `reporter.maskBody.enabled`
-- `reporter.maskBody.fields`
-- `reporter.maskBody.maskTokens`
-- `reporter.maskXml.enabled`
-- `reporter.maskXml.fields`
-- `reporter.assertions.capture`
+- `pulsereport.output.formats`
+- `pulsereport.output.directory`
+- `pulsereport.report.title`
+- `pulsereport.s3.enabled`
+- `pulsereport.s3.bucket`
+- `pulsereport.s3.region`
+- `pulsereport.s3.keyPrefix`
+- `pulsereport.http.enabled`
+- `pulsereport.http.url`
+- `pulsereport.http.method`
+- `pulsereport.http.auth.type`
+- `pulsereport.http.auth.token`
+- `pulsereport.slack.enabled`
+- `pulsereport.slack.webhookUrl`
+- `pulsereport.slack.channel`
+- `pulsereport.slack.mentionOnFailure`
+- `pulsereport.slack.reportUrl`
+- `pulsereport.maxArtifactContentSize`
+- `pulsereport.video.storage`
+- `pulsereport.screenshots.mode`
+- `pulsereport.video.mode`
+- `pulsereport.video.fps`
+- `pulsereport.video.ffmpegPath`
+- `pulsereport.maskSensitiveData`
+- `pulsereport.maskHeaders.enabled`
+- `pulsereport.maskHeaders.fields`
+- `pulsereport.maskBody.enabled`
+- `pulsereport.maskBody.fields`
+- `pulsereport.maskBody.maskTokens`
+- `pulsereport.maskXml.enabled`
+- `pulsereport.maskXml.fields`
+- `pulsereport.assertions.capture`
 
 The masking keys are described in detail in [Sensitive Data Masking](#sensitive-data-masking).
 
-`reporter.assertions.capture` (default `true`) controls automatic assertion capture in Cucumber steps. When it's on, every JUnit, TestNG and Hamcrest assertion that runs inside a step appears under that step in the report, whether it passed or failed. It can also be set as a system property (`-Dreporter.assertions.capture=false`), which takes precedence. See [Assertion Capture](adapters-guide.md#assertion-capture) for details.
+`pulsereport.assertions.capture` (default `true`) controls automatic assertion capture in the Cucumber and TestNG adapters. When it's on, every JUnit, TestNG, Hamcrest and AssertJ assertion and every REST Assured response check appears in the report under the step, hook or test that made it, whether it passed or failed. It can also be set as a system property (`-Dpulsereport.assertions.capture=false`), which takes precedence. See [Assertion Capture](adapters-guide.md#assertion-capture) for details.
 
-`reporter.video.storage` controls how video evidence (Appium, and Selenium drivers wrapped with `track(...)`) is stored: `path` (default), `embed`, or `url`. Selenium videos larger than 50 MB are linked instead of embedded.
+`pulsereport.video.storage` controls how video evidence (Appium, and Selenium drivers wrapped with `track(...)`) is stored: `path` (default), `embed`, or `url`. For Selenium, `url` means each recording is handed to the uploader registered with `SeleniumAdapter.setVideoUploader(...)` (for example MinIO or S3) and the report plays the returned URL; without an uploader it behaves like `path`. Selenium videos larger than 50 MB, or beyond 200 MB of embedded video in one run, are linked instead of embedded.
 
-For drivers wrapped with `SeleniumAdapter.track(...)`:
+Files in `pulsereport.screenshots.directory` and `pulsereport.video.directory` are linked from the report by a path relative to the report's folder, so keep the folders at the same place relative to the report (or move them together). The S3 publisher uploads only linked files that sit inside the report's folder.
+
+For drivers wrapped with `SeleniumAdapter.track(...)` or `SeleniumTracker.track(...)`:
 
 | Key | Values | Default |
 | --- | --- | --- |
-| `reporter.screenshots.mode` | `all` (every step), `failed` (failed steps and failed tests), `last` (last step of each test, plus failures), `none` | `failed` |
-| `reporter.video.mode` | `always`, `failed` (kept only for failed tests), `none` | `none` |
-| `reporter.video.fps` | Frames captured per second, 1–30 | `2` |
-| `reporter.video.ffmpegPath` | ffmpeg executable used to encode MP4 | `ffmpeg` |
+| `pulsereport.screenshots.mode` | `all` (every top-level step), `failed` (failed steps and failed tests), `last` (last step of each test, plus failures), `none` | `failed` |
+| `pulsereport.screenshots.storage` | `embed` (Base64 inside the report, no files), `path` (files in `pulsereport.screenshots.directory`, shown from there) | `embed` |
+| `pulsereport.screenshots.directory` | Folder for screenshot files when `storage=path`; absolute, or relative to the working directory | `<output>/artifacts/screenshots` |
+| `pulsereport.video.mode` | `always`, `failed` (kept only for failed tests), `none` | `none` |
+| `pulsereport.video.directory` | Folder for recorded videos; absolute, or relative to the working directory | `<output>/videos` |
+| `pulsereport.video.fps` | Frames captured per second, 1–30 | `2` |
+| `pulsereport.video.ffmpegPath` | ffmpeg executable used to encode MP4 | `ffmpeg` |
+| `pulsereport.selenium.stepDetail` | `full` (element label, URL change, page load per action; up to two extra browser calls per action), `minimal` (no extra calls; elements named by locator) | `full` |
+| `pulsereport.selenium.maskInputs` | `sensitive` (password, one-time-code, card and sensitive-looking fields, plus credentials and sensitive parameters in URLs), `all`, `none`. `pulsereport.maskSensitiveData=false` turns it off | `sensitive` |
+| `pulsereport.selenium.failureCapture` | Comma list of `page` (URL, title, window size), `console` (browser console, Chromium-based browsers), `source` (page source), or `none` | `page,console,source` |
+| `pulsereport.selenium.pageMetrics` | Record `page.load.time` and `page.ttfb` for each navigation | `true` |
+| `pulsereport.selenium.trackScripts` | Record `executeScript` calls as steps | `false` |
 
-Videos are written to `<output directory>/videos/` and need [ffmpeg](https://ffmpeg.org) with libx264; if ffmpeg is missing, a warning is logged and tests run without video. All four keys can also be passed as `-D` system properties.
+Field names in `pulsereport.maskBody.fields` are also treated as sensitive input fields and URL parameters.
 
-Size limits: screenshots over 10 MB, or beyond 200 MB of screenshots in one report, are not embedded in the HTML (the report links their file path instead). A single test records at most 1 GB of video frames, and encoding is abandoned after 3 minutes.
+Screenshots are embedded in the report by default (`pulsereport.screenshots.storage=embed`); logs and page sources are written to `<output directory>/artifacts/`, and videos to `pulsereport.video.directory`; the report refers to files by relative path. Videos need [ffmpeg](https://ffmpeg.org) with libx264; if ffmpeg is missing, a warning is logged and tests run without video. Every key can also be passed as a `-D` system property.
+
+Size limits: screenshots over 10 MB, or beyond 200 MB of screenshots in one report, are not embedded in the HTML (the report links their file instead). A single test records at most 1 GB of video frames, and encoding is abandoned after 3 minutes. Encoding runs in the background; the report waits up to 4 minutes per video when the suite ends.
 
 Other property examples in this document preserve the current PulseReport naming, but they are not all mapped by `ReporterConfig` yet.
 
 ## Core Settings
 
-### Reporter Metadata
+### PulseReport Metadata
 
 ```properties
-# Reporter name shown in report headers
-reporter.name=PulseReport
+# Report name shown in report headers
+pulsereport.name=PulseReport
 
-# Reporter version (for tracking)
-reporter.version=${version}
+# PulseReport version (for tracking)
+pulsereport.version=${version}
 
-# Enable/disable reporter globally
-reporter.enabled=true
+# Enable/disable PulseReport globally
+pulsereport.enabled=true
 # Set to false to disable all reporting
 ```
 
@@ -111,21 +123,21 @@ reporter.enabled=true
 
 ```properties
 # Output formats (comma-separated)
-reporter.output.formats=html,json,junit
+pulsereport.output.formats=html,json,junit
 # Available: html, json, junit
 
 # Output directory
-reporter.output.directory=target/pulsereport
+pulsereport.output.directory=target/pulsereport
 
 # Title shown in the HTML report header and browser tab.
-# Defaults to the test run name. Can also be set with -Dreporter.report.title=...
-reporter.report.title=Checkout regression
+# Defaults to the test run name. Can also be set with -Dpulsereport.report.title=...
+pulsereport.report.title=Checkout regression
 
 # Create output directory if missing
-reporter.output.createDirectory=true
+pulsereport.output.createDirectory=true
 
 # Overwrite existing reports
-reporter.output.overwrite=true
+pulsereport.output.overwrite=true
 ```
 
 ## Adapter Configuration
@@ -134,94 +146,76 @@ reporter.output.overwrite=true
 
 ```properties
 # Enable TestNG adapter
-reporter.testng.enabled=true
+pulsereport.testng.enabled=true
 
 # Capture test parameters
-reporter.testng.captureParameters=true
+pulsereport.testng.captureParameters=true
 
 # Capture test groups
-reporter.testng.captureGroups=true
+pulsereport.testng.captureGroups=true
 
 # Capture configuration methods
-reporter.testng.captureConfigMethods=false
+pulsereport.testng.captureConfigMethods=false
 # @BeforeMethod, @AfterMethod, etc.
 ```
 
 ### Selenium Adapter
 
 ```properties
-# Enable Selenium adapter
-reporter.selenium.enabled=true
-
-# Screenshot settings
-reporter.selenium.screenshot.enabled=true
-reporter.selenium.screenshot.onSuccess=true
-reporter.selenium.screenshot.onFailure=true
-reporter.selenium.screenshot.onSkip=false
-reporter.selenium.screenshot.format=png
-# Options: png, jpg
-
-# Screenshot quality (for jpg)
-reporter.selenium.screenshot.quality=90
-# Range: 1-100
-
-# Screenshot compression
-reporter.selenium.screenshot.compress=true
-reporter.selenium.screenshot.maxWidth=1920
-reporter.selenium.screenshot.maxHeight=1080
-
-# Page metrics
-reporter.selenium.metrics.pageLoad=true
-reporter.selenium.metrics.domReady=true
-reporter.selenium.metrics.firstContentfulPaint=true
-
-# Browser info capture
-reporter.selenium.captureBrowserInfo=true
+pulsereport.screenshots.mode=failed
+pulsereport.video.mode=failed
+pulsereport.selenium.stepDetail=full
+pulsereport.selenium.maskInputs=sensitive
+pulsereport.selenium.failureCapture=page,console,source
+pulsereport.selenium.pageMetrics=true
+pulsereport.selenium.trackScripts=false
 ```
+
+See the [Selenium key table](#properties-loaded-by-reporterconfig) above for the values.
 
 ### Appium Adapter
 
 ```properties
 # Enable Appium adapter
-reporter.appium.enabled=true
+pulsereport.appium.enabled=true
 
 # Screenshot settings
-reporter.appium.screenshot.enabled=true
-reporter.appium.screenshot.onSuccess=true
-reporter.appium.screenshot.onFailure=true
-reporter.appium.screenshot.format=png
+pulsereport.appium.screenshot.enabled=true
+pulsereport.appium.screenshot.onSuccess=true
+pulsereport.appium.screenshot.onFailure=true
+pulsereport.appium.screenshot.format=png
 
 # Device info capture
-reporter.appium.captureDeviceInfo=true
+pulsereport.appium.captureDeviceInfo=true
 
 # App logs capture
-reporter.appium.captureLogs=true
-reporter.appium.logs.maxLines=1000
+pulsereport.appium.captureLogs=true
+pulsereport.appium.logs.maxLines=1000
 ```
 
 ### REST-assured Adapter
 
 ```properties
 # Enable REST-assured adapter
-reporter.restassured.enabled=true
+pulsereport.restassured.enabled=true
 
 # Request/Response logging
-reporter.restassured.logging.request=true
-reporter.restassured.logging.response=true
-reporter.restassured.logging.headers=true
-reporter.restassured.logging.body=true
-reporter.restassured.logging.cookies=false
+pulsereport.restassured.logging.request=true
+pulsereport.restassured.logging.response=true
+pulsereport.restassured.logging.headers=true
+pulsereport.restassured.logging.body=true
+pulsereport.restassured.logging.cookies=false
 
 # Body size limits
-reporter.maxArtifactContentSize=51200
+pulsereport.maxArtifactContentSize=51200
 # In bytes (51200 = 50KB default); caps captured request/response body size
 
-# Sensitive data masking uses the reporter.mask* keys documented in
+# Sensitive data masking uses the pulsereport.mask* keys documented in
 # Sensitive Data Masking below (enabled by default).
-reporter.maskSensitiveData=true
+pulsereport.maskSensitiveData=true
 
 # Response time tracking
-reporter.restassured.metrics.responseTime=true
+pulsereport.restassured.metrics.responseTime=true
 ```
 
 ## Sensitive Data Masking
@@ -231,21 +225,41 @@ The REST-assured adapter masks credentials, tokens, and other sensitive values i
 ### Master Switch
 
 ```properties
-# Gates ALL masking (headers, bodies, XML, tokens). Default: true
-reporter.maskSensitiveData=true
+# Gates ALL masking (headers, bodies, XML, tokens, Selenium input and URLs). Default: true
+pulsereport.maskSensitiveData=true
 ```
 
-When `reporter.maskSensitiveData=false`, no masking of any kind is applied, regardless of the per-category toggles below.
+When `pulsereport.maskSensitiveData=false`, no masking of any kind is applied, regardless of the per-category toggles below.
+
+### Selenium Input and URL Masking
+
+```properties
+# sensitive (default) | all | none
+pulsereport.selenium.maskInputs=sensitive
+```
+
+For drivers wrapped with `track(...)`:
+
+- `sensitive` hides typed text in password, one-time-code (`autocomplete="one-time-code"`) and
+  card fields, and in fields whose name, id or label contains `password`, `token`, `secret`,
+  `otp`, `pin`, `cvv`, `ssn`, `card number`, `iban`, `api key`, `auth`, or any name listed in
+  `pulsereport.maskBody.fields`. It also hides credentials (`https://user:pass@…`) and the values of
+  sensitive URL parameters (`token`, `code`, `access_token`, `session`, `signature`, …) in step
+  names, URL changes, metric labels and page details.
+- `all` hides every typed text (and keys sent with `Actions` or to alerts), plus the URL masking above.
+- `none` shows everything.
+
+Typed text is shown as `••••••`; masked URL parts as `***`.
 
 ### Header Masking
 
 ```properties
 # Whether header masking is applied (default: true)
-reporter.maskHeaders.enabled=true
+pulsereport.maskHeaders.enabled=true
 
 # Comma-separated header names to mask
 # Default: Authorization,X-API-Key,Cookie,Set-Cookie
-reporter.maskHeaders.fields=Authorization,X-API-Key,Cookie,Set-Cookie
+pulsereport.maskHeaders.fields=Authorization,X-API-Key,Cookie,Set-Cookie
 ```
 
 Header name matching is case-insensitive. Masked header values become `***REDACTED***`.
@@ -254,49 +268,49 @@ Header name matching is case-insensitive. Masked header values become `***REDACT
 
 ```properties
 # Whether body masking is applied (default: true)
-reporter.maskBody.enabled=true
+pulsereport.maskBody.enabled=true
 
 # Comma-separated body field names to mask
 # Default: password,secret,token,access_token,refresh_token,id_token,client_secret,api_key,apiKey,authorization
-reporter.maskBody.fields=password,secret,token,access_token,refresh_token,id_token,client_secret,api_key,apiKey,authorization
+pulsereport.maskBody.fields=password,secret,token,access_token,refresh_token,id_token,client_secret,api_key,apiKey,authorization
 
 # Whether Bearer/JWT regex masking passes are applied to ALL body types (default: true)
-reporter.maskBody.maskTokens=true
+pulsereport.maskBody.maskTokens=true
 ```
 
 - **JSON bodies** (body starts with `{` or `[`) are parsed and masked recursively at any depth: any field whose name case-insensitively matches the list has its value replaced with `***REDACTED***`. String, number, boolean, and null values are all replaced with the redacted string.
 - **Form-urlencoded bodies** (`key=value&...`) are masked by key, case-insensitively.
-- **All body types**: when `reporter.maskBody.maskTokens=true`, a Bearer/JWT regex pass additionally redacts tokens (JWTs are anchored on the `eyJ` prefix to avoid false positives like version numbers).
+- **All body types**: when `pulsereport.maskBody.maskTokens=true`, a Bearer/JWT regex pass additionally redacts tokens (JWTs are anchored on the `eyJ` prefix to avoid false positives like version numbers).
 
 ### XML Body Masking
 
 ```properties
 # Whether XML element masking is applied (default: true)
-reporter.maskXml.enabled=true
+pulsereport.maskXml.enabled=true
 
 # Comma-separated XML element names to mask.
-# When unset, inherits the reporter.maskBody.fields list.
-reporter.maskXml.fields=password,secret,token
+# When unset, inherits the pulsereport.maskBody.fields list.
+pulsereport.maskXml.fields=password,secret,token
 ```
 
 For XML bodies (body starts with `<`), the text content of any element whose tag name case-insensitively matches the list is replaced with `***REDACTED***`. Namespace prefixes are ignored (e.g. `ns:password` matches `password`). **Attributes are NOT masked.** Parsing is XXE-safe (DOCTYPE declarations are disallowed and external entities are disabled), and malformed XML safely falls back to token-only masking — the masker never throws and never logs the unmasked body.
 
 ### Field Lists Are Authoritative
 
-Setting a field list **fully replaces** the built-in defaults — lists are not additive. For example, `reporter.maskHeaders.fields=X-Custom-Secret` means only `X-Custom-Secret` is masked; `Authorization` is no longer masked unless you add it to the list.
+Setting a field list **fully replaces** the built-in defaults — lists are not additive. For example, `pulsereport.maskHeaders.fields=X-Custom-Secret` means only `X-Custom-Secret` is masked; `Authorization` is no longer masked unless you add it to the list.
 
 ### Configuration Auto-Detection
 
-Auto-detection applies to **all adapters and the CLI**. When `reporter.properties` is in the working directory or on the classpath, no client-side configuration code is needed:
+Auto-detection applies to **all adapters and the CLI**. When `pulsereport.properties` is in the working directory or on the classpath, no client-side configuration code is needed:
 
 - `new RestAssuredAdapter()` (default constructor) resolves configuration in this order:
-  1. `./reporter.properties` (working directory)
-  2. `./src/main/resources/reporter.properties`
-  3. `/reporter.properties` on the classpath
+  1. `./pulsereport.properties` (working directory)
+  2. `./src/main/resources/pulsereport.properties`
+  3. `/pulsereport.properties` on the classpath
   4. Built-in defaults (all masking enabled)
-- The Cucumber and TestNG adapters auto-detect `reporter.properties` from the same locations when resolving the report output directory at the end of the run.
-- The Appium adapter auto-detects `reporter.properties` (e.g. for `reporter.video.storage`) from the same locations.
-- The CLI auto-detects `reporter.properties` when `--config` is omitted.
+- The Cucumber and TestNG adapters auto-detect `pulsereport.properties` from the same locations when resolving the report output directory at the end of the run.
+- The Appium adapter auto-detects `pulsereport.properties` (e.g. for `pulsereport.video.storage`) from the same locations.
+- The CLI auto-detects `pulsereport.properties` when `--config` is omitted.
 
 An explicit configuration always wins: `new RestAssuredAdapter(config)` and `ReporterConfig.loadFromFile(...)` bypass auto-detection entirely.
 
@@ -304,11 +318,11 @@ An explicit configuration always wins: `new RestAssuredAdapter(config)` and `Rep
 
 The Cucumber and TestNG adapters resolve the report output directory with `ReporterConfig.resolveOutputDirectory(...)`, using this precedence (highest first):
 
-1. The `-Dreporter.output.directory` system property, if set and non-blank
-2. The `reporter.output.directory` value from an auto-detected `reporter.properties` file
+1. The `-Dpulsereport.output.directory` system property, if set and non-blank
+2. The `pulsereport.output.directory` value from an auto-detected `pulsereport.properties` file
 3. The default `target/pulsereport`
 
-This means a `reporter.properties` file alone is enough to redirect reports — a system property is only needed to override the file, and resolution never fails: if no file is found, reports go to `target/pulsereport`.
+This means a `pulsereport.properties` file alone is enough to redirect reports — a system property is only needed to override the file, and resolution never fails: if no file is found, reports go to `target/pulsereport`.
 
 Relative output directories are resolved against the working directory (`user.dir`); under Maven Surefire this is the module directory.
 
@@ -317,29 +331,29 @@ Relative output directories are resolved against the working directory (`user.di
 ```properties
 # ---- Sensitive data masking ----
 # Master switch: gates ALL masking below (default: true)
-reporter.maskSensitiveData=true
+pulsereport.maskSensitiveData=true
 
 # Header masking (default: true)
-reporter.maskHeaders.enabled=true
+pulsereport.maskHeaders.enabled=true
 # Authoritative list of header names to mask (case-insensitive);
 # values become ***REDACTED***
-reporter.maskHeaders.fields=Authorization,X-API-Key,Cookie,Set-Cookie
+pulsereport.maskHeaders.fields=Authorization,X-API-Key,Cookie,Set-Cookie
 
 # Body masking for JSON and form-urlencoded bodies (default: true)
-reporter.maskBody.enabled=true
+pulsereport.maskBody.enabled=true
 # Authoritative list of body field names to mask; JSON is masked
 # recursively at any depth and values of any type (string, number,
 # boolean, null) become ***REDACTED***
-reporter.maskBody.fields=password,secret,token,access_token,refresh_token,id_token,client_secret,api_key,apiKey,authorization
+pulsereport.maskBody.fields=password,secret,token,access_token,refresh_token,id_token,client_secret,api_key,apiKey,authorization
 # Bearer/JWT regex pass applied to ALL body types (default: true)
-reporter.maskBody.maskTokens=true
+pulsereport.maskBody.maskTokens=true
 
 # XML body masking (default: true); element text masked by tag name
 # (case-insensitive, namespace prefixes ignored); attributes are NOT
 # masked; malformed XML falls back to token-only masking
-reporter.maskXml.enabled=true
-# When unset, inherits reporter.maskBody.fields
-reporter.maskXml.fields=password,secret,token,access_token,refresh_token,id_token,client_secret,api_key,apiKey,authorization
+pulsereport.maskXml.enabled=true
+# When unset, inherits pulsereport.maskBody.fields
+pulsereport.maskXml.fields=password,secret,token,access_token,refresh_token,id_token,client_secret,api_key,apiKey,authorization
 ```
 
 ### Programmatic Masking Configuration
@@ -359,9 +373,9 @@ ReporterConfig config = ReporterConfig.builder()
 
 The matching getters are `isMaskSensitiveData()`, `isMaskHeadersEnabled()`, `getMaskHeaderFields()`, `isMaskBodyEnabled()`, `getSensitiveBodyFields()`, `isMaskXmlEnabled()`, `getXmlFields()`, and `isMaskTokens()`.
 
-### Migrating from `reporter.sensitiveHeaders`
+### Migrating from `pulsereport.sensitiveHeaders`
 
-The `reporter.sensitiveHeaders` key and the `sensitiveHeaders(...)` / `getSensitiveHeaders()` builder API were **removed** in this release. Configurations using the old key must rename it to `reporter.maskHeaders.fields`, and code using the old builder methods must switch to `maskHeaderFields(...)` / `getMaskHeaderFields()`.
+The `pulsereport.sensitiveHeaders` key and the `sensitiveHeaders(...)` / `getSensitiveHeaders()` builder API were **removed** in this release. Configurations using the old key must rename it to `pulsereport.maskHeaders.fields`, and code using the old builder methods must switch to `maskHeaderFields(...)` / `getMaskHeaderFields()`.
 
 ## Output Format Configuration
 
@@ -375,42 +389,42 @@ The HTML report is generated as a self-contained single file with all styles and
 
 ```properties
 # Pretty print JSON
-reporter.json.pretty=true
+pulsereport.json.pretty=true
 
 # Include full stack traces
-reporter.json.includeStackTraces=true
+pulsereport.json.includeStackTraces=true
 
 # Include artifact content
-reporter.json.includeArtifacts=true
+pulsereport.json.includeArtifacts=true
 # Artifacts encoded as base64
 
 # Include metric details
-reporter.json.includeMetrics=true
+pulsereport.json.includeMetrics=true
 
 # JSON schema validation
-reporter.json.validateSchema=false
-reporter.json.schemaPath=/path/to/schema.json
+pulsereport.json.validateSchema=false
+pulsereport.json.schemaPath=/path/to/schema.json
 ```
 
 ### JUnit XML Output
 
 ```properties
 # Include system output
-reporter.junit.includeSystemOut=true
-reporter.junit.includeSystemErr=true
+pulsereport.junit.includeSystemOut=true
+pulsereport.junit.includeSystemErr=true
 
 # Include properties
-reporter.junit.includeProperties=true
+pulsereport.junit.includeProperties=true
 
 # Flatten suite hierarchy
-reporter.junit.flattenSuites=false
+pulsereport.junit.flattenSuites=false
 
 # Timestamp format
-reporter.junit.timestampFormat=ISO8601
+pulsereport.junit.timestampFormat=ISO8601
 # Options: ISO8601, UNIX, CUSTOM
 
 # Custom timestamp format (if CUSTOM)
-reporter.junit.timestampPattern=yyyy-MM-dd'T'HH:mm:ss.SSSZ
+pulsereport.junit.timestampPattern=yyyy-MM-dd'T'HH:mm:ss.SSSZ
 ```
 
 ## Integration Configuration
@@ -419,12 +433,12 @@ reporter.junit.timestampPattern=yyyy-MM-dd'T'HH:mm:ss.SSSZ
 
 ```properties
 # Enable S3 publishing
-reporter.s3.enabled=false
+pulsereport.s3.enabled=false
 
 # Bucket details
-reporter.s3.bucket=my-test-reports
-reporter.s3.region=us-east-1
-reporter.s3.keyPrefix=builds/${BUILD_ID}/
+pulsereport.s3.bucket=my-test-reports
+pulsereport.s3.region=us-east-1
+pulsereport.s3.keyPrefix=builds/${BUILD_ID}/
 ```
 
 `ReporterConfig` currently maps only the S3 enabled flag, bucket, region, and key prefix. Credentials and custom S3 client behavior are configured in code when you build the AWS SDK client.
@@ -433,67 +447,67 @@ reporter.s3.keyPrefix=builds/${BUILD_ID}/
 
 ```properties
 # Enable HTTP publishing
-reporter.http.enabled=false
+pulsereport.http.enabled=false
 
 # Endpoint URL
-reporter.http.url=https://api.example.com/test-reports
+pulsereport.http.url=https://api.example.com/test-reports
 
 # HTTP method
-reporter.http.method=POST
+pulsereport.http.method=POST
 # Options: POST, PUT
 
 # Authentication type
-reporter.http.auth.type=bearer
+pulsereport.http.auth.type=bearer
 # Common values in the current API: bearer
 
 # Bearer token (if type=bearer)
-reporter.http.auth.token=${API_TOKEN}
+pulsereport.http.auth.token=${API_TOKEN}
 ```
 
-`ReporterConfig` maps the HTTP enabled flag, endpoint URL, method, auth type, and bearer token. When `reporter.http.auth.type=bearer`, the CLI passes the token to `HttpPublishConfig` automatically. Custom headers and alternate authentication modes are configured directly on `HttpPublishConfig` in code.
+`ReporterConfig` maps the HTTP enabled flag, endpoint URL, method, auth type, and bearer token. When `pulsereport.http.auth.type=bearer`, the CLI passes the token to `HttpPublishConfig` automatically. Custom headers and alternate authentication modes are configured directly on `HttpPublishConfig` in code.
 
 ### Slack Integration
 
 ```properties
 # Enable Slack notifications
-reporter.slack.enabled=false
+pulsereport.slack.enabled=false
 
 # Webhook URL
-reporter.slack.webhookUrl=${SLACK_WEBHOOK_URL}
+pulsereport.slack.webhookUrl=${SLACK_WEBHOOK_URL}
 
 # Channel override
-reporter.slack.channel=#test-results
+pulsereport.slack.channel=#test-results
 
 # Bot customization
-reporter.slack.username=Test Reporter Bot
-reporter.slack.iconEmoji=:robot_face:
-reporter.slack.iconUrl=https://example.com/icon.png
+pulsereport.slack.username=PulseReport Bot
+pulsereport.slack.iconEmoji=:robot_face:
+pulsereport.slack.iconUrl=https://example.com/icon.png
 
 # Notification conditions
-reporter.slack.notifyOnSuccess=true
-reporter.slack.notifyOnFailure=true
-reporter.slack.mentionOnFailure=@qa-team
+pulsereport.slack.notifyOnSuccess=true
+pulsereport.slack.notifyOnFailure=true
+pulsereport.slack.mentionOnFailure=@qa-team
 
 # URL to include in Slack notification linking to the published report
-reporter.slack.reportUrl=https://reports.example.com/latest
+pulsereport.slack.reportUrl=https://reports.example.com/latest
 
 # Notification thresholds
-reporter.slack.notifyThreshold.failureRate=0.0
+pulsereport.slack.notifyThreshold.failureRate=0.0
 # Only notify if failure rate >= this (%)
-reporter.slack.notifyThreshold.durationMinutes=0
+pulsereport.slack.notifyThreshold.durationMinutes=0
 # Only notify if duration >= this (minutes)
 
 # Message formatting
-reporter.slack.includeStackTrace=false
-reporter.slack.maxStackTraceLines=10
-reporter.slack.includeReportUrl=true
+pulsereport.slack.includeStackTrace=false
+pulsereport.slack.maxStackTraceLines=10
+pulsereport.slack.includeReportUrl=true
 
 # Custom message template
-reporter.slack.messageTemplate=/path/to/template.json
+pulsereport.slack.messageTemplate=/path/to/template.json
 
 # Rate limiting
-reporter.slack.rateLimit.enabled=true
-reporter.slack.rateLimit.perMinute=60
+pulsereport.slack.rateLimit.enabled=true
+pulsereport.slack.rateLimit.perMinute=60
 ```
 
 ## Aggregator Configuration
@@ -502,11 +516,11 @@ reporter.slack.rateLimit.perMinute=60
 
 ```properties
 # Aggregator type
-reporter.aggregator.type=standard
+pulsereport.aggregator.type=standard
 # Options: standard, streaming
 
 # Thread safety
-reporter.aggregator.threadSafe=true
+pulsereport.aggregator.threadSafe=true
 ```
 
 ### Streaming Aggregator
@@ -515,18 +529,18 @@ For large test suites to reduce memory usage:
 
 ```properties
 # Use streaming aggregator
-reporter.aggregator.type=streaming
+pulsereport.aggregator.type=streaming
 
 # Flush interval
-reporter.aggregator.streaming.flushInterval=100
+pulsereport.aggregator.streaming.flushInterval=100
 # Flush after every N tests
 
 # Buffer size
-reporter.aggregator.streaming.bufferSize=1000
+pulsereport.aggregator.streaming.bufferSize=1000
 # Maximum tests in memory
 
 # Temporary storage
-reporter.aggregator.streaming.tempDirectory=target/temp
+pulsereport.aggregator.streaming.tempDirectory=target/temp
 ```
 
 ## Performance Configuration
@@ -535,31 +549,31 @@ reporter.aggregator.streaming.tempDirectory=target/temp
 
 ```properties
 # Enable memory optimization
-reporter.performance.optimizeMemory=true
+pulsereport.performance.optimizeMemory=true
 
 # Artifact compression
-reporter.performance.compressArtifacts=true
+pulsereport.performance.compressArtifacts=true
 
 # Lazy loading
-reporter.performance.lazyLoadArtifacts=true
+pulsereport.performance.lazyLoadArtifacts=true
 
 # Parallel processing
-reporter.performance.parallel.enabled=true
-reporter.performance.parallel.threads=4
+pulsereport.performance.parallel.enabled=true
+pulsereport.performance.parallel.threads=4
 ```
 
 ### Caching
 
 ```properties
 # Enable caching
-reporter.performance.cache.enabled=true
+pulsereport.performance.cache.enabled=true
 
 # Cache size
-reporter.performance.cache.maxSize=1000
+pulsereport.performance.cache.maxSize=1000
 # Number of test results to cache
 
 # Cache TTL
-reporter.performance.cache.ttlMinutes=60
+pulsereport.performance.cache.ttlMinutes=60
 ```
 
 ## Logging Configuration
@@ -572,7 +586,7 @@ log.level=INFO
 # Options: TRACE, DEBUG, INFO, WARN, ERROR
 
 # Log file
-log.file=reporter.log
+log.file=pulsereport.log
 
 # Log pattern
 log.pattern=%d{ISO8601} [%thread] %-5level %logger{36} - %msg%n
@@ -590,15 +604,15 @@ log.file.maxBackupIndex=5
 
 ```properties
 # Enable model validation
-reporter.validation.enabled=true
+pulsereport.validation.enabled=true
 
 # Strict mode (fail on validation errors)
-reporter.validation.strict=false
+pulsereport.validation.strict=false
 
 # Validation rules
-reporter.validation.requireName=true
-reporter.validation.requireTimestamp=true
-reporter.validation.requireStatus=true
+pulsereport.validation.requireName=true
+pulsereport.validation.requireTimestamp=true
+pulsereport.validation.requireStatus=true
 ```
 
 ## Environment Variable Substitution
@@ -609,10 +623,10 @@ All configuration values support environment variable substitution:
 # Environment variables: ${VAR_NAME}
 # Resolves from system properties first, then environment variables.
 # If not found, the placeholder is kept as-is.
-reporter.s3.bucket=${S3_BUCKET}
-reporter.slack.webhookUrl=${SLACK_WEBHOOK}
-reporter.name=${REPORT_NAME}
-reporter.output.directory=${OUTPUT_DIR}
+pulsereport.s3.bucket=${S3_BUCKET}
+pulsereport.slack.webhookUrl=${SLACK_WEBHOOK}
+pulsereport.name=${REPORT_NAME}
+pulsereport.output.directory=${OUTPUT_DIR}
 ```
 
 ## Programmatic Configuration
@@ -649,14 +663,14 @@ ReporterConfig config = ReporterConfig.builder()
 import io.github.pulsereport.config.ReporterConfig;
 import java.io.File;
 
-File configFile = new File("config/reporter.properties");
+File configFile = new File("config/pulsereport.properties");
 ReporterConfig config = ReporterConfig.loadFromFile(configFile);
 ```
 
 ### Override Values
 
 ```java
-ReporterConfig loadedConfig = ReporterConfig.loadFromFile(new File("config/reporter.properties"));
+ReporterConfig loadedConfig = ReporterConfig.loadFromFile(new File("config/pulsereport.properties"));
 
 ReporterConfig effectiveConfig = ReporterConfig.builder()
     .outputFormats(loadedConfig.getOutputFormats())
@@ -691,34 +705,34 @@ try {
 
 ### Validation Rules
 
-- `reporter.output.formats` must be present and contain only `html`, `json`, or `junit`
-- `reporter.output.directory` must be set
-- If `reporter.s3.enabled=true`, `reporter.s3.bucket` must be set
-- If `reporter.http.enabled=true`, `reporter.http.url` must be set
-- If `reporter.slack.enabled=true`, `reporter.slack.webhookUrl` must be set
-- `reporter.video.storage` must be one of `path`, `embed`, or `url` (default `path`); any other value fails validation with `Invalid video storage: …`
+- `pulsereport.output.formats` must be present and contain only `html`, `json`, or `junit`
+- `pulsereport.output.directory` must be set
+- If `pulsereport.s3.enabled=true`, `pulsereport.s3.bucket` must be set
+- If `pulsereport.http.enabled=true`, `pulsereport.http.url` must be set
+- If `pulsereport.slack.enabled=true`, `pulsereport.slack.webhookUrl` must be set
+- `pulsereport.video.storage` must be one of `path`, `embed`, or `url` (default `path`); any other value fails validation with `Invalid video storage: …`
 
 ## Default Values
 
 ```properties
 # Defaults in ReporterConfig itself
-reporter.output.formats=
-reporter.output.directory=
+pulsereport.output.formats=
+pulsereport.output.directory=
 
-reporter.s3.enabled=false
-reporter.http.enabled=false
-reporter.http.method=POST
-reporter.slack.enabled=false
+pulsereport.s3.enabled=false
+pulsereport.http.enabled=false
+pulsereport.http.method=POST
+pulsereport.slack.enabled=false
 
-reporter.maxArtifactContentSize=51200
-reporter.maskSensitiveData=true
-reporter.maskHeaders.enabled=true
-reporter.maskHeaders.fields=Authorization,X-API-Key,Cookie,Set-Cookie
-reporter.maskBody.enabled=true
-reporter.maskBody.fields=password,secret,token,access_token,refresh_token,id_token,client_secret,api_key,apiKey,authorization
-reporter.maskBody.maskTokens=true
-reporter.maskXml.enabled=true
-# reporter.maskXml.fields inherits reporter.maskBody.fields when unset
+pulsereport.maxArtifactContentSize=51200
+pulsereport.maskSensitiveData=true
+pulsereport.maskHeaders.enabled=true
+pulsereport.maskHeaders.fields=Authorization,X-API-Key,Cookie,Set-Cookie
+pulsereport.maskBody.enabled=true
+pulsereport.maskBody.fields=password,secret,token,access_token,refresh_token,id_token,client_secret,api_key,apiKey,authorization
+pulsereport.maskBody.maskTokens=true
+pulsereport.maskXml.enabled=true
+# pulsereport.maskXml.fields inherits pulsereport.maskBody.fields when unset
 ```
 
 ## Best Practices
@@ -727,31 +741,31 @@ reporter.maskXml.enabled=true
 
 ```properties
 # Good
-reporter.s3.accessKey=${AWS_ACCESS_KEY_ID}
+pulsereport.s3.accessKey=${AWS_ACCESS_KEY_ID}
 
 # Bad
-reporter.s3.accessKey=AKIAIOSFODNN7EXAMPLE
+pulsereport.s3.accessKey=AKIAIOSFODNN7EXAMPLE
 ```
 
 ### 2. Enable Appropriate Output Formats
 
 ```properties
 # For local development
-reporter.output.formats=html
+pulsereport.output.formats=html
 
 # For CI/CD
-reporter.output.formats=html,junit
+pulsereport.output.formats=html,junit
 
 # For custom processing
-reporter.output.formats=json
+pulsereport.output.formats=json
 ```
 
 ### 3. Optimize for Large Test Suites
 
 ```properties
-reporter.aggregator.type=streaming
-reporter.performance.optimizeMemory=true
-reporter.html.screenshots.compress=true
+pulsereport.aggregator.type=streaming
+pulsereport.performance.optimizeMemory=true
+pulsereport.html.screenshots.compress=true
 ```
 
 ### 4. Separate Config by Environment
@@ -759,12 +773,12 @@ reporter.html.screenshots.compress=true
 ```bash
 # Validate a specific environment file
 java -jar target/pulsereport-${version}.jar validate \
-    --config config/reporter-dev.properties
+    --config config/pulsereport-dev.properties
 
 # Generate with a specific environment file
 java -jar target/pulsereport-${version}.jar generate \
     --input target/test-results.json \
-    --config config/reporter-prod.properties
+    --config config/pulsereport-prod.properties
 ```
 
 ## Troubleshooting
@@ -773,7 +787,7 @@ java -jar target/pulsereport-${version}.jar generate \
 
 **Problem**: Configuration values not applied.
 
-**Solution**: Ensure `reporter.properties` is in the project root, `src/main/resources/`, or on the classpath. For the CLI, pass `--config` explicitly to verify the right file is loaded. Use `--verbose` to confirm auto-detection.
+**Solution**: Ensure `pulsereport.properties` is in the project root, `src/main/resources/`, or on the classpath. For the CLI, pass `--config` explicitly to verify the right file is loaded. Use `--verbose` to confirm auto-detection.
 
 ### Invalid Property Values
 
@@ -782,7 +796,7 @@ java -jar target/pulsereport-${version}.jar generate \
 **Solution**: Run validation:
 
 ```bash
-java -jar target/pulsereport-${version}.jar validate --config reporter.properties
+java -jar target/pulsereport-${version}.jar validate --config pulsereport.properties
 ```
 
 ### Environment Variables Not Resolved

@@ -53,8 +53,8 @@ public class HtmlReportGenerator implements OutputGenerator {
     private final String reportTitle;
 
     /**
-     * Creates a generator whose title comes from {@code reporter.report.title}
-     * (system property or auto-detected reporter.properties), falling back to
+     * Creates a generator whose title comes from {@code pulsereport.report.title}
+     * (system property or auto-detected pulsereport.properties), falling back to
      * the test run name.
      */
     public HtmlReportGenerator() {
@@ -102,7 +102,7 @@ public class HtmlReportGenerator implements OutputGenerator {
         }
 
         try (FileOutputStream fos = new FileOutputStream(outputFile)) {
-            generate(testRun, fos);
+            render(testRun, fos, outputFile.getAbsoluteFile().getParentFile());
         }
     }
 
@@ -123,14 +123,21 @@ public class HtmlReportGenerator implements OutputGenerator {
         if (outputStream == null) {
             throw new IllegalArgumentException("outputStream cannot be null");
         }
+        render(testRun, outputStream, null);
+    }
 
+    /**
+     * @param reportDir the folder the report is written to; artifact paths
+     * relative to it (e.g. {@code artifacts/screenshots/...}) are read from there
+     */
+    private void render(TestRun testRun, OutputStream outputStream, File reportDir) throws IOException {
         try {
             Template template = freemarkerConfig.getTemplate("html-report.ftl");
 
             Map<String, Object> dataModel = new HashMap<>();
             String name = reportTitle != null ? reportTitle : testRun.getName();
             dataModel.put("runName", name == null || name.isBlank() ? DEFAULT_RUN_NAME : name);
-            dataModel.put("runJson", toScriptSafeJson(testRun));
+            dataModel.put("runJson", toScriptSafeJson(testRun, reportDir));
             dataModel.put("fontFaces", FONT_FACES);
 
             try (Writer writer = new OutputStreamWriter(outputStream, StandardCharsets.UTF_8)) {
@@ -155,26 +162,29 @@ public class HtmlReportGenerator implements OutputGenerator {
         }
     }
 
-    private String toScriptSafeJson(TestRun testRun) throws IOException {
+    private String toScriptSafeJson(TestRun testRun, File reportDir) throws IOException {
         JsonNode tree = objectMapper.valueToTree(testRun);
-        inlineImageArtifacts(tree, new long[] {MAX_INLINE_TOTAL_BYTES});
+        // pulsereport.screenshots.storage=path: screenshots are shown from their folder, not embedded
+        if (!"path".equalsIgnoreCase(ReporterConfig.resolveProperty("pulsereport.screenshots.storage", "embed"))) {
+            inlineImageArtifacts(tree, new long[] {MAX_INLINE_TOTAL_BYTES}, reportDir);
+        }
         return escapeForScriptBlock(objectMapper.writeValueAsString(tree));
     }
 
-    private void inlineImageArtifacts(JsonNode node, long[] budget) {
+    private void inlineImageArtifacts(JsonNode node, long[] budget, File reportDir) {
         JsonNode artifacts = node.isObject() ? node.get("artifacts") : null;
         if (artifacts != null && artifacts.isArray()) {
             for (JsonNode artifact : artifacts) {
                 if (artifact.isObject()) {
-                    inlineImage((ObjectNode) artifact, budget);
+                    inlineImage((ObjectNode) artifact, budget, reportDir);
                 }
             }
         }
-        node.forEach(child -> inlineImageArtifacts(child, budget));
+        node.forEach(child -> inlineImageArtifacts(child, budget, reportDir));
     }
 
     /** Reads a path-backed screenshot into base64 content so the report stays viewable when moved. */
-    private void inlineImage(ObjectNode artifact, long[] budget) {
+    private void inlineImage(ObjectNode artifact, long[] budget, File reportDir) {
         if (!artifact.path("content").asText("").isEmpty()) {
             return;
         }
@@ -186,6 +196,10 @@ public class HtmlReportGenerator implements OutputGenerator {
         }
         try {
             Path file = Paths.get(path);
+            if (!file.isAbsolute() && reportDir != null && Files.exists(reportDir.toPath().resolve(file))) {
+                // Adapters store screenshots relative to the report folder
+                file = reportDir.toPath().resolve(file);
+            }
             long size = Files.size(file);
             if (size > MAX_INLINE_IMAGE_BYTES || size > budget[0]) {
                 return;

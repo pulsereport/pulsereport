@@ -3,6 +3,7 @@ package io.github.pulsereport.integrations.s3;
 import io.github.pulsereport.integrations.PublishConfig;
 import io.github.pulsereport.integrations.PublishException;
 import io.github.pulsereport.integrations.Publisher;
+import io.github.pulsereport.integrations.ReportFiles;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import software.amazon.awssdk.core.sync.RequestBody;
@@ -14,6 +15,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -55,6 +57,31 @@ public class S3Publisher implements Publisher {
         } catch (IOException e) {
             throw new PublishException("Failed to read report file: " + reportFile.getAbsolutePath(), e);
         }
+        if (((S3PublishConfig) config).isUploadArtifacts()) {
+            publishLinkedFiles(reportFile, (S3PublishConfig) config);
+        }
+    }
+
+    /**
+     * Uploads the screenshots, videos and logs the report links to by relative
+     * path, under the same key prefix, so the published report's links work.
+     */
+    private void publishLinkedFiles(File reportFile, S3PublishConfig config) throws PublishException {
+        List<String> files = ReportFiles.referencedFiles(reportFile);
+        if (files.isEmpty()) {
+            return;
+        }
+        File dir = reportFile.getAbsoluteFile().getParentFile();
+        for (String relative : files) {
+            try {
+                byte[] data = Files.readAllBytes(dir.toPath().resolve(relative));
+                uploadWithRetry(data, config.getKeyPrefix() + relative, config, ReportFiles.contentType(relative));
+            } catch (IOException e) {
+                throw new PublishException("Failed to read report file: " + relative, e);
+            }
+        }
+        logger.info("Uploaded {} files linked from the report to s3://{}/{}", files.size(),
+                config.getBucketName(), config.getKeyPrefix());
     }
 
     @Override
@@ -65,15 +92,19 @@ public class S3Publisher implements Publisher {
         
         S3PublishConfig s3Config = (S3PublishConfig) config;
         String key = s3Config.getKeyPrefix() + fileName;
-        
+        uploadWithRetry(reportData, key, s3Config, ReportFiles.contentType(fileName));
+        logger.info("Successfully published report to S3: s3://{}/{}", s3Config.getBucketName(), key);
+    }
+
+    private void uploadWithRetry(byte[] reportData, String key, S3PublishConfig s3Config, String contentType)
+            throws PublishException {
         int attempt = 0;
         long delay = s3Config.getRetryDelayMs();
         Exception lastException = null;
 
         while (attempt < s3Config.getRetryAttempts()) {
             try {
-                uploadToS3(reportData, key, s3Config);
-                logger.info("Successfully published report to S3: s3://{}/{}", s3Config.getBucketName(), key);
+                uploadToS3(reportData, key, s3Config, contentType);
                 return;
             } catch (S3Exception e) {
                 lastException = e;
@@ -100,13 +131,16 @@ public class S3Publisher implements Publisher {
                 lastException);
     }
 
-    private void uploadToS3(byte[] data, String key, S3PublishConfig config) {
+    private void uploadToS3(byte[] data, String key, S3PublishConfig config, String contentType) {
         Map<String, String> metadata = new HashMap<>(config.getMetadata());
         
         PutObjectRequest.Builder requestBuilder = PutObjectRequest.builder()
                 .bucket(config.getBucketName())
                 .key(key)
                 .metadata(metadata);
+        if (contentType != null) {
+            requestBuilder.contentType(contentType);
+        }
         
         s3Client.putObject(requestBuilder.build(), RequestBody.fromBytes(data));
     }

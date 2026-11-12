@@ -10,7 +10,7 @@ import io.github.pulsereport.core.model.TestStep;
  *
  * <p>
  * Adapters bridge the gap between framework-specific test events and the custom
- * reporter's canonical data model. Each test framework (TestNG, JUnit, etc.)
+ * PulseReport's canonical data model. Each test framework (TestNG, JUnit, etc.)
  * should implement this interface to provide framework-specific mapping
  * logic.</p>
  *

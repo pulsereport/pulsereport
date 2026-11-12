@@ -27,8 +27,8 @@ class CucumberAssertionCaptureTest {
 
     @Test
     void assertionsInStepDefinitionsAppearUnderTheirSteps() throws Exception {
-        String previousOutputDir = System.getProperty("reporter.output.directory");
-        System.setProperty("reporter.output.directory", outputDir.toString());
+        String previousOutputDir = System.getProperty("pulsereport.output.directory");
+        System.setProperty("pulsereport.output.directory", outputDir.toString());
         System.setProperty("cucumber.publish.quiet", "true");
         byte exitStatus;
         try {
@@ -40,9 +40,9 @@ class CucumberAssertionCaptureTest {
             }, Thread.currentThread().getContextClassLoader());
         } finally {
             if (previousOutputDir == null) {
-                System.clearProperty("reporter.output.directory");
+                System.clearProperty("pulsereport.output.directory");
             } else {
-                System.setProperty("reporter.output.directory", previousOutputDir);
+                System.setProperty("pulsereport.output.directory", previousOutputDir);
             }
         }
         assertEquals(1, exitStatus, "the second scenario fails on purpose");
@@ -56,29 +56,33 @@ class CucumberAssertionCaptureTest {
                 .filter(c -> c.path("name").asText().contains("failing")).findFirst().orElseThrow();
 
         JsonNode passingSteps = passing.path("steps");
-        assertTrue(passingSteps.get(0).path("assertions").isMissingNode(),
+        JsonNode setup = passingSteps.get(0);
+        assertEquals("@Before", setup.path("keyword").asText(), "the asserting @Before hook is shown as a step");
+        assertEquals("checkFixtures", setup.path("name").asText());
+        assertEquals("hook assertion", setup.path("assertions").get(0).path("message").asText());
+        assertTrue(passingSteps.get(1).path("assertions").isMissingNode(),
                 "the Given step asserts nothing; hook assertions must not leak into it");
 
-        JsonNode status = passingSteps.get(1).path("assertions");
+        JsonNode status = passingSteps.get(2).path("assertions");
         assertEquals(1, status.size());
         assertEquals("JUnit 5", status.get(0).path("framework").asText());
         assertEquals("Login API status code", status.get(0).path("message").asText());
         assertEquals("200", status.get(0).path("expected").asText());
         assertEquals("PASSED", status.get(0).path("status").asText());
 
-        JsonNode name = passingSteps.get(2).path("assertions");
+        JsonNode name = passingSteps.get(3).path("assertions");
         assertEquals(2, name.size());
         assertEquals("TestNG", name.get(0).path("framework").asText());
         assertEquals("\"alice\"", name.get(0).path("actual").asText());
         assertEquals("Hamcrest", name.get(1).path("framework").asText());
         assertEquals("a value greater than <0>", name.get(1).path("expected").asText());
 
-        JsonNode failed = failing.path("steps").get(1).path("assertions");
+        JsonNode failed = failing.path("steps").get(2).path("assertions");
         assertEquals(1, failed.size());
         assertEquals("FAILED", failed.get(0).path("status").asText());
         assertEquals("200", failed.get(0).path("expected").asText());
         assertEquals("404", failed.get(0).path("actual").asText());
-        assertEquals(failing.path("steps").get(1).path("errorMessage").asText(),
+        assertEquals(failing.path("steps").get(2).path("errorMessage").asText(),
                 failed.get(0).path("errorMessage").asText());
 
         String html = Files.readString(outputDir.resolve("test-report.html"));

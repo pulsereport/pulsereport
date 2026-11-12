@@ -646,7 +646,7 @@ class HtmlReportGeneratorTest {
     @Test
     void httpSidesRenderCopyAndSearchButtons() throws IOException {
         String html = generateHtml(createSampleTestRun());
-        String fn = functionSource(html, "httpSide");
+        String fn = functionSource(html, "bodyBox");
 
         assertTrue(fn.contains("copyButton(") && fn.contains("'Copy ' + label"),
                 "Each side should get a copy button labelled per side");
@@ -659,6 +659,8 @@ class HtmlReportGeneratorTest {
         assertTrue(fn.contains("role: 'status'"), "Match count should be announced as a status");
         assertTrue(fn.contains("class: 'xtools'"), "Buttons should be grouped outside the body <pre>");
         assertFalse(fn.contains("[p.line, ...p.headers"), "Sides without a body should not get a line+headers copy");
+        assertTrue(functionSource(html, "httpSide").contains("bodyBox(body, label)"),
+                "HTTP sides should use the shared body toolbar");
 
         String copy = functionSource(html, "copyButton");
         assertTrue(copy.contains("type: 'button'"), "Shared copy button should be a real button");
@@ -682,7 +684,7 @@ class HtmlReportGeneratorTest {
     @Test
     void httpToolsSitInsideBodyContainer() throws IOException {
         String html = generateHtml(createSampleTestRun());
-        String fn = functionSource(html, "httpSide");
+        String fn = functionSource(html, "bodyBox");
 
         int box = fn.indexOf("class: 'body-box'");
         assertTrue(box >= 0, "The body <pre> should be wrapped in a .body-box container");
@@ -762,12 +764,12 @@ class HtmlReportGeneratorTest {
     void bodySearchInputMatchesFeatureSearch() throws IOException {
         String html = generateHtml(createSampleTestRun());
         String css = styles(html);
-        String fn = functionSource(html, "httpSide");
+        String fn = functionSource(html, "bodyBox");
 
         assertTrue(fn.contains("h('div', { class: 'search-wrap' }, icon('search'), ui.input)"),
                 "Find input should reuse the feature search wrapper and icon");
         int at = fn.indexOf("input: h('input'");
-        assertTrue(at >= 0, "httpSide should build the find input");
+        assertTrue(at >= 0, "bodyBox should build the find input");
         String input = fn.substring(at, fn.indexOf("})", at));
         assertTrue(input.contains("type: 'search'") && input.contains("'aria-label': 'Find in ' + label"),
                 "Find input keeps its type and accessible name");
@@ -794,7 +796,7 @@ class HtmlReportGeneratorTest {
     @Test
     void bodyToolbarButtonsHaveNoTooltips() throws IOException {
         String html = generateHtml(createSampleTestRun());
-        String fn = functionSource(html, "httpSide");
+        String fn = functionSource(html, "bodyBox");
 
         assertFalse(fn.contains("data-tip"), "Body search, copy, prev/next and close buttons should not show tooltips");
         assertTrue(fn.contains("copyButton('Copy ' + label, () => body.textContent, null)"),
@@ -865,6 +867,32 @@ class HtmlReportGeneratorTest {
         int next = html.indexOf("\n            const ", start + 1);
         if (next > start && (end < 0 || next < end)) end = next;
         return html.substring(start, end > start ? end : html.length());
+    }
+
+    // ---------- Report-relative artifacts ----------
+
+    @Test
+    void screenshotsStoredRelativeToTheReportFolderAreEmbedded() throws IOException {
+        File reportDir = new File(tempDir, "report");
+        byte[] png = {(byte) 0x89, 'P', 'N', 'G', 1, 2, 3};
+        File stepShot = new File(reportDir, "artifacts/screenshots/00001-step-failure.png");
+        stepShot.getParentFile().mkdirs();
+        Files.write(stepShot.toPath(), png);
+        TestStep child = TestStep.builder().name("Click").status(TestStatus.FAILED)
+                .artifacts(List.of(artifact("step-failure.png", "screenshot",
+                        "artifacts/screenshots/00001-step-failure.png").mimeType("image/png").build()))
+                .build();
+        TestStep step = TestStep.builder().name("Log in").status(TestStatus.FAILED).children(List.of(child)).build();
+        File out = new File(reportDir, "test-report.html");
+
+        generator.generate(createTestRunWithTestCase(baseCase("tc-rel", TestStatus.FAILED).steps(List.of(step)).build()),
+                out);
+
+        JsonNode shot = embeddedRun(Files.readString(out.toPath(), StandardCharsets.UTF_8))
+                .path("suites").get(0).path("testCases").get(0).path("steps").get(0)
+                .path("children").get(0).path("artifacts").get(0);
+        assertEquals(Base64.getEncoder().encodeToString(png), shot.path("content").asText(),
+                "a sub-step's report-relative screenshot is read from the report folder");
     }
 
     // ---------- Helpers ----------
