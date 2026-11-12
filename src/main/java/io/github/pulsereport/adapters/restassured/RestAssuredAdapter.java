@@ -135,9 +135,9 @@ public class RestAssuredAdapter implements Filter {
     /**
      * Constructs a new RestAssuredAdapter. Configuration is auto-detected via
      * {@link ReporterConfig#autoDetect()} (working-directory
-     * {@code reporter.properties}, then
-     * {@code src/main/resources/reporter.properties}, then the classpath
-     * {@code /reporter.properties}); if nothing is found, a built-in default
+     * {@code pulsereport.properties}, then
+     * {@code src/main/resources/pulsereport.properties}, then the classpath
+     * {@code /pulsereport.properties}); if nothing is found, a built-in default
      * configuration is used.
      */
     public RestAssuredAdapter() {
@@ -145,11 +145,11 @@ public class RestAssuredAdapter implements Filter {
         if (detected != null) {
             this.config = detected;
             logger.info("RestAssuredAdapter initialized with auto-detected config"
-                    + " (reporter.properties from working directory or classpath)");
+                    + " (pulsereport.properties from working directory or classpath)");
         } else {
             this.config = createDefaultConfig();
             logger.info("RestAssuredAdapter initialized with default config"
-                    + " (no reporter.properties found, using built-in defaults)");
+                    + " (no pulsereport.properties found, using built-in defaults)");
         }
     }
 

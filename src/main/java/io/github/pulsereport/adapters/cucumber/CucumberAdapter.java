@@ -598,7 +598,7 @@ public class CucumberAdapter implements EventListener {
 
     private void generateReports(TestRun testRun) {
         try {
-            String outputDir = ReporterConfig.resolveOutputDirectory("reporter.output.directory",
+            String outputDir = ReporterConfig.resolveOutputDirectory("pulsereport.output.directory",
                     "target/pulsereport");
             File reportDir = resolveOutputDirectory(outputDir);
             reportDir.mkdirs();

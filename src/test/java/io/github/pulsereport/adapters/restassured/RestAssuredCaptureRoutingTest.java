@@ -73,7 +73,7 @@ class RestAssuredCaptureRoutingTest {
 
     @BeforeEach
     void setUp() {
-        System.setProperty("reporter.output.directory", reportDir.getAbsolutePath());
+        System.setProperty("pulsereport.output.directory", reportDir.getAbsolutePath());
         testng = new RecordingAdapter();
         rest = new RestAssuredAdapter(ReporterConfig.builder().outputDirectory(reportDir).build());
         result = testResult("apiTest" + TEST_IDS.incrementAndGet());
@@ -81,7 +81,7 @@ class RestAssuredCaptureRoutingTest {
 
     @AfterEach
     void tearDown() {
-        System.clearProperty("reporter.output.directory");
+        System.clearProperty("pulsereport.output.directory");
         RestAssuredAdapter.clearCurrentTestName();
         RestAssuredAdapter.clearTestData("standalone");
     }

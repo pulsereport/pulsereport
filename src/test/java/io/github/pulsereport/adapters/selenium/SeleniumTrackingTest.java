@@ -86,7 +86,7 @@ class SeleniumTrackingTest {
 
     @BeforeEach
     void setUp() {
-        System.setProperty("reporter.output.directory", reportDir.getAbsolutePath());
+        System.setProperty("pulsereport.output.directory", reportDir.getAbsolutePath());
         SeleniumAdapter.resetSettings();
         adapter = new RecordingAdapter();
         result = testResult("trackedTest" + TEST_IDS.incrementAndGet());
@@ -95,12 +95,12 @@ class SeleniumTrackingTest {
 
     @AfterEach
     void tearDown() {
-        System.clearProperty("reporter.output.directory");
-        System.clearProperty("reporter.screenshots.mode");
-        System.clearProperty("reporter.selenium.maskInputs");
-        System.clearProperty("reporter.selenium.stepDetail");
-        System.clearProperty("reporter.screenshots.storage");
-        System.clearProperty("reporter.screenshots.directory");
+        System.clearProperty("pulsereport.output.directory");
+        System.clearProperty("pulsereport.screenshots.mode");
+        System.clearProperty("pulsereport.selenium.maskInputs");
+        System.clearProperty("pulsereport.selenium.stepDetail");
+        System.clearProperty("pulsereport.screenshots.storage");
+        System.clearProperty("pulsereport.screenshots.directory");
         SeleniumTracker.setHooks(null);
         SeleniumAdapter.setVideoUploader(null);
         SeleniumAdapter.resetSettings();
@@ -228,8 +228,8 @@ class SeleniumTrackingTest {
     @Test
     void screenshotsCanBeWrittenToAChosenFolder() throws Exception {
         File folder = new File(reportDir.getParentFile(), "shots-" + TEST_IDS.incrementAndGet());
-        System.setProperty("reporter.screenshots.storage", "path");
-        System.setProperty("reporter.screenshots.directory", folder.getAbsolutePath());
+        System.setProperty("pulsereport.screenshots.storage", "path");
+        System.setProperty("pulsereport.screenshots.directory", folder.getAbsolutePath());
         SeleniumAdapter.resetSettings();
         adapter.onTestStart(result);
         adapter.track(browser);
@@ -264,8 +264,8 @@ class SeleniumTrackingTest {
     @Test
     void recordedVideosGoThroughTheUploader() throws Exception {
         org.junit.jupiter.api.Assumptions.assumeTrue(SeleniumVideoRecorder.isFfmpegAvailable("ffmpeg"), "needs ffmpeg");
-        System.setProperty("reporter.video.mode", "always");
-        System.setProperty("reporter.video.fps", "5");
+        System.setProperty("pulsereport.video.mode", "always");
+        System.setProperty("pulsereport.video.fps", "5");
         SeleniumAdapter.resetSettings();
         List<File> uploaded = new java.util.concurrent.CopyOnWriteArrayList<>();
         SeleniumAdapter.setVideoUploader((video, testKey) -> {
@@ -292,8 +292,8 @@ class SeleniumTrackingTest {
             assertEquals(1, uploaded.size());
             assertFalse(uploaded.get(0).exists(), "the local file is removed after a successful upload");
         } finally {
-            System.clearProperty("reporter.video.mode");
-            System.clearProperty("reporter.video.fps");
+            System.clearProperty("pulsereport.video.mode");
+            System.clearProperty("pulsereport.video.fps");
         }
     }
 
@@ -375,7 +375,7 @@ class SeleniumTrackingTest {
 
     @Test
     void allInputCanBeMasked() {
-        System.setProperty("reporter.selenium.maskInputs", "all");
+        System.setProperty("pulsereport.selenium.maskInputs", "all");
         SeleniumAdapter.resetSettings();
         browser.element(By.id("user"), "input", "User", "text");
         adapter.onTestStart(result);
@@ -402,7 +402,7 @@ class SeleniumTrackingTest {
 
     @Test
     void minimalDetailNamesElementsByLocatorWithoutExtraBrowserCalls() {
-        System.setProperty("reporter.selenium.stepDetail", "minimal");
+        System.setProperty("pulsereport.selenium.stepDetail", "minimal");
         SeleniumAdapter.resetSettings();
         browser.element(By.id("login"), "button", "Sign in", "submit");
         adapter.onTestStart(result);
@@ -524,7 +524,7 @@ class SeleniumTrackingTest {
 
     @Test
     void lastModeAttachesTheFinalScreenshotToTheLastStep() {
-        System.setProperty("reporter.screenshots.mode", "last");
+        System.setProperty("pulsereport.screenshots.mode", "last");
         SeleniumAdapter.resetSettings();
         adapter.onTestStart(result);
         WebDriver driver = adapter.track(browser);

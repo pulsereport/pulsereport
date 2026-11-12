@@ -53,8 +53,8 @@ public class HtmlReportGenerator implements OutputGenerator {
     private final String reportTitle;
 
     /**
-     * Creates a generator whose title comes from {@code reporter.report.title}
-     * (system property or auto-detected reporter.properties), falling back to
+     * Creates a generator whose title comes from {@code pulsereport.report.title}
+     * (system property or auto-detected pulsereport.properties), falling back to
      * the test run name.
      */
     public HtmlReportGenerator() {
@@ -164,8 +164,8 @@ public class HtmlReportGenerator implements OutputGenerator {
 
     private String toScriptSafeJson(TestRun testRun, File reportDir) throws IOException {
         JsonNode tree = objectMapper.valueToTree(testRun);
-        // reporter.screenshots.storage=path: screenshots are shown from their folder, not embedded
-        if (!"path".equalsIgnoreCase(ReporterConfig.resolveProperty("reporter.screenshots.storage", "embed"))) {
+        // pulsereport.screenshots.storage=path: screenshots are shown from their folder, not embedded
+        if (!"path".equalsIgnoreCase(ReporterConfig.resolveProperty("pulsereport.screenshots.storage", "embed"))) {
             inlineImageArtifacts(tree, new long[] {MAX_INLINE_TOTAL_BYTES}, reportDir);
         }
         return escapeForScriptBlock(objectMapper.writeValueAsString(tree));

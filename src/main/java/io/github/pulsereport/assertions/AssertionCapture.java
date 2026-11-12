@@ -49,8 +49,8 @@ import net.bytebuddy.utility.JavaModule;
  * dynamic attach and prints no warning.</li>
  * </ul>
  *
- * <p>Disable with the {@code reporter.assertions.capture=false} system property
- * or {@code reporter.properties} entry.</p>
+ * <p>Disable with the {@code pulsereport.assertions.capture=false} system property
+ * or {@code pulsereport.properties} entry.</p>
  */
 public final class AssertionCapture {
 

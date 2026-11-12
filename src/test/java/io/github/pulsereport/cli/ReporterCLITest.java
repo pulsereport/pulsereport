@@ -45,13 +45,13 @@ class ReporterCLITest {
 
     @BeforeEach
     void setUp() throws IOException {
-        configFile = tempDir.resolve("reporter.properties").toFile();
+        configFile = tempDir.resolve("pulsereport.properties").toFile();
         Properties props = new Properties();
-        props.setProperty("reporter.output.formats", "html,json");
-        props.setProperty("reporter.output.directory", tempDir.toString());
-        props.setProperty("reporter.s3.enabled", "false");
-        props.setProperty("reporter.http.enabled", "false");
-        props.setProperty("reporter.slack.enabled", "false");
+        props.setProperty("pulsereport.output.formats", "html,json");
+        props.setProperty("pulsereport.output.directory", tempDir.toString());
+        props.setProperty("pulsereport.s3.enabled", "false");
+        props.setProperty("pulsereport.http.enabled", "false");
+        props.setProperty("pulsereport.slack.enabled", "false");
 
         try (FileWriter writer = new FileWriter(configFile)) {
             props.store(writer, "Test config");
@@ -182,7 +182,7 @@ class ReporterCLITest {
 
         int exitCode = ReporterCLI.execute(args);
 
-        // Auto-detects reporter.properties from classpath; S3 is disabled so it skips with a warning
+        // Auto-detects pulsereport.properties from classpath; S3 is disabled so it skips with a warning
         assertTrue(exitCode == 0 || exitCode == 1);
     }
 
@@ -204,9 +204,9 @@ class ReporterCLITest {
     void validateCommand_withInvalidConfig() throws IOException {
         File invalidConfigFile = tempDir.resolve("invalid.properties").toFile();
         Properties props = new Properties();
-        props.setProperty("reporter.output.formats", ""); // Invalid: empty formats
-        props.setProperty("reporter.s3.enabled", "true");
-        props.setProperty("reporter.s3.bucket", ""); // Invalid: empty bucket
+        props.setProperty("pulsereport.output.formats", ""); // Invalid: empty formats
+        props.setProperty("pulsereport.s3.enabled", "true");
+        props.setProperty("pulsereport.s3.bucket", ""); // Invalid: empty bucket
 
         try (FileWriter writer = new FileWriter(invalidConfigFile)) {
             props.store(writer, "Invalid config");

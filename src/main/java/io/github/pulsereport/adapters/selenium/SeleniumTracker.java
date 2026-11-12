@@ -82,14 +82,14 @@ import io.github.pulsereport.core.model.TestStep;
  * version and platform are read from the driver's capabilities.</p>
  *
  * <p>
- * Settings ({@code reporter.properties} or {@code -D}):</p>
+ * Settings ({@code pulsereport.properties} or {@code -D}):</p>
  * <pre>
- * reporter.screenshots.mode=failed               # all | failed | last | none
- * reporter.selenium.stepDetail=full              # full | minimal (no extra browser calls per action)
- * reporter.selenium.maskInputs=sensitive         # sensitive | all | none
- * reporter.selenium.failureCapture=page,console,source   # or none
- * reporter.selenium.pageMetrics=true
- * reporter.selenium.trackScripts=false           # record executeScript calls as steps
+ * pulsereport.screenshots.mode=failed               # all | failed | last | none
+ * pulsereport.selenium.stepDetail=full              # full | minimal (no extra browser calls per action)
+ * pulsereport.selenium.maskInputs=sensitive         # sensitive | all | none
+ * pulsereport.selenium.failureCapture=page,console,source   # or none
+ * pulsereport.selenium.pageMetrics=true
+ * pulsereport.selenium.trackScripts=false           # record executeScript calls as steps
  * </pre>
  *
  * @since 1.3.0
@@ -189,28 +189,28 @@ public final class SeleniumTracker {
             try {
                 config = ReporterConfig.autoDetect();
             } catch (RuntimeException e) {
-                logger.warn("PulseReport: could not read reporter.properties; using default Selenium settings", e);
+                logger.warn("PulseReport: could not read pulsereport.properties; using default Selenium settings", e);
             }
             if (config == null) {
                 config = ReporterConfig.builder().build();
             }
-            String screenshots = option("reporter.screenshots.mode",
-                    config.getProperty("reporter.screenshots.mode", config.getScreenshotMode()), MODE_FAILED,
+            String screenshots = option("pulsereport.screenshots.mode",
+                    config.getProperty("pulsereport.screenshots.mode", config.getScreenshotMode()), MODE_FAILED,
                     List.of(MODE_ALL, MODE_FAILED, MODE_LAST, MODE_NONE));
-            String detail = option("reporter.selenium.stepDetail",
-                    config.getProperty("reporter.selenium.stepDetail", "full"), "full", List.of("full", "minimal"));
-            // reporter.maskSensitiveData is the master switch for every kind of masking
+            String detail = option("pulsereport.selenium.stepDetail",
+                    config.getProperty("pulsereport.selenium.stepDetail", "full"), "full", List.of("full", "minimal"));
+            // pulsereport.maskSensitiveData is the master switch for every kind of masking
             String mask = config.isMaskSensitiveData()
-                    ? option("reporter.selenium.maskInputs", config.getProperty("reporter.selenium.maskInputs", "sensitive"),
+                    ? option("pulsereport.selenium.maskInputs", config.getProperty("pulsereport.selenium.maskInputs", "sensitive"),
                             "sensitive", List.of("sensitive", "all", "none"))
                     : "none";
             Set<String> failureCapture = new LinkedHashSet<>();
-            for (String item : config.getProperty("reporter.selenium.failureCapture", "page,console,source").split(",")) {
+            for (String item : config.getProperty("pulsereport.selenium.failureCapture", "page,console,source").split(",")) {
                 String value = item.trim().toLowerCase(Locale.ROOT);
                 if (List.of("page", "console", "source").contains(value)) {
                     failureCapture.add(value);
                 } else if (!value.isEmpty() && !MODE_NONE.equals(value)) {
-                    logger.warn("PulseReport: ignoring unknown reporter.selenium.failureCapture item '{}'"
+                    logger.warn("PulseReport: ignoring unknown pulsereport.selenium.failureCapture item '{}'"
                             + " (expected page, console, source or none)", value);
                 }
             }
@@ -225,13 +225,13 @@ public final class SeleniumTracker {
             }
             Pattern fieldPattern = Pattern.compile("(?:^|_)(?:" + fields.stream().map(Pattern::quote)
                     .collect(Collectors.joining("|")) + ")(?:_|$)");
-            String storage = option("reporter.screenshots.storage",
-                    config.getProperty("reporter.screenshots.storage", "embed"), "embed", List.of("embed", "path"));
+            String storage = option("pulsereport.screenshots.storage",
+                    config.getProperty("pulsereport.screenshots.storage", "embed"), "embed", List.of("embed", "path"));
             return new Settings(screenshots, "full".equals(detail), mask, Collections.unmodifiableSet(failureCapture),
-                    Boolean.parseBoolean(config.getProperty("reporter.selenium.trackScripts", "false")),
-                    Boolean.parseBoolean(config.getProperty("reporter.selenium.pageMetrics", "true")),
+                    Boolean.parseBoolean(config.getProperty("pulsereport.selenium.trackScripts", "false")),
+                    Boolean.parseBoolean(config.getProperty("pulsereport.selenium.pageMetrics", "true")),
                     fieldPattern, Collections.unmodifiableSet(params),
-                    "embed".equals(storage), config.getProperty("reporter.screenshots.directory", null));
+                    "embed".equals(storage), config.getProperty("pulsereport.screenshots.directory", null));
         }
 
         private static String option(String key, String value, String fallback, List<String> allowed) {
@@ -933,8 +933,8 @@ public final class SeleniumTracker {
 
     /**
      * Keeps a screenshot as configured: embedded in the report as Base64
-     * ({@code reporter.screenshots.storage=embed}, the default) or written to
-     * {@code reporter.screenshots.directory} and shown from there ({@code path}).
+     * ({@code pulsereport.screenshots.storage=embed}, the default) or written to
+     * {@code pulsereport.screenshots.directory} and shown from there ({@code path}).
      */
     static Artifact storeScreenshot(String name, byte[] png) {
         Settings s = settings();
@@ -1028,7 +1028,7 @@ public final class SeleniumTracker {
     }
 
     static File reportDirectory() {
-        String dir = ReporterConfig.resolveOutputDirectory("reporter.output.directory", "target/pulsereport");
+        String dir = ReporterConfig.resolveOutputDirectory("pulsereport.output.directory", "target/pulsereport");
         File file = new File(dir);
         return file.isAbsolute() ? file : new File(System.getProperty("user.dir", "."), dir);
     }
@@ -1120,7 +1120,7 @@ public final class SeleniumTracker {
     /**
      * Whether typed text should be hidden: password and one-time-code style
      * fields, fields whose name, id or label looks sensitive, or everything when
-     * {@code reporter.selenium.maskInputs=all}.
+     * {@code pulsereport.selenium.maskInputs=all}.
      */
     static boolean isSensitiveField(String type, String autocomplete, String... names) {
         Settings s = settings();

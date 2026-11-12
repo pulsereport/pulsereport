@@ -208,14 +208,14 @@
                 <directory>src/main/resources</directory>
                 <filtering>true</filtering>
                 <includes>
-                    <include>reporter.properties</include>
+                    <include>pulsereport.properties</include>
                 </includes>
             </resource>
             <resource>
                 <directory>src/main/resources</directory>
                 <filtering>false</filtering>
                 <excludes>
-                    <exclude>reporter.properties</exclude>
+                    <exclude>pulsereport.properties</exclude>
                 </excludes>
             </resource>
         </resources>

@@ -18,8 +18,8 @@ public class ReporterConfig {
 
     private static final List<String> VALID_FORMATS = Arrays.asList("html", "json", "junit");
     private static final Pattern ENV_VAR_PATTERN = Pattern.compile("\\$\\{([^}]+)\\}");
-    private static final String REPORT_TITLE_KEY = "reporter.report.title";
-    private static final String ASSERTION_CAPTURE_KEY = "reporter.assertions.capture";
+    private static final String REPORT_TITLE_KEY = "pulsereport.report.title";
+    private static final String ASSERTION_CAPTURE_KEY = "pulsereport.assertions.capture";
     private static final List<String> VALID_SCREENSHOT_MODES = Arrays.asList("all", "failed", "last", "none");
     private static final List<String> VALID_VIDEO_MODES = Arrays.asList("always", "failed", "none");
 
@@ -97,8 +97,8 @@ public class ReporterConfig {
     }
 
     private static final String[] AUTO_DETECT_PATHS = {
-        "reporter.properties",
-        "src/main/resources/reporter.properties"
+        "pulsereport.properties",
+        "src/main/resources/pulsereport.properties"
     };
 
     /**
@@ -117,7 +117,7 @@ public class ReporterConfig {
                 }
             }
         }
-        try (InputStream is = ReporterConfig.class.getResourceAsStream("/reporter.properties")) {
+        try (InputStream is = ReporterConfig.class.getResourceAsStream("/pulsereport.properties")) {
             if (is != null) {
                 Properties props = new Properties();
                 props.load(is);
@@ -135,8 +135,8 @@ public class ReporterConfig {
      * <ol>
      * <li>The {@code System.getProperty(systemPropertyName)} value, if non-null
      * and non-blank</li>
-     * <li>The {@code reporter.output.directory} value from an auto-detected
-     * {@code reporter.properties} file (see {@link #autoDetect()}), if
+     * <li>The {@code pulsereport.output.directory} value from an auto-detected
+     * {@code pulsereport.properties} file (see {@link #autoDetect()}), if
      * present</li>
      * <li>The supplied {@code defaultDirectory}</li>
      * </ol>
@@ -144,7 +144,7 @@ public class ReporterConfig {
      * to the default.
      *
      * @param systemPropertyName name of the system property that overrides the
-     * output directory (e.g. {@code "reporter.output.directory"})
+     * output directory (e.g. {@code "pulsereport.output.directory"})
      * @param defaultDirectory fallback directory used when neither the system
      * property nor an auto-detected properties file provides a value
      * @return the resolved output directory path
@@ -167,7 +167,7 @@ public class ReporterConfig {
 
     /**
      * Resolves any setting by key: the {@code -D} system property first, then
-     * an auto-detected {@code reporter.properties}, then the default. Never throws.
+     * an auto-detected {@code pulsereport.properties}, then the default. Never throws.
      *
      * @param key the property key
      * @param defaultValue returned when the key is set nowhere
@@ -190,9 +190,9 @@ public class ReporterConfig {
     }
 
     /**
-     * Resolves the HTML report title: the {@code reporter.report.title} system
+     * Resolves the HTML report title: the {@code pulsereport.report.title} system
      * property first, then the same key in an auto-detected
-     * {@code reporter.properties}. Never throws.
+     * {@code pulsereport.properties}. Never throws.
      *
      * @return the configured title, or null when none is set
      */
@@ -220,7 +220,7 @@ public class ReporterConfig {
         config.rawProperties = new Properties();
         config.rawProperties.putAll(props);
 
-        String formats = interpolate(props.getProperty("reporter.output.formats", ""));
+        String formats = interpolate(props.getProperty("pulsereport.output.formats", ""));
         if (!formats.isEmpty()) {
             config.outputFormats = Arrays.asList(formats.split(","));
             config.outputFormats = config.outputFormats.stream()
@@ -228,7 +228,7 @@ public class ReporterConfig {
                     .collect(java.util.stream.Collectors.toList());
         }
 
-        String outputDir = interpolate(props.getProperty("reporter.output.directory", ""));
+        String outputDir = interpolate(props.getProperty("pulsereport.output.directory", ""));
         if (!outputDir.isEmpty()) {
             config.outputDirectory = new File(outputDir);
         }
@@ -236,42 +236,42 @@ public class ReporterConfig {
         String title = interpolate(props.getProperty(REPORT_TITLE_KEY, "")).trim();
         config.reportTitle = title.isEmpty() ? null : title;
 
-        config.s3Config.enabled = Boolean.parseBoolean(props.getProperty("reporter.s3.enabled", "false"));
-        config.s3Config.bucket = interpolate(props.getProperty("reporter.s3.bucket", ""));
-        config.s3Config.region = interpolate(props.getProperty("reporter.s3.region", ""));
-        config.s3Config.keyPrefix = interpolate(props.getProperty("reporter.s3.keyPrefix", ""));
+        config.s3Config.enabled = Boolean.parseBoolean(props.getProperty("pulsereport.s3.enabled", "false"));
+        config.s3Config.bucket = interpolate(props.getProperty("pulsereport.s3.bucket", ""));
+        config.s3Config.region = interpolate(props.getProperty("pulsereport.s3.region", ""));
+        config.s3Config.keyPrefix = interpolate(props.getProperty("pulsereport.s3.keyPrefix", ""));
 
-        config.httpConfig.enabled = Boolean.parseBoolean(props.getProperty("reporter.http.enabled", "false"));
-        config.httpConfig.url = interpolate(props.getProperty("reporter.http.url", ""));
-        config.httpConfig.method = interpolate(props.getProperty("reporter.http.method", "POST"));
-        config.httpConfig.authType = interpolate(props.getProperty("reporter.http.auth.type", ""));
-        config.httpConfig.authToken = interpolate(props.getProperty("reporter.http.auth.token", ""));
+        config.httpConfig.enabled = Boolean.parseBoolean(props.getProperty("pulsereport.http.enabled", "false"));
+        config.httpConfig.url = interpolate(props.getProperty("pulsereport.http.url", ""));
+        config.httpConfig.method = interpolate(props.getProperty("pulsereport.http.method", "POST"));
+        config.httpConfig.authType = interpolate(props.getProperty("pulsereport.http.auth.type", ""));
+        config.httpConfig.authToken = interpolate(props.getProperty("pulsereport.http.auth.token", ""));
 
-        config.slackConfig.enabled = Boolean.parseBoolean(props.getProperty("reporter.slack.enabled", "false"));
-        config.slackConfig.webhookUrl = interpolate(props.getProperty("reporter.slack.webhookUrl", ""));
-        config.slackConfig.channel = interpolate(props.getProperty("reporter.slack.channel", ""));
-        config.slackConfig.mentionOnFailure = interpolate(props.getProperty("reporter.slack.mentionOnFailure", ""));
-        config.slackConfig.reportUrl = interpolate(props.getProperty("reporter.slack.reportUrl", ""));
+        config.slackConfig.enabled = Boolean.parseBoolean(props.getProperty("pulsereport.slack.enabled", "false"));
+        config.slackConfig.webhookUrl = interpolate(props.getProperty("pulsereport.slack.webhookUrl", ""));
+        config.slackConfig.channel = interpolate(props.getProperty("pulsereport.slack.channel", ""));
+        config.slackConfig.mentionOnFailure = interpolate(props.getProperty("pulsereport.slack.mentionOnFailure", ""));
+        config.slackConfig.reportUrl = interpolate(props.getProperty("pulsereport.slack.reportUrl", ""));
 
-        config.maxArtifactContentSize = Integer.parseInt(props.getProperty("reporter.maxArtifactContentSize", "51200"));
-        config.maskSensitiveData = Boolean.parseBoolean(props.getProperty("reporter.maskSensitiveData", "true"));
-        config.maskHeadersEnabled = Boolean.parseBoolean(props.getProperty("reporter.maskHeaders.enabled", "true"));
-        config.maskHeaderFields = interpolate(props.getProperty("reporter.maskHeaders.fields", "Authorization,X-API-Key,Cookie,Set-Cookie"));
-        config.maskBodyEnabled = Boolean.parseBoolean(props.getProperty("reporter.maskBody.enabled", "true"));
-        config.sensitiveBodyFields = interpolate(props.getProperty("reporter.maskBody.fields",
+        config.maxArtifactContentSize = Integer.parseInt(props.getProperty("pulsereport.maxArtifactContentSize", "51200"));
+        config.maskSensitiveData = Boolean.parseBoolean(props.getProperty("pulsereport.maskSensitiveData", "true"));
+        config.maskHeadersEnabled = Boolean.parseBoolean(props.getProperty("pulsereport.maskHeaders.enabled", "true"));
+        config.maskHeaderFields = interpolate(props.getProperty("pulsereport.maskHeaders.fields", "Authorization,X-API-Key,Cookie,Set-Cookie"));
+        config.maskBodyEnabled = Boolean.parseBoolean(props.getProperty("pulsereport.maskBody.enabled", "true"));
+        config.sensitiveBodyFields = interpolate(props.getProperty("pulsereport.maskBody.fields",
                 "password,secret,token,access_token,refresh_token,id_token,client_secret,api_key,apiKey,authorization"));
-        config.maskXmlEnabled = Boolean.parseBoolean(props.getProperty("reporter.maskXml.enabled", "true"));
-        String xmlFieldsValue = interpolate(props.getProperty("reporter.maskXml.fields"));
+        config.maskXmlEnabled = Boolean.parseBoolean(props.getProperty("pulsereport.maskXml.enabled", "true"));
+        String xmlFieldsValue = interpolate(props.getProperty("pulsereport.maskXml.fields"));
         config.xmlFields = (xmlFieldsValue == null || xmlFieldsValue.isEmpty())
                 ? config.sensitiveBodyFields
                 : xmlFieldsValue;
-        config.maskTokens = Boolean.parseBoolean(props.getProperty("reporter.maskBody.maskTokens", "true"));
-        String videoStorageValue = interpolate(props.getProperty("reporter.video.storage", "path"));
+        config.maskTokens = Boolean.parseBoolean(props.getProperty("pulsereport.maskBody.maskTokens", "true"));
+        String videoStorageValue = interpolate(props.getProperty("pulsereport.video.storage", "path"));
         config.videoStorage = videoStorageValue == null ? "path" : videoStorageValue.trim().toLowerCase();
-        config.screenshotMode = interpolate(props.getProperty("reporter.screenshots.mode", "failed")).trim().toLowerCase();
-        config.videoMode = interpolate(props.getProperty("reporter.video.mode", "none")).trim().toLowerCase();
-        config.videoFps = Integer.parseInt(props.getProperty("reporter.video.fps", "2").trim());
-        config.ffmpegPath = interpolate(props.getProperty("reporter.video.ffmpegPath", "ffmpeg")).trim();
+        config.screenshotMode = interpolate(props.getProperty("pulsereport.screenshots.mode", "failed")).trim().toLowerCase();
+        config.videoMode = interpolate(props.getProperty("pulsereport.video.mode", "none")).trim().toLowerCase();
+        config.videoFps = Integer.parseInt(props.getProperty("pulsereport.video.fps", "2").trim());
+        config.ffmpegPath = interpolate(props.getProperty("pulsereport.video.ffmpegPath", "ffmpeg")).trim();
         config.assertionCapture = Boolean.parseBoolean(
                 interpolate(props.getProperty(ASSERTION_CAPTURE_KEY, "true")).trim());
 
@@ -514,7 +514,7 @@ public class ReporterConfig {
      * Reads any setting by key: the {@code -D} system property first, then the
      * loaded properties file (with {@code ${ENV}} interpolation), then the
      * default. Used for adapter-specific settings such as
-     * {@code reporter.selenium.*}.
+     * {@code pulsereport.selenium.*}.
      *
      * @param key the property key
      * @param defaultValue returned when the key is set nowhere
@@ -549,8 +549,8 @@ public class ReporterConfig {
 
     /**
      * Resolves whether assertion capture is enabled: the
-     * {@code reporter.assertions.capture} system property first, then the same key
-     * in an auto-detected {@code reporter.properties}, defaulting to true. Never
+     * {@code pulsereport.assertions.capture} system property first, then the same key
+     * in an auto-detected {@code pulsereport.properties}, defaulting to true. Never
      * throws.
      *
      * @return true unless capture has been explicitly disabled

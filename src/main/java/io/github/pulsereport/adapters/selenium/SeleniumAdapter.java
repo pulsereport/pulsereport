@@ -94,25 +94,25 @@ import io.github.pulsereport.core.model.TestRun;
  * </ul>
  * <p>
  * Screenshots, logs and videos are written under the report folder
- * ({@code reporter.output.directory}), so copy or publish that folder as a
+ * ({@code pulsereport.output.directory}), so copy or publish that folder as a
  * whole. The same tracking works without TestNG through
  * {@link SeleniumTracker}, e.g. in Cucumber step definitions.</p>
  *
  * <h2>Settings</h2>
  * <pre>
- * reporter.screenshots.mode=failed               # all | failed | last | none
- * reporter.video.mode=none                       # always | failed | none (requires ffmpeg)
- * reporter.video.fps=2
- * reporter.video.ffmpegPath=ffmpeg
- * reporter.video.storage=path                    # path | embed
- * reporter.selenium.stepDetail=full              # full | minimal
- * reporter.selenium.maskInputs=sensitive         # sensitive | all | none
- * reporter.selenium.failureCapture=page,console,source
- * reporter.selenium.pageMetrics=true
- * reporter.selenium.trackScripts=false
+ * pulsereport.screenshots.mode=failed               # all | failed | last | none
+ * pulsereport.video.mode=none                       # always | failed | none (requires ffmpeg)
+ * pulsereport.video.fps=2
+ * pulsereport.video.ffmpegPath=ffmpeg
+ * pulsereport.video.storage=path                    # path | embed
+ * pulsereport.selenium.stepDetail=full              # full | minimal
+ * pulsereport.selenium.maskInputs=sensitive         # sensitive | all | none
+ * pulsereport.selenium.failureCapture=page,console,source
+ * pulsereport.selenium.pageMetrics=true
+ * pulsereport.selenium.trackScripts=false
  * </pre>
  * <p>
- * Set them in {@code reporter.properties} or as {@code -D} system properties.</p>
+ * Set them in {@code pulsereport.properties} or as {@code -D} system properties.</p>
  *
  * <h2>Thread safety</h2>
  * <p>
@@ -194,37 +194,37 @@ public class SeleniumAdapter extends TestNGAdapter {
             try {
                 config = ReporterConfig.autoDetect();
             } catch (RuntimeException e) {
-                logger.warn("PulseReport: could not read reporter.properties; using default video settings", e);
+                logger.warn("PulseReport: could not read pulsereport.properties; using default video settings", e);
             }
             if (config == null) {
                 config = ReporterConfig.builder().build();
             }
-            String mode = config.getProperty("reporter.video.mode", config.getVideoMode());
+            String mode = config.getProperty("pulsereport.video.mode", config.getVideoMode());
             mode = mode == null ? SeleniumTracker.MODE_NONE : mode.trim().toLowerCase(Locale.ROOT);
             if (!List.of(VIDEO_ALWAYS, SeleniumTracker.MODE_FAILED, SeleniumTracker.MODE_NONE).contains(mode)) {
-                logger.warn("PulseReport: invalid reporter.video.mode='{}'; expected always, failed or none."
+                logger.warn("PulseReport: invalid pulsereport.video.mode='{}'; expected always, failed or none."
                         + " Using 'none'", mode);
                 mode = SeleniumTracker.MODE_NONE;
             }
             int fps = config.getVideoFps();
-            String fpsOverride = System.getProperty("reporter.video.fps");
+            String fpsOverride = System.getProperty("pulsereport.video.fps");
             if (fpsOverride != null) {
                 try {
                     fps = Integer.parseInt(fpsOverride.trim());
                 } catch (NumberFormatException e) {
-                    logger.warn("PulseReport: invalid reporter.video.fps='{}'; using {}", fpsOverride, fps);
+                    logger.warn("PulseReport: invalid pulsereport.video.fps='{}'; using {}", fpsOverride, fps);
                 }
             }
-            String storage = config.getProperty("reporter.video.storage", config.getVideoStorage());
+            String storage = config.getProperty("pulsereport.video.storage", config.getVideoStorage());
             storage = storage == null ? "path" : storage.trim().toLowerCase(Locale.ROOT);
             if (!List.of("path", "embed", "url").contains(storage)) {
-                logger.warn("PulseReport: invalid reporter.video.storage='{}'; expected path or embed. Using 'path'",
+                logger.warn("PulseReport: invalid pulsereport.video.storage='{}'; expected path or embed. Using 'path'",
                         storage);
                 storage = "path";
             }
             return new VideoSettings(mode, Math.min(30, Math.max(1, fps)),
-                    config.getProperty("reporter.video.ffmpegPath", config.getFfmpegPath()), storage,
-                    config.getProperty("reporter.video.directory", null));
+                    config.getProperty("pulsereport.video.ffmpegPath", config.getFfmpegPath()), storage,
+                    config.getProperty("pulsereport.video.directory", null));
         }
     }
 
@@ -593,7 +593,7 @@ public class SeleniumAdapter extends TestNGAdapter {
                 return;
             }
             if ("url".equals(settings.storage())) {
-                logger.warn("PulseReport: reporter.video.storage=url but no uploader is set "
+                logger.warn("PulseReport: pulsereport.video.storage=url but no uploader is set "
                         + "(SeleniumAdapter.setVideoUploader); {} is linked from its folder", fileName);
             }
             if ("embed".equals(settings.storage())) {

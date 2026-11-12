@@ -310,7 +310,7 @@ public class ReporterCLI implements Callable<Integer> {
                 } else {
                     config = ReporterConfig.autoDetect();
                     if (config == null) {
-                        System.err.println("Error: No configuration file found. Use --config or place reporter.properties in the project root.");
+                        System.err.println("Error: No configuration file found. Use --config or place pulsereport.properties in the project root.");
                         return 2;
                     }
                     if (verbose) {

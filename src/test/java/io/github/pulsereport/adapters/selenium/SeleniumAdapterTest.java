@@ -42,7 +42,7 @@ public class SeleniumAdapterTest {
 
     @AfterEach
     public void tearDown() {
-        System.clearProperty("reporter.output.directory");
+        System.clearProperty("pulsereport.output.directory");
     }
 
     @Test
@@ -155,7 +155,7 @@ public class SeleniumAdapterTest {
         ITestContext mockContext = createMockTestContext("WebTests");
         ITestResult mockResult = createMockTestResult("testBrowserMetadata", ITestResult.SUCCESS);
 
-        System.setProperty("reporter.output.directory", "target/pulsereport/test-selenium-adapter");
+        System.setProperty("pulsereport.output.directory", "target/pulsereport/test-selenium-adapter");
 
         adapter.onStart(mockSuite);
         adapter.onStart(mockContext);

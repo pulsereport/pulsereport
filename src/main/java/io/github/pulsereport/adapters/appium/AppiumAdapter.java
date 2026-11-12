@@ -295,7 +295,7 @@ public class AppiumAdapter extends TestNGAdapter {
      * Attaches a screen recording (video) to the specified test.
      *
      * <p>How the third argument is interpreted depends on the configured video
-     * storage mode ({@code reporter.video.storage}):</p>
+     * storage mode ({@code pulsereport.video.storage}):</p>
      * <ul>
      *   <li><b>path</b> (default) — {@code source} is a local/hosted file path;
      *       the report renders an inline {@code <video>} player streaming from it.</li>

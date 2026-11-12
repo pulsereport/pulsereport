@@ -31,15 +31,15 @@ class ReporterConfigTest {
 
     @BeforeEach
     void setUp() throws IOException {
-        configFile = tempDir.resolve("test-reporter.properties").toFile();
+        configFile = tempDir.resolve("test-pulsereport.properties").toFile();
         Properties props = new Properties();
-        props.setProperty("reporter.output.formats", "html,json");
-        props.setProperty("reporter.output.directory", tempDir.toString());
-        props.setProperty("reporter.s3.enabled", "true");
-        props.setProperty("reporter.s3.bucket", "test-bucket");
-        props.setProperty("reporter.s3.region", "us-west-2");
-        props.setProperty("reporter.http.enabled", "false");
-        props.setProperty("reporter.slack.enabled", "false");
+        props.setProperty("pulsereport.output.formats", "html,json");
+        props.setProperty("pulsereport.output.directory", tempDir.toString());
+        props.setProperty("pulsereport.s3.enabled", "true");
+        props.setProperty("pulsereport.s3.bucket", "test-bucket");
+        props.setProperty("pulsereport.s3.region", "us-west-2");
+        props.setProperty("pulsereport.http.enabled", "false");
+        props.setProperty("pulsereport.slack.enabled", "false");
 
         try (FileWriter writer = new FileWriter(configFile)) {
             props.store(writer, "Test configuration");
@@ -77,8 +77,8 @@ class ReporterConfigTest {
     @Test
     void loadFromProperties() {
         Properties props = new Properties();
-        props.setProperty("reporter.output.formats", "junit");
-        props.setProperty("reporter.output.directory", "target/test-reports");
+        props.setProperty("pulsereport.output.formats", "junit");
+        props.setProperty("pulsereport.output.directory", "target/test-reports");
 
         ReporterConfig config = ReporterConfig.loadFromProperties(props);
 
@@ -131,10 +131,10 @@ class ReporterConfigTest {
     @Test
     void s3ConfigValidation() throws Exception {
         Properties props = new Properties();
-        props.setProperty("reporter.output.formats", "html");
-        props.setProperty("reporter.output.directory", tempDir.toString());
-        props.setProperty("reporter.s3.enabled", "true");
-        props.setProperty("reporter.s3.bucket", ""); // Invalid: empty bucket
+        props.setProperty("pulsereport.output.formats", "html");
+        props.setProperty("pulsereport.output.directory", tempDir.toString());
+        props.setProperty("pulsereport.s3.enabled", "true");
+        props.setProperty("pulsereport.s3.bucket", ""); // Invalid: empty bucket
 
         ReporterConfig config = ReporterConfig.loadFromProperties(props);
 
@@ -145,10 +145,10 @@ class ReporterConfigTest {
     @Test
     void httpConfigValidation() {
         Properties props = new Properties();
-        props.setProperty("reporter.output.formats", "html");
-        props.setProperty("reporter.output.directory", tempDir.toString());
-        props.setProperty("reporter.http.enabled", "true");
-        props.setProperty("reporter.http.url", ""); // Invalid: empty URL
+        props.setProperty("pulsereport.output.formats", "html");
+        props.setProperty("pulsereport.output.directory", tempDir.toString());
+        props.setProperty("pulsereport.http.enabled", "true");
+        props.setProperty("pulsereport.http.url", ""); // Invalid: empty URL
 
         ReporterConfig config = ReporterConfig.loadFromProperties(props);
 
@@ -159,10 +159,10 @@ class ReporterConfigTest {
     @Test
     void slackConfigValidation() {
         Properties props = new Properties();
-        props.setProperty("reporter.output.formats", "html");
-        props.setProperty("reporter.output.directory", tempDir.toString());
-        props.setProperty("reporter.slack.enabled", "true");
-        props.setProperty("reporter.slack.webhookUrl", ""); // Invalid: empty webhook
+        props.setProperty("pulsereport.output.formats", "html");
+        props.setProperty("pulsereport.output.directory", tempDir.toString());
+        props.setProperty("pulsereport.slack.enabled", "true");
+        props.setProperty("pulsereport.slack.webhookUrl", ""); // Invalid: empty webhook
 
         ReporterConfig config = ReporterConfig.loadFromProperties(props);
 
@@ -174,11 +174,11 @@ class ReporterConfigTest {
     void environmentVariableInterpolation() {
         System.setProperty("TEST_BUCKET", "my-test-bucket");
         Properties props = new Properties();
-        props.setProperty("reporter.output.formats", "html");
-        props.setProperty("reporter.output.directory", tempDir.toString());
-        props.setProperty("reporter.s3.enabled", "true");
-        props.setProperty("reporter.s3.bucket", "${TEST_BUCKET}");
-        props.setProperty("reporter.s3.region", "us-east-1");
+        props.setProperty("pulsereport.output.formats", "html");
+        props.setProperty("pulsereport.output.directory", tempDir.toString());
+        props.setProperty("pulsereport.s3.enabled", "true");
+        props.setProperty("pulsereport.s3.bucket", "${TEST_BUCKET}");
+        props.setProperty("pulsereport.s3.region", "us-east-1");
 
         ReporterConfig config = ReporterConfig.loadFromProperties(props);
 
@@ -220,9 +220,9 @@ class ReporterConfigTest {
     @Test
     void configLoadsContentSizeLimit() {
         Properties props = new Properties();
-        props.setProperty("reporter.output.formats", "html");
-        props.setProperty("reporter.output.directory", tempDir.toString());
-        props.setProperty("reporter.maxArtifactContentSize", "102400");
+        props.setProperty("pulsereport.output.formats", "html");
+        props.setProperty("pulsereport.output.directory", tempDir.toString());
+        props.setProperty("pulsereport.maxArtifactContentSize", "102400");
 
         ReporterConfig config = ReporterConfig.loadFromProperties(props);
 
@@ -232,7 +232,7 @@ class ReporterConfigTest {
     @Test
     void configLoadsReportTitle() {
         Properties props = new Properties();
-        props.setProperty("reporter.report.title", "  Checkout regression  ");
+        props.setProperty("pulsereport.report.title", "  Checkout regression  ");
 
         assertEquals("Checkout regression", ReporterConfig.loadFromProperties(props).getReportTitle());
     }
@@ -240,7 +240,7 @@ class ReporterConfigTest {
     @Test
     void blankReportTitleMeansUseRunName() {
         Properties props = new Properties();
-        props.setProperty("reporter.report.title", "   ");
+        props.setProperty("pulsereport.report.title", "   ");
 
         assertEquals(null, ReporterConfig.loadFromProperties(props).getReportTitle());
         assertEquals(null, ReporterConfig.loadFromProperties(new Properties()).getReportTitle());
@@ -249,8 +249,8 @@ class ReporterConfigTest {
     @Test
     void configLoadsDefaultContentSizeLimit() {
         Properties props = new Properties();
-        props.setProperty("reporter.output.formats", "html");
-        props.setProperty("reporter.output.directory", tempDir.toString());
+        props.setProperty("pulsereport.output.formats", "html");
+        props.setProperty("pulsereport.output.directory", tempDir.toString());
 
         ReporterConfig config = ReporterConfig.loadFromProperties(props);
 
@@ -260,10 +260,10 @@ class ReporterConfigTest {
     @Test
     void configLoadsSensitiveDataSettings() {
         Properties props = new Properties();
-        props.setProperty("reporter.output.formats", "html");
-        props.setProperty("reporter.output.directory", tempDir.toString());
-        props.setProperty("reporter.maskSensitiveData", "true");
-        props.setProperty("reporter.maskHeaders.fields", "Authorization,X-API-Key,Custom-Token");
+        props.setProperty("pulsereport.output.formats", "html");
+        props.setProperty("pulsereport.output.directory", tempDir.toString());
+        props.setProperty("pulsereport.maskSensitiveData", "true");
+        props.setProperty("pulsereport.maskHeaders.fields", "Authorization,X-API-Key,Custom-Token");
 
         ReporterConfig config = ReporterConfig.loadFromProperties(props);
 
@@ -274,8 +274,8 @@ class ReporterConfigTest {
     @Test
     void configLoadsDefaultSensitiveDataSettings() {
         Properties props = new Properties();
-        props.setProperty("reporter.output.formats", "html");
-        props.setProperty("reporter.output.directory", tempDir.toString());
+        props.setProperty("pulsereport.output.formats", "html");
+        props.setProperty("pulsereport.output.directory", tempDir.toString());
 
         ReporterConfig config = ReporterConfig.loadFromProperties(props);
 
@@ -317,11 +317,11 @@ class ReporterConfigTest {
     @Test
     void configLoadsMaskBodySettings() {
         Properties props = new Properties();
-        props.setProperty("reporter.output.formats", "html");
-        props.setProperty("reporter.output.directory", tempDir.toString());
-        props.setProperty("reporter.maskBody.enabled", "false");
-        props.setProperty("reporter.maskBody.fields", "ssn,pin");
-        props.setProperty("reporter.maskBody.maskTokens", "false");
+        props.setProperty("pulsereport.output.formats", "html");
+        props.setProperty("pulsereport.output.directory", tempDir.toString());
+        props.setProperty("pulsereport.maskBody.enabled", "false");
+        props.setProperty("pulsereport.maskBody.fields", "ssn,pin");
+        props.setProperty("pulsereport.maskBody.maskTokens", "false");
 
         ReporterConfig config = ReporterConfig.loadFromProperties(props);
 
@@ -333,8 +333,8 @@ class ReporterConfigTest {
     @Test
     void configLoadsDefaultMaskBodySettings() {
         Properties props = new Properties();
-        props.setProperty("reporter.output.formats", "html");
-        props.setProperty("reporter.output.directory", tempDir.toString());
+        props.setProperty("pulsereport.output.formats", "html");
+        props.setProperty("pulsereport.output.directory", tempDir.toString());
 
         ReporterConfig config = ReporterConfig.loadFromProperties(props);
 
@@ -364,10 +364,10 @@ class ReporterConfigTest {
     @Test
     void loadFromProperties_parsesNewGranularKeys() {
         Properties props = new Properties();
-        props.setProperty("reporter.maskHeaders.enabled", "false");
-        props.setProperty("reporter.maskHeaders.fields", "X-Custom");
-        props.setProperty("reporter.maskXml.enabled", "false");
-        props.setProperty("reporter.maskXml.fields", "a,b");
+        props.setProperty("pulsereport.maskHeaders.enabled", "false");
+        props.setProperty("pulsereport.maskHeaders.fields", "X-Custom");
+        props.setProperty("pulsereport.maskXml.enabled", "false");
+        props.setProperty("pulsereport.maskXml.fields", "a,b");
 
         ReporterConfig config = ReporterConfig.loadFromProperties(props);
 
@@ -380,7 +380,7 @@ class ReporterConfigTest {
     @Test
     void loadFromProperties_newKeysDefaultToTrueAndXmlFieldsInheritsBodyFields() {
         Properties props = new Properties();
-        props.setProperty("reporter.maskBody.fields", "foo,bar");
+        props.setProperty("pulsereport.maskBody.fields", "foo,bar");
 
         ReporterConfig config = ReporterConfig.loadFromProperties(props);
 
@@ -395,24 +395,24 @@ class ReporterConfigTest {
     @Test
     void loadFromProperties_xmlFieldsExplicitOverridesInheritance() {
         Properties props = new Properties();
-        props.setProperty("reporter.maskBody.fields", "foo");
-        props.setProperty("reporter.maskXml.fields", "baz");
+        props.setProperty("pulsereport.maskBody.fields", "foo");
+        props.setProperty("pulsereport.maskXml.fields", "baz");
 
         ReporterConfig config = ReporterConfig.loadFromProperties(props);
 
         assertEquals("baz", config.getXmlFields(),
-                "Explicit reporter.maskXml.fields should override inheritance from body fields");
+                "Explicit pulsereport.maskXml.fields should override inheritance from body fields");
     }
 
     @Test
     void loadFromProperties_legacySensitiveHeadersKeyIgnored() {
         Properties props = new Properties();
-        props.setProperty("reporter.sensitiveHeaders", "X-Legacy");
+        props.setProperty("pulsereport.sensitiveHeaders", "X-Legacy");
 
         ReporterConfig config = ReporterConfig.loadFromProperties(props);
 
         assertEquals("Authorization,X-API-Key,Cookie,Set-Cookie", config.getMaskHeaderFields(),
-                "Legacy reporter.sensitiveHeaders key must have no effect");
+                "Legacy pulsereport.sensitiveHeaders key must have no effect");
     }
 
     @Test
@@ -432,26 +432,26 @@ class ReporterConfigTest {
 
     // --- resolveOutputDirectory tests (adapter auto-detect, Phase 1) ---
     //
-    // DEVIATION NOTE: src/main/resources/reporter.properties (the library's own
+    // DEVIATION NOTE: src/main/resources/pulsereport.properties (the library's own
     // bundled resource) IS on the test classpath AND is discoverable via the
-    // relative path "src/main/resources/reporter.properties" because Surefire
+    // relative path "src/main/resources/pulsereport.properties" because Surefire
     // runs with the repo root as the working directory. That file sets
-    // reporter.output.directory=target/pulsereport, which happens to equal the
+    // pulsereport.output.directory=target/pulsereport, which happens to equal the
     // built-in default. Tests below document where this affects assertions.
 
-    private static final String OUTPUT_DIR_PROPERTY = "reporter.output.directory";
-    private static final File WORKING_DIR_PROPS = new File("reporter.properties").getAbsoluteFile();
+    private static final String OUTPUT_DIR_PROPERTY = "pulsereport.output.directory";
+    private static final File WORKING_DIR_PROPS = new File("pulsereport.properties").getAbsoluteFile();
 
     /**
-     * Writes a working-dir reporter.properties for auto-detection. Fails rather
-     * than clobbering a pre-existing repo-root reporter.properties.
+     * Writes a working-dir pulsereport.properties for auto-detection. Fails rather
+     * than clobbering a pre-existing repo-root pulsereport.properties.
      *
      * @return true if this call created the file (caller must delete it)
      */
     private boolean writeWorkingDirProps(Properties props) throws IOException {
         if (WORKING_DIR_PROPS.exists()) {
             throw new IllegalStateException(
-                    "Repo-root reporter.properties already exists; refusing to clobber: "
+                    "Repo-root pulsereport.properties already exists; refusing to clobber: "
                             + WORKING_DIR_PROPS);
         }
         try (FileWriter writer = new FileWriter(WORKING_DIR_PROPS)) {
@@ -461,7 +461,7 @@ class ReporterConfigTest {
     }
 
     /**
-     * Best-effort removal of the temporary working-dir reporter.properties.
+     * Best-effort removal of the temporary working-dir pulsereport.properties.
      */
     private static void deleteWorkingDirProps() {
         try {
@@ -486,7 +486,7 @@ class ReporterConfigTest {
 
             assertEquals("custom/dir",
                     ReporterConfig.resolveOutputDirectory(OUTPUT_DIR_PROPERTY, "target/pulsereport"),
-                    "System property must win over auto-detected reporter.properties");
+                    "System property must win over auto-detected pulsereport.properties");
         } finally {
             if (saved == null) {
                 System.clearProperty(OUTPUT_DIR_PROPERTY);
@@ -511,7 +511,7 @@ class ReporterConfigTest {
 
             assertEquals("target/from-props",
                     ReporterConfig.resolveOutputDirectory(OUTPUT_DIR_PROPERTY, "target/pulsereport"),
-                    "Auto-detected working-dir reporter.properties value must be used "
+                    "Auto-detected working-dir pulsereport.properties value must be used "
                             + "when the system property is absent");
         } finally {
             if (saved == null) {
@@ -531,16 +531,16 @@ class ReporterConfigTest {
         try {
             System.clearProperty(OUTPUT_DIR_PROPERTY);
             assertFalse(WORKING_DIR_PROPS.exists(),
-                    "Test requires no repo-root reporter.properties to be present");
+                    "Test requires no repo-root pulsereport.properties to be present");
 
-            // DEVIATION: the library's bundled reporter.properties
-            // (src/main/resources/reporter.properties) is auto-detected from the
-            // test classpath and sets reporter.output.directory=target/pulsereport.
+            // DEVIATION: the library's bundled pulsereport.properties
+            // (src/main/resources/pulsereport.properties) is auto-detected from the
+            // test classpath and sets pulsereport.output.directory=target/pulsereport.
             // So the value asserted here comes from the classpath resource, not the
             // literal fallback default — the two coincidentally match.
             assertEquals("target/pulsereport",
                     ReporterConfig.resolveOutputDirectory(OUTPUT_DIR_PROPERTY, "target/pulsereport"),
-                    "Bundled classpath reporter.properties sets reporter.output.directory"
+                    "Bundled classpath pulsereport.properties sets pulsereport.output.directory"
                             + "=target/pulsereport, which equals the built-in default");
         } finally {
             if (saved == null) {
@@ -557,17 +557,17 @@ class ReporterConfigTest {
         boolean created = false;
         try {
             System.clearProperty(OUTPUT_DIR_PROPERTY);
-            // Working-dir properties file present but WITHOUT reporter.output.directory.
+            // Working-dir properties file present but WITHOUT pulsereport.output.directory.
             // The working-dir file shadows the bundled classpath resource in
             // autoDetect()'s lookup order, so resolution must fall through to the
             // default. (The bundled resource's value equals the default anyway.)
             Properties props = new Properties();
-            props.setProperty("reporter.output.formats", "html,json");
+            props.setProperty("pulsereport.output.formats", "html,json");
             created = writeWorkingDirProps(props);
 
             assertEquals("target/pulsereport",
                     ReporterConfig.resolveOutputDirectory(OUTPUT_DIR_PROPERTY, "target/pulsereport"),
-                    "Properties file without reporter.output.directory must fall back "
+                    "Properties file without pulsereport.output.directory must fall back "
                             + "to the default");
         } finally {
             if (saved == null) {

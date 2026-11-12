@@ -65,7 +65,7 @@ class TestNGAssertionCaptureTest {
 
     @BeforeEach
     void setUp() {
-        System.setProperty("reporter.output.directory", reportDir.getAbsolutePath());
+        System.setProperty("pulsereport.output.directory", reportDir.getAbsolutePath());
         adapter = new RecordingAdapter();
         result = testResult("checkedTest" + TEST_IDS.incrementAndGet());
         testMethod = invoked(false, null, false);
@@ -73,7 +73,7 @@ class TestNGAssertionCaptureTest {
 
     @AfterEach
     void tearDown() {
-        System.clearProperty("reporter.output.directory");
+        System.clearProperty("pulsereport.output.directory");
     }
 
     @Test

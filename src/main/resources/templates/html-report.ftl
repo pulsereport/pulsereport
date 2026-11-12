@@ -4656,7 +4656,7 @@
                             )
                         : null,
                     box,
-                    p.note ? h('p', { class: 'xnote' }, `${p.note}. Raise reporter.maxArtifactContentSize to capture more.`) : null
+                    p.note ? h('p', { class: 'xnote' }, `${p.note}. Raise pulsereport.maxArtifactContentSize to capture more.`) : null
                 );
             }
 
@@ -5695,7 +5695,7 @@
                                 ' as a listener in ',
                                 h('code', null, 'testng.xml'),
                                 ', and that ',
-                                h('code', null, 'reporter.output.formats'),
+                                h('code', null, 'pulsereport.output.formats'),
                                 ' includes ',
                                 h('code', null, 'html'),
                                 '.'

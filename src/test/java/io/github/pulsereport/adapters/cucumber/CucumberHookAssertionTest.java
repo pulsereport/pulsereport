@@ -23,8 +23,8 @@ class CucumberHookAssertionTest {
 
     @Test
     void hookAssertionsAppearWithTheirSteps() throws Exception {
-        String previousOutputDir = System.getProperty("reporter.output.directory");
-        System.setProperty("reporter.output.directory", outputDir.toString());
+        String previousOutputDir = System.getProperty("pulsereport.output.directory");
+        System.setProperty("pulsereport.output.directory", outputDir.toString());
         System.setProperty("cucumber.publish.quiet", "true");
         byte exitStatus;
         try {
@@ -36,9 +36,9 @@ class CucumberHookAssertionTest {
             }, Thread.currentThread().getContextClassLoader());
         } finally {
             if (previousOutputDir == null) {
-                System.clearProperty("reporter.output.directory");
+                System.clearProperty("pulsereport.output.directory");
             } else {
-                System.setProperty("reporter.output.directory", previousOutputDir);
+                System.setProperty("pulsereport.output.directory", previousOutputDir);
             }
         }
         assertEquals(0, exitStatus);

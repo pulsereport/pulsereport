@@ -742,7 +742,7 @@ public class TestNGAdapter implements Adapter, ITestListener, ISuiteListener, II
         }
 
         try {
-            String outputDir = ReporterConfig.resolveOutputDirectory("reporter.output.directory",
+            String outputDir = ReporterConfig.resolveOutputDirectory("pulsereport.output.directory",
                     "target/pulsereport");
             File reportDir = resolveOutputDirectory(outputDir);
             reportDir.mkdirs();

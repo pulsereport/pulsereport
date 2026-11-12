@@ -95,7 +95,7 @@ final class SeleniumVideoRecorder {
                 }
             }
             logger.warn("PulseReport: video recording is enabled but ffmpeg was not found at '{}'. "
-                    + "Install ffmpeg or set reporter.video.ffmpegPath. Videos will be skipped.", path);
+                    + "Install ffmpeg or set pulsereport.video.ffmpegPath. Videos will be skipped.", path);
             return false;
         });
     }
