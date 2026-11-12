@@ -15,7 +15,7 @@ A unified test reporting library for Java. PulseReport captures results from Tes
 <dependency>
     <groupId>io.github.pulsereport</groupId>
     <artifactId>pulsereport</artifactId>
-    <version>1.2.0</version>
+    <version>1.3.0</version>
 </dependency>
 ```
 
