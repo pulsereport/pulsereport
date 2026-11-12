@@ -14,7 +14,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * Tests to verify TestNGAdapter complies with Adapter interface contract.
  * Specifically tests that the documented API usage examples work as expected.
  * 
- * @author Custom Reporter Team
+ * @author PulseReport Team
  * @since Phase 4
  */
 public class AdapterContractComplianceTest {

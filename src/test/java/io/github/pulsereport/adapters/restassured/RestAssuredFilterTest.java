@@ -27,7 +27,7 @@ import io.restassured.specification.FilterableResponseSpecification;
  * Tests for RestAssuredAdapter Filter functionality. Verifies automatic HTTP
  * request/response capture with size limits and masking.
  *
- * @author Custom Reporter Team
+ * @author PulseReport Team
  * @since 1.0.0
  */
 public class RestAssuredFilterTest {

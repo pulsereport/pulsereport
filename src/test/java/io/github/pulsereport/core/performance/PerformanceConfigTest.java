@@ -9,7 +9,7 @@ import static org.junit.jupiter.api.Assertions.*;
 /**
  * Unit tests for PerformanceConfig.
  * 
- * @author Custom Reporter Team
+ * @author PulseReport Team
  * @since 1.0.0
  */
 public class PerformanceConfigTest {

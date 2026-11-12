@@ -20,7 +20,7 @@ import static org.mockito.Mockito.*;
  * Tests for AppiumAdapter implementation.
  * Verifies mobile-specific artifact/metric capture for Appium framework.
  * 
- * @author Custom Reporter Team
+ * @author PulseReport Team
  * @since 1.0.0
  */
 public class AppiumAdapterTest {

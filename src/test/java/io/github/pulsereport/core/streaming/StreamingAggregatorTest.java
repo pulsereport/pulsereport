@@ -37,7 +37,7 @@ import io.github.pulsereport.core.performance.PerformanceConfig;
 /**
  * Unit tests for StreamingAggregator.
  *
- * @author Custom Reporter Team
+ * @author PulseReport Team
  * @since 1.0.0
  */
 public class StreamingAggregatorTest {

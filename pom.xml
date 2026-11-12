@@ -89,7 +89,7 @@
             <version>${jackson.version}</version>
         </dependency>
 
-        <!-- JUnit 5 - For unit testing the reporter itself -->
+        <!-- JUnit 5 - For unit testing PulseReport itself -->
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter-api</artifactId>

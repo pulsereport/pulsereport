@@ -18,7 +18,7 @@ import java.nio.file.Path;
  *     .streamingMode(true)
  *     .batchSize(1000)
  *     .maxMemoryMB(512)
- *     .tempStorageDir(Paths.get("/tmp/reporter"))
+ *     .tempStorageDir(Paths.get("/tmp/pulsereport"))
  *     .autoCleanup(true)
  *     .build();
  * </pre>
@@ -41,7 +41,7 @@ public class PerformanceConfig {
     /**
      * Default temporary storage directory.
      */
-    public static final Path DEFAULT_TEMP_DIR = Path.of(System.getProperty("java.io.tmpdir"), "reporter-temp");
+    public static final Path DEFAULT_TEMP_DIR = Path.of(System.getProperty("java.io.tmpdir"), "pulsereport-temp");
 
     private final boolean streamingMode;
     private final int batchSize;

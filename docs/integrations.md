@@ -296,7 +296,7 @@ Send test result notifications to Slack channels.
 1. Go to <https://api.slack.com/apps>
 2. Click "Create New App"
 3. Choose "From scratch"
-4. Name your app (e.g., "Test Reporter Bot")
+4. Name your app (e.g., "PulseReport Bot")
 5. Select your workspace
 6. Navigate to "Incoming Webhooks"
 7. Activate Incoming Webhooks

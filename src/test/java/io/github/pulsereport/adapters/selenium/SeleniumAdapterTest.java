@@ -28,7 +28,7 @@ import io.github.pulsereport.core.model.TestRun;
  * Tests for SeleniumAdapter implementation. Verifies web-specific
  * artifact/metric capture for Selenium WebDriver.
  *
- * @author Custom Reporter Team
+ * @author PulseReport Team
  * @since 1.0.0
  */
 public class SeleniumAdapterTest {

@@ -19,7 +19,7 @@ import static org.junit.jupiter.api.Assertions.*;
 /**
  * Unit tests for TempStorageManager.
  * 
- * @author Custom Reporter Team
+ * @author PulseReport Team
  * @since 1.0.0
  */
 public class TempStorageManagerTest {
@@ -29,7 +29,7 @@ public class TempStorageManagerTest {
 
     @BeforeEach
     public void setUp() throws IOException {
-        tempDir = Files.createTempDirectory("reporter-test-");
+        tempDir = Files.createTempDirectory("pulsereport-test-");
         storageManager = new TempStorageManager(tempDir);
     }
 

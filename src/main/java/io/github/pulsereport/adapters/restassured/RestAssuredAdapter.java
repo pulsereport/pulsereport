@@ -156,7 +156,7 @@ public class RestAssuredAdapter implements Filter {
     /**
      * Constructs a new RestAssuredAdapter with custom configuration.
      *
-     * @param config the reporter configuration
+     * @param config the PulseReport configuration
      */
     public RestAssuredAdapter(ReporterConfig config) {
         this.config = config != null ? config : createDefaultConfig();

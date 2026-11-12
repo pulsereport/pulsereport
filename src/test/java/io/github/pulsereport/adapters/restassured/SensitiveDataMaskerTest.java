@@ -18,7 +18,7 @@ import io.restassured.http.Headers;
  * Tests for SensitiveDataMasker utility class.
  * Verifies sensitive header masking functionality.
  * 
- * @author Custom Reporter Team
+ * @author PulseReport Team
  * @since 1.0.0
  */
 public class SensitiveDataMaskerTest {

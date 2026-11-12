@@ -22,7 +22,7 @@ import io.restassured.filter.Filter;
  * Tests for RestAssuredAdapter implementation. Verifies standalone API-specific
  * artifact/metric capture for REST-assured.
  *
- * @author Custom Reporter Team
+ * @author PulseReport Team
  * @since 1.0.0
  */
 public class RestAssuredAdapterTest {

@@ -105,16 +105,16 @@ Other property examples in this document preserve the current PulseReport naming
 
 ## Core Settings
 
-### Reporter Metadata
+### PulseReport Metadata
 
 ```properties
-# Reporter name shown in report headers
+# Report name shown in report headers
 pulsereport.name=PulseReport
 
-# Reporter version (for tracking)
+# PulseReport version (for tracking)
 pulsereport.version=${version}
 
-# Enable/disable reporter globally
+# Enable/disable PulseReport globally
 pulsereport.enabled=true
 # Set to false to disable all reporting
 ```
@@ -479,7 +479,7 @@ pulsereport.slack.webhookUrl=${SLACK_WEBHOOK_URL}
 pulsereport.slack.channel=#test-results
 
 # Bot customization
-pulsereport.slack.username=Test Reporter Bot
+pulsereport.slack.username=PulseReport Bot
 pulsereport.slack.iconEmoji=:robot_face:
 pulsereport.slack.iconUrl=https://example.com/icon.png
 
@@ -586,7 +586,7 @@ log.level=INFO
 # Options: TRACE, DEBUG, INFO, WARN, ERROR
 
 # Log file
-log.file=reporter.log
+log.file=pulsereport.log
 
 # Log pattern
 log.pattern=%d{ISO8601} [%thread] %-5level %logger{36} - %msg%n
@@ -773,12 +773,12 @@ pulsereport.html.screenshots.compress=true
 ```bash
 # Validate a specific environment file
 java -jar target/pulsereport-${version}.jar validate \
-    --config config/reporter-dev.properties
+    --config config/pulsereport-dev.properties
 
 # Generate with a specific environment file
 java -jar target/pulsereport-${version}.jar generate \
     --input target/test-results.json \
-    --config config/reporter-prod.properties
+    --config config/pulsereport-prod.properties
 ```
 
 ## Troubleshooting

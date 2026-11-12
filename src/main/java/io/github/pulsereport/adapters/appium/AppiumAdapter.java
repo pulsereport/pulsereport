@@ -346,7 +346,7 @@ public class AppiumAdapter extends TestNGAdapter {
                 return cfg.getVideoStorage();
             }
         } catch (Exception e) {
-            logger.debug("Could not load reporter config for video storage mode: {}", e.getMessage());
+            logger.debug("Could not load PulseReport config for video storage mode: {}", e.getMessage());
         }
         return "path";
     }

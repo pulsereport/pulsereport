@@ -11,7 +11,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Configuration POJO for the custom reporter. Supports loading from properties
+ * Configuration POJO for PulseReport. Supports loading from properties
  * files and builder pattern.
  */
 public class ReporterConfig {
