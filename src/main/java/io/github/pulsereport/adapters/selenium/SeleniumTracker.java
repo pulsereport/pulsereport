@@ -91,6 +91,8 @@ import io.github.pulsereport.core.model.TestStep;
  * pulsereport.selenium.failureCapture=page,console,source   # or none
  * pulsereport.selenium.pageMetrics=true
  * pulsereport.selenium.trackScripts=false           # record executeScript calls as steps
+ * pulsereport.selenium.autoSteps=true               # false: only step(...), waitFor(...) and failures are steps
+ * pulsereport.appium.autoSteps=true                 # the same for drivers from AppiumAdapter.createDriver
  * </pre>
  *
  * @since 1.3.0
@@ -185,7 +187,13 @@ public final class SeleniumTracker {
 
     record Settings(String screenshots, boolean detailed, String maskInputs, Set<String> failureCapture,
             boolean trackScripts, boolean pageMetrics, Pattern sensitiveField, Set<String> sensitiveParams,
-            boolean embedScreenshots, String screenshotDirectory) {
+            boolean embedScreenshots, String screenshotDirectory, boolean seleniumAutoSteps,
+            boolean appiumAutoSteps) {
+
+        /** Whether actions on drivers labelled {@code adapter} become steps on their own. */
+        boolean autoSteps(String adapter) {
+            return "Appium".equals(adapter) ? appiumAutoSteps : seleniumAutoSteps;
+        }
 
         static Settings load() {
             ReporterConfig config = null;
@@ -234,7 +242,9 @@ public final class SeleniumTracker {
                     Boolean.parseBoolean(config.getProperty("pulsereport.selenium.trackScripts", "false")),
                     Boolean.parseBoolean(config.getProperty("pulsereport.selenium.pageMetrics", "true")),
                     fieldPattern, Collections.unmodifiableSet(params),
-                    "embed".equals(storage), config.getProperty("pulsereport.screenshots.directory", null));
+                    "embed".equals(storage), config.getProperty("pulsereport.screenshots.directory", null),
+                    !"false".equalsIgnoreCase(config.getProperty("pulsereport.selenium.autoSteps", "true").trim()),
+                    !"false".equalsIgnoreCase(config.getProperty("pulsereport.appium.autoSteps", "true").trim()));
         }
 
         private static String option(String key, String value, String fallback, List<String> allowed) {
@@ -297,7 +307,7 @@ public final class SeleniumTracker {
             return current.decorated();
         }
         ReentrantLock lock = new ReentrantLock();
-        WebDriver decorated = new EventFiringDecorator<WebDriver>(new SeleniumStepListener(driver, lock))
+        WebDriver decorated = new EventFiringDecorator<WebDriver>(new SeleniumStepListener(driver, lock, ADAPTER_NAME))
                 .decorate(driver);
         register(driver, decorated, lock, ADAPTER_NAME, Map.of());
         return decorated;
@@ -321,7 +331,7 @@ public final class SeleniumTracker {
             throw new IllegalArgumentException("driver cannot be null");
         }
         ReentrantLock lock = new ReentrantLock();
-        SeleniumStepListener listener = new SeleniumStepListener(driver, lock);
+        SeleniumStepListener listener = new SeleniumStepListener(driver, lock, adapterName);
         register(driver, driver, lock, adapterName, details == null ? Map.of() : details);
         return listener;
     }

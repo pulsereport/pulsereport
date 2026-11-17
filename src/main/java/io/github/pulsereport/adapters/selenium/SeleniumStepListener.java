@@ -81,10 +81,12 @@ final class SeleniumStepListener implements WebDriverListener {
     private final ThreadLocal<Pending> pending = new ThreadLocal<>();
     // Android or iOS for a native app session, which runs no JavaScript; null for a browser
     private final Platform nativeApp;
+    private final String adapter;
     private volatile Double lastTimeOrigin;
 
-    SeleniumStepListener(WebDriver driver, ReentrantLock driverLock) {
+    SeleniumStepListener(WebDriver driver, ReentrantLock driverLock, String adapter) {
         this.driver = driver;
+        this.adapter = adapter;
         this.driverLock = driverLock;
         this.camera = new SeleniumTracker.Camera(driver, driverLock);
         this.nativeApp = nativeAppPlatform(driver);
@@ -154,7 +156,14 @@ final class SeleniumStepListener implements WebDriverListener {
     }
 
     private Pending prepare(Object target, String name, Object[] args) {
-        boolean detailed = SeleniumTracker.settings().detailed();
+        SeleniumTracker.Settings settings = SeleniumTracker.settings();
+        boolean detailed = settings.detailed();
+        boolean navigation = (target instanceof WebDriver && "get".equals(name))
+                || (target instanceof WebDriver.Navigation && NAVIGATION_ACTIONS.contains(name));
+        if (!settings.autoSteps(adapter)) {
+            // Manual steps only: no step and no extra browser calls per action; page loads still give their metrics
+            return navigation && detailed && settings.pageMetrics() ? new Pending(Kind.NAVIGATION, name, args) : null;
+        }
         if (LOOKUPS.contains(name) && (target instanceof WebDriver || target instanceof WebElement)) {
             Pending p = new Pending(Kind.LOOKUP, name, args);
             p.element = target instanceof WebElement ? (WebElement) target : null;
@@ -167,8 +176,7 @@ final class SeleniumStepListener implements WebDriverListener {
             p.info = detailed ? describe(p.element, "sendKeys".equals(name)) : null;
             return p;
         }
-        if ((target instanceof WebDriver && "get".equals(name))
-                || (target instanceof WebDriver.Navigation && NAVIGATION_ACTIONS.contains(name))) {
+        if (navigation) {
             return new Pending(Kind.NAVIGATION, name, args);
         }
         if (target instanceof WebDriver && "close".equals(name)) {
@@ -303,8 +311,10 @@ final class SeleniumStepListener implements WebDriverListener {
                         details.add(p.detail);
                     }
             }
-            SeleniumTracker.recordAction(name, details.isEmpty() ? null : String.join(" · ", details),
-                    failure, p.startedAt, durationMs, camera);
+            if (SeleniumTracker.settings().autoSteps(adapter)) {
+                SeleniumTracker.recordAction(name, details.isEmpty() ? null : String.join(" · ", details),
+                        failure, p.startedAt, durationMs, camera);
+            }
         } catch (RuntimeException e) {
             logger.debug("Could not record Selenium step for '{}'", method, e);
         }
