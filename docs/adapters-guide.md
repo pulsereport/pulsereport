@@ -313,6 +313,7 @@ inside the report folder.
 | `pulsereport.selenium.failureCapture` | any of `page`, `console`, `source`, or `none` | `page,console,source` |
 | `pulsereport.selenium.pageMetrics` | `true`, `false` | `true` |
 | `pulsereport.selenium.trackScripts` | record `executeScript` calls as steps | `false` |
+| `pulsereport.selenium.autoSteps` | `false`: actions are not steps on their own; only `step(...)`, `waitFor(...)` and failures are | `true` |
 
 See [Configuration](configuration.md) for details. Video frames are captured from the same
 browser session; the adapter serializes them with your test's commands, and recording stops at
@@ -459,6 +460,10 @@ public class MobileTest {
   Selenium video settings).
 - Naming each step costs 3 to 4 extra driver calls. Set
   `pulsereport.selenium.stepDetail=minimal` to name steps by locator only.
+- Set `pulsereport.appium.autoSteps=false` to record only your own
+  `appium.step(...)` and `appium.waitFor(...)` calls. Screenshots, video, the
+  device per test and failure evidence keep working, and taps cost no extra
+  driver calls. (`pulsereport.selenium.autoSteps` does the same for browsers.)
 
 The automatic steps are built for native app contexts. In a `WEBVIEW` context
 elements are still named from their attributes, not from the page.

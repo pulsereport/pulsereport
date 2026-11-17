@@ -27,6 +27,7 @@ import org.openqa.selenium.NoSuchElementException;
 import org.openqa.selenium.TimeoutException;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebDriverException;
+import org.openqa.selenium.support.events.EventFiringDecorator;
 import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.WebDriverWait;
 import org.testng.IInvokedMethod;
@@ -97,6 +98,8 @@ class SeleniumTrackingTest {
     void tearDown() {
         System.clearProperty("pulsereport.output.directory");
         System.clearProperty("pulsereport.screenshots.mode");
+        System.clearProperty("pulsereport.selenium.autoSteps");
+        System.clearProperty("pulsereport.appium.autoSteps");
         System.clearProperty("pulsereport.selenium.maskInputs");
         System.clearProperty("pulsereport.selenium.stepDetail");
         System.clearProperty("pulsereport.screenshots.storage");
@@ -144,7 +147,7 @@ class SeleniumTrackingTest {
     @Test
     void listenerHoldsTheDriverOnlyForTheDurationOfACommand() throws Exception {
         ReentrantLock lock = new ReentrantLock();
-        SeleniumStepListener listener = new SeleniumStepListener(browser, lock);
+        SeleniumStepListener listener = new SeleniumStepListener(browser, lock, SeleniumTracker.ADAPTER_NAME);
         Method getTitle = WebDriver.class.getMethod("getTitle");
 
         listener.beforeAnyCall(browser, getTitle, null);
@@ -369,6 +372,48 @@ class SeleniumTrackingTest {
         assertEquals(List.of("click-button-first.png", "click-button-second.png"), group.getChildren().stream()
                 .flatMap(c -> c.getArtifacts().stream()).map(Artifact::getName).toList());
         assertTrue(group.getArtifacts().isEmpty(), "the actions' screenshots already show the step");
+    }
+
+    @Test
+    void withAutoStepsOffOnlyManualStepsAreRecordedAndEvidenceStays() {
+        System.setProperty("pulsereport.selenium.autoSteps", "false");
+        System.setProperty("pulsereport.screenshots.mode", "all");
+        SeleniumAdapter.resetSettings();
+        browser.element(By.id("login"), "button", "Log in", "");
+        adapter.onTestStart(result);
+        WebDriver driver = adapter.track(browser);
+
+        driver.get("https://example.test/login");
+        adapter.step("Log in", () -> driver.findElement(By.id("login")).click());
+        NoSuchElementException failure = assertThrows(NoSuchElementException.class,
+                () -> driver.findElement(By.id("missing")));
+        adapter.onTestFailure(withFailure(result, failure));
+
+        assertEquals(1, adapter.steps().size(), adapter.steps().toString());
+        TestStep step = adapter.steps().get(0);
+        assertEquals("Log in", step.getName());
+        assertTrue(step.getChildren().isEmpty(), "actions are not steps of their own");
+        assertEquals(List.of("log-in.png"), step.getArtifacts().stream().map(Artifact::getName).toList());
+        assertTrue(adapter.metrics().stream().anyMatch(m -> m.getName().equals("page.load.time")));
+        assertTrue(adapter.artifacts().stream().anyMatch(a -> "failure.png".equals(a.getName())));
+        assertTrue(adapter.artifacts().stream().anyMatch(a -> "page-source".equals(a.getType())));
+    }
+
+    @Test
+    void appiumAutoStepsAreSwitchedOffApartFromSelenium() {
+        System.setProperty("pulsereport.appium.autoSteps", "false");
+        SeleniumAdapter.resetSettings();
+        browser.element(By.id("login"), "button", "Log in", "");
+        adapter.onTestStart(result);
+        // As AppiumAdapter.createDriver does: the device's calls go to the listener trackIntercepted returns
+        WebDriver device = new EventFiringDecorator<WebDriver>(
+                SeleniumTracker.trackIntercepted(browser, "Appium", java.util.Map.of())).decorate(browser);
+
+        device.findElement(By.id("login")).click();
+        adapter.step("Log in", () -> { });
+
+        assertEquals(List.of("Log in"), adapter.steps().stream().map(TestStep::getName).toList());
+        assertTrue(SeleniumTracker.settings().autoSteps("Selenium"), "Selenium keeps its own setting");
     }
 
     @Test

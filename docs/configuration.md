@@ -94,6 +94,8 @@ For drivers wrapped with `SeleniumAdapter.track(...)` or `SeleniumTracker.track(
 | `pulsereport.selenium.failureCapture` | Comma list of `page` (URL, title, window size), `console` (browser console, Chromium-based browsers), `source` (page source), or `none` | `page,console,source` |
 | `pulsereport.selenium.pageMetrics` | Record `page.load.time` and `page.ttfb` for each navigation | `true` |
 | `pulsereport.selenium.trackScripts` | Record `executeScript` calls as steps | `false` |
+| `pulsereport.selenium.autoSteps` | `false`: browser actions are not steps on their own; only `step(...)`, `waitFor(...)` and failures are. Screenshots, video, page metrics and failure evidence still work | `true` |
+| `pulsereport.appium.autoSteps` | The same for drivers made with `AppiumAdapter.createDriver` | `true` |
 
 Field names in `pulsereport.maskBody.fields` are also treated as sensitive input fields and URL parameters.
 
@@ -169,6 +171,7 @@ pulsereport.selenium.maskInputs=sensitive
 pulsereport.selenium.failureCapture=page,console,source
 pulsereport.selenium.pageMetrics=true
 pulsereport.selenium.trackScripts=false
+pulsereport.selenium.autoSteps=true
 ```
 
 See the [Selenium key table](#properties-loaded-by-reporterconfig) above for the values.
@@ -178,6 +181,9 @@ See the [Selenium key table](#properties-loaded-by-reporterconfig) above for the
 ```properties
 # Enable Appium adapter
 pulsereport.appium.enabled=true
+
+# false: taps and typing are not steps on their own; only step(...) and waitFor(...) are
+pulsereport.appium.autoSteps=true
 
 # Screenshot settings
 pulsereport.appium.screenshot.enabled=true

@@ -110,6 +110,7 @@ import io.github.pulsereport.core.model.TestRun;
  * pulsereport.selenium.failureCapture=page,console,source
  * pulsereport.selenium.pageMetrics=true
  * pulsereport.selenium.trackScripts=false
+ * pulsereport.selenium.autoSteps=true               # false: only step(...), waitFor(...) and failures are steps
  * </pre>
  * <p>
  * Set them in {@code pulsereport.properties} or as {@code -D} system properties.</p>
