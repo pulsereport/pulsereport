@@ -1,6 +1,9 @@
 package io.github.pulsereport.adapters.appium;
 
+import org.openqa.selenium.Capabilities;
+
 import java.util.LinkedHashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 
@@ -63,6 +66,84 @@ public final class MobileSessionMetadata {
         putIfPresent(env, "mobile.automationName", automationName);
         putIfPresent(env, "mobile.appiumServerVersion", appiumServerVersion);
         return env;
+    }
+
+    /**
+     * The details shown with each test that ran on this device, labelled for
+     * the report: Device, OS, UDID, App, App version, Automation, Appium server.
+     *
+     * @return label to value, in display order; values that were not set are left out
+     */
+    public Map<String, String> toTestDetails() {
+        Map<String, String> details = new LinkedHashMap<>();
+        putIfPresent(details, "Device", join(deviceName, deviceModel == null ? null : "(" + deviceModel + ")"));
+        putIfPresent(details, "OS", join(platformName(), platformVersion));
+        putIfPresent(details, "UDID", udid);
+        String activity = appActivity != null && appPackage != null && appActivity.startsWith(appPackage + ".")
+                ? appActivity.substring(appPackage.length()) // com.app.ui.Main -> .ui.Main
+                : appActivity;
+        putIfPresent(details, "App", activity == null ? appPackage : join(appPackage, "/ " + activity));
+        putIfPresent(details, "App version", join(appVersion, appBuild == null ? null : "(" + appBuild + ")"));
+        putIfPresent(details, "Automation", automationName);
+        putIfPresent(details, "Appium server", appiumServerVersion);
+        return details;
+    }
+
+    /**
+     * Reads the session details an Appium driver reports in its capabilities.
+     *
+     * <pre>{@code
+     * adapter.recordSessionMetadata(MobileSessionMetadata.fromCapabilities(driver.getCapabilities()));
+     * }</pre>
+     *
+     * @param caps the driver's capabilities
+     * @return the metadata; fields the session did not report are null
+     */
+    public static MobileSessionMetadata fromCapabilities(Capabilities caps) {
+        if (caps == null) {
+            throw new IllegalArgumentException("caps cannot be null");
+        }
+        String appPackage = capability(caps, "appPackage");
+        return builder()
+                .platformName(capability(caps, "platformName"))
+                .platformVersion(capability(caps, "platformVersion"))
+                .deviceName(capability(caps, "deviceName"))
+                .deviceModel(capability(caps, "deviceModel"))
+                .udid(capability(caps, "udid"))
+                .appPackage(appPackage != null ? appPackage : capability(caps, "bundleId"))
+                .appActivity(capability(caps, "appActivity"))
+                .automationName(capability(caps, "automationName"))
+                .build();
+    }
+
+    /** "Android" or "iOS" however the platform was spelled; other names as given. */
+    String platformName() {
+        if (platformName == null) {
+            return null;
+        }
+        switch (platformName.trim().toLowerCase(Locale.ROOT)) {
+            case "android":
+                return "Android";
+            case "ios":
+                return "iOS";
+            default:
+                return platformName.trim();
+        }
+    }
+
+    private static String capability(Capabilities caps, String name) {
+        Object value = caps.getCapability(name);
+        if (value == null) {
+            value = caps.getCapability("appium:" + name);
+        }
+        return value == null || String.valueOf(value).isBlank() ? null : String.valueOf(value);
+    }
+
+    private static String join(String first, String second) {
+        if (first == null || first.isBlank()) {
+            return second;
+        }
+        return second == null || second.isBlank() ? first : first + " " + second;
     }
 
     private static void putIfPresent(Map<String, String> env, String key, String value) {

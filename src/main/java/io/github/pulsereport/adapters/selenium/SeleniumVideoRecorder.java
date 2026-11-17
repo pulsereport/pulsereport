@@ -133,7 +133,7 @@ final class SeleniumVideoRecorder {
         byte[] png;
         try {
             takenAt = System.currentTimeMillis();
-            png = camera.getScreenshotAs(OutputType.BYTES);
+            png = SeleniumTracker.internal(() -> camera.getScreenshotAs(OutputType.BYTES));
         } catch (RuntimeException e) {
             // Browser busy, closed, or between pages: skip this frame
             logger.trace("Video frame skipped", e);

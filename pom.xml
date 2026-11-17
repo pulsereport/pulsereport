@@ -144,7 +144,7 @@
         <dependency>
             <groupId>org.seleniumhq.selenium</groupId>
             <artifactId>selenium-java</artifactId>
-            <version>4.15.0</version>
+            <version>4.51.0</version>
             <optional>true</optional>
         </dependency>
 
@@ -152,7 +152,7 @@
         <dependency>
             <groupId>io.appium</groupId>
             <artifactId>java-client</artifactId>
-            <version>9.0.0</version>
+            <version>10.1.1</version>
             <optional>true</optional>
         </dependency>
 

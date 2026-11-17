@@ -280,7 +280,7 @@ public class AppiumAdapterTest {
     }
 
     @Test
-    public void recordSessionMetadataSurfacesInEnvironment() {
+    public void recordSessionMetadataPutsThePlatformOnTheRunAndTheDeviceOnEachTest() {
         ITestResult mockResult = createMockTestResult("testMeta", ITestResult.SUCCESS);
         ISuite mockSuite = createWiredSuite("MetadataSuite", "Metadata", mockResult);
         ITestContext mockContext = mockResult.getTestContext();
@@ -303,9 +303,14 @@ public class AppiumAdapterTest {
         TestRun testRun = adapter.getTestRun();
         assertNotNull(testRun);
         assertNotNull(testRun.getEnvironment());
+        // The run shows only the platform; the device can differ per test, so it is on the test
         assertEquals("iOS", testRun.getEnvironment().get("mobile.platform"));
-        assertEquals("iPhone 14 Pro", testRun.getEnvironment().get("mobile.deviceName"));
-        assertEquals("3.2.1", testRun.getEnvironment().get("mobile.appVersion"));
+        assertFalse(testRun.getEnvironment().containsKey("mobile.deviceName"));
+        Map<String, String> device = testRun.getSuites().get(0).getTestCases().get(0).getMetadata();
+        assertEquals("iPhone 14 Pro", device.get("Device"));
+        assertEquals("iOS 17.0", device.get("OS"));
+        assertEquals("3.2.1", device.get("App version"));
+        assertEquals("2.4.1", device.get("Appium server"));
     }
 
     @Test

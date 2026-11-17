@@ -3,7 +3,9 @@ package io.github.pulsereport.core.model;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
@@ -41,6 +43,7 @@ public final class TestCase {
     private final List<String> tags;
     private final String adapter;
     private final List<AssertionResult> assertions;
+    private final Map<String, String> metadata;
 
     @JsonCreator
     private TestCase(
@@ -64,7 +67,8 @@ public final class TestCase {
             @JsonProperty("backgroundSteps") List<TestStep> backgroundSteps,
             @JsonProperty("tags") List<String> tags,
             @JsonProperty("adapter") String adapter,
-            @JsonProperty("assertions") List<AssertionResult> assertions) {
+            @JsonProperty("assertions") List<AssertionResult> assertions,
+            @JsonProperty("metadata") Map<String, String> metadata) {
         this.id = id;
         this.name = name;
         this.className = className;
@@ -86,6 +90,7 @@ public final class TestCase {
         this.tags = tags != null ? new ArrayList<>(tags) : new ArrayList<>();
         this.adapter = adapter;
         this.assertions = assertions != null ? new ArrayList<>(assertions) : new ArrayList<>();
+        this.metadata = metadata != null ? new LinkedHashMap<>(metadata) : new LinkedHashMap<>();
     }
 
     /**
@@ -290,6 +295,17 @@ public final class TestCase {
     }
 
     /**
+     * Gets details of where this test ran that can differ from test to test,
+     * such as the device and OS version of a mobile test.
+     *
+     * @return an unmodifiable map of label to value, in display order
+     */
+    @JsonInclude(JsonInclude.Include.NON_EMPTY)
+    public Map<String, String> getMetadata() {
+        return Collections.unmodifiableMap(metadata);
+    }
+
+    /**
      * Creates a builder pre-filled with this test case's values.
      *
      * @return a new builder
@@ -300,7 +316,7 @@ public final class TestCase {
                 .errorMessage(errorMessage).stackTrace(stackTrace).steps(steps).artifacts(artifacts)
                 .metrics(metrics).retryCount(retryCount).bddType(bddType).featureName(featureName)
                 .featureDescription(featureDescription).backgroundSteps(backgroundSteps).tags(tags)
-                .adapter(adapter).assertions(assertions);
+                .adapter(adapter).assertions(assertions).metadata(metadata);
     }
 
     /**
@@ -338,6 +354,7 @@ public final class TestCase {
                 && Objects.equals(backgroundSteps, testCase.backgroundSteps)
                 && Objects.equals(tags, testCase.tags)
                 && Objects.equals(adapter, testCase.adapter)
+                && Objects.equals(metadata, testCase.metadata)
                 && Objects.equals(assertions, testCase.assertions);
     }
 
@@ -350,7 +367,7 @@ public final class TestCase {
     public int hashCode() {
         return Objects.hash(id, name, className, methodName, startTime, endTime,
                 duration, status, errorMessage, stackTrace, steps, artifacts, metrics, retryCount,
-                bddType, featureName, featureDescription, backgroundSteps, tags, adapter, assertions);
+                bddType, featureName, featureDescription, backgroundSteps, tags, adapter, assertions, metadata);
     }
 
     /**
@@ -405,8 +422,20 @@ public final class TestCase {
         private List<String> tags;
         private String adapter;
         private List<AssertionResult> assertions;
+        private Map<String, String> metadata;
 
         private Builder() {
+        }
+
+        /**
+         * Sets details of where this test ran, such as its device.
+         *
+         * @param metadata label to value, in display order (optional)
+         * @return this builder
+         */
+        public Builder metadata(Map<String, String> metadata) {
+            this.metadata = metadata;
+            return this;
         }
 
         /**
@@ -659,7 +688,7 @@ public final class TestCase {
             }
             return new TestCase(id, name, className, methodName, startTime, endTime,
                     duration, status, errorMessage, stackTrace, steps, artifacts, metrics, retryCount,
-                    bddType, featureName, featureDescription, backgroundSteps, tags, adapter, assertions);
+                    bddType, featureName, featureDescription, backgroundSteps, tags, adapter, assertions, metadata);
         }
     }
 }

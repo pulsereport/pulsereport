@@ -13,8 +13,11 @@ import java.util.Set;
 import java.util.concurrent.locks.ReentrantLock;
 
 import org.openqa.selenium.Alert;
+import org.openqa.selenium.Capabilities;
+import org.openqa.selenium.HasCapabilities;
 import org.openqa.selenium.By;
 import org.openqa.selenium.Keys;
+import org.openqa.selenium.Platform;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.WindowType;
@@ -76,12 +79,33 @@ final class SeleniumStepListener implements WebDriverListener {
         }
     });
     private final ThreadLocal<Pending> pending = new ThreadLocal<>();
+    // Android or iOS for a native app session, which runs no JavaScript; null for a browser
+    private final Platform nativeApp;
     private volatile Double lastTimeOrigin;
 
     SeleniumStepListener(WebDriver driver, ReentrantLock driverLock) {
         this.driver = driver;
         this.driverLock = driverLock;
         this.camera = new SeleniumTracker.Camera(driver, driverLock);
+        this.nativeApp = nativeAppPlatform(driver);
+    }
+
+    /** Android or iOS when the driver automates a native app rather than a browser, else null. */
+    static Platform nativeAppPlatform(WebDriver driver) {
+        if (!(driver instanceof HasCapabilities)) {
+            return null;
+        }
+        try {
+            Capabilities caps = ((HasCapabilities) driver).getCapabilities();
+            Platform platform = caps.getPlatformName();
+            boolean noBrowser = caps.getBrowserName() == null || caps.getBrowserName().isBlank();
+            if (noBrowser && platform != null && platform.is(Platform.ANDROID)) {
+                return Platform.ANDROID;
+            }
+            return noBrowser && platform != null && platform.is(Platform.IOS) ? Platform.IOS : null;
+        } catch (RuntimeException e) {
+            return null;
+        }
     }
 
     /** What an element looked like just before the action. */
@@ -109,6 +133,9 @@ final class SeleniumStepListener implements WebDriverListener {
 
     @Override
     public void beforeAnyCall(Object target, Method method, Object[] args) {
+        if (SeleniumTracker.isInternalCall()) {
+            return; // PulseReport's own call through an intercepted driver: no step, and the lock is its caller's
+        }
         // Held until afterAnyCall/onError so recorder screenshots never interleave with this command
         driverLock.lock();
         String name = method.getName();
@@ -137,7 +164,7 @@ final class SeleniumStepListener implements WebDriverListener {
             Pending p = new Pending(Kind.ELEMENT, name, args);
             p.element = (WebElement) target;
             // Read before acting: the element may be stale once the action navigates away
-            p.info = detailed ? describe(p.element) : null;
+            p.info = detailed ? describe(p.element, "sendKeys".equals(name)) : null;
             return p;
         }
         if ((target instanceof WebDriver && "get".equals(name))
@@ -172,8 +199,15 @@ final class SeleniumStepListener implements WebDriverListener {
 
     @Override
     public void afterAnyCall(Object target, Method method, Object[] args, Object result) {
+        if (SeleniumTracker.isInternalCall()) {
+            return; // PulseReport's own call through an intercepted driver: no step, and the lock is its caller's
+        }
         try {
             String name = method.getName();
+            Pending p = pending.get();
+            if (p != null && p.method.equals(name)) {
+                SeleniumTracker.clearFailedLookup(); // a later action worked; housekeeping calls don't count
+            }
             if (LOOKUPS.contains(name)) {
                 clearPending(name);
                 rememberLocator(target, args, result);
@@ -189,6 +223,9 @@ final class SeleniumStepListener implements WebDriverListener {
 
     @Override
     public void onError(Object target, Method method, Object[] args, InvocationTargetException e) {
+        if (SeleniumTracker.isInternalCall()) {
+            return; // PulseReport's own call through an intercepted driver: no step, and the lock is its caller's
+        }
         try {
             String name = method.getName();
             if ("quit".equals(name) && target instanceof WebDriver) {
@@ -275,7 +312,10 @@ final class SeleniumStepListener implements WebDriverListener {
 
     // ------------------------------------------------------------------ element actions
 
-    private ElementInfo describe(WebElement element) {
+    private ElementInfo describe(WebElement element, boolean typing) {
+        if (nativeApp != null) {
+            return describeNative(element, typing);
+        }
         List<?> info = SeleniumTracker.script(camera, DESCRIBE_SCRIPT, unwrap(element));
         if (info.size() != 8) {
             return null;
@@ -285,6 +325,46 @@ final class SeleniumStepListener implements WebDriverListener {
         return new ElementInfo(String.valueOf(info.get(0)), String.valueOf(info.get(1)), String.valueOf(info.get(2)),
                 String.valueOf(info.get(3)), timeOrigin, String.valueOf(info.get(5)), String.valueOf(info.get(6)),
                 String.valueOf(info.get(7)));
+    }
+
+    /**
+     * Describes a native app element from its attributes: one driver call each,
+     * so only what the step name needs. The password check runs only for typing.
+     */
+    private ElementInfo describeNative(WebElement element, boolean typing) {
+        try {
+            boolean android = nativeApp == Platform.ANDROID;
+            // UiAutomator2 answers the tag name with the content description, so Android reads the class
+            String tag = android ? attribute(element, "class") : String.valueOf(element.getTagName());
+            String shortTag = tag.substring(tag.lastIndexOf('.') + 1).replaceFirst("^XCUIElementType", "");
+            String id = attribute(element, android ? "resource-id" : "name");
+            String label = attribute(element, android ? "content-desc" : "label");
+            if (label.isBlank() && android) {
+                label = attribute(element, "text");
+            }
+            if (label.isBlank()) {
+                label = id.substring(id.indexOf('/') + 1); // com.app:id/login -> login
+            }
+            boolean secret = typing && (android ? "true".equals(attribute(element, "password"))
+                    : tag.endsWith("SecureTextField"));
+            return new ElementInfo(shortTag, label, secret ? "password" : "", null, null, "", id, "");
+        } catch (RuntimeException e) {
+            return null;
+        }
+    }
+
+    private static String attribute(WebElement element, String name) {
+        try {
+            String value = element.getAttribute(name);
+            return value == null || "null".equals(value) ? "" : value;
+        } catch (RuntimeException e) {
+            return "";
+        }
+    }
+
+    /** URL, load timing and title of the current page; nothing for a native app. */
+    private List<?> pageState() {
+        return nativeApp != null ? List.of() : SeleniumTracker.script(camera, PAGE_SCRIPT);
     }
 
     private String describeElementAction(Pending p, List<String> details) {
@@ -319,7 +399,7 @@ final class SeleniumStepListener implements WebDriverListener {
     }
 
     private void afterElementAction(Pending p, List<String> details) {
-        List<?> page = SeleniumTracker.script(camera, PAGE_SCRIPT);
+        List<?> page = pageState();
         if (page.size() != 5) {
             return;
         }
@@ -354,7 +434,7 @@ final class SeleniumStepListener implements WebDriverListener {
 
     private void afterNavigation(Pending p, List<String> details) {
         Double before = lastTimeOrigin;
-        List<?> page = SeleniumTracker.script(camera, PAGE_SCRIPT);
+        List<?> page = pageState();
         if (page.size() != 5) {
             return;
         }
@@ -404,7 +484,7 @@ final class SeleniumStepListener implements WebDriverListener {
     }
 
     private void afterWindowSwitch(List<String> details) {
-        List<?> page = SeleniumTracker.script(camera, PAGE_SCRIPT);
+        List<?> page = pageState();
         if (page.size() != 5) {
             return;
         }
@@ -530,7 +610,7 @@ final class SeleniumStepListener implements WebDriverListener {
     private String elementDescription(WebElement element, boolean detailed) {
         String locator = locatorOf(element);
         if (detailed) {
-            ElementInfo info = describe(element);
+            ElementInfo info = describe(element, false);
             if (info != null) {
                 String text = info.tag() + (info.label().isBlank() ? "" : " \"" + truncate(info.label(), MAX_LABEL) + "\"");
                 return locator != null ? text + " (" + locator + ")" : text;

@@ -9,6 +9,7 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Deque;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -289,6 +290,9 @@ public class TestNGAdapter implements Adapter, ITestListener, ISuiteListener, II
     /** Extra tags per test key (e.g. the browser a Selenium test ran in), in insertion order. */
     private static final Map<String, Set<String>> tagsByTest = new ConcurrentHashMap<>();
 
+    /** Details of where each test ran (e.g. its device), by test key, in display order. */
+    private static final Map<String, Map<String, String>> metadataByTest = new ConcurrentHashMap<>();
+
     /** Configuration methods running on this thread, innermost first; null when none. */
     private static final ThreadLocal<Deque<ConfigScope>> configScopes = new ThreadLocal<>();
 
@@ -326,10 +330,12 @@ public class TestNGAdapter implements Adapter, ITestListener, ISuiteListener, II
         final List<Artifact> artifacts = new CopyOnWriteArrayList<>();
         final List<Metric> metrics = new CopyOnWriteArrayList<>();
         final Set<String> tags = Collections.synchronizedSet(new LinkedHashSet<>());
+        final Map<String, String> metadata = Collections.synchronizedMap(new LinkedHashMap<>());
         volatile String adapter;
 
         boolean isEmpty() {
-            return steps.isEmpty() && artifacts.isEmpty() && metrics.isEmpty() && tags.isEmpty() && adapter == null;
+            return steps.isEmpty() && artifacts.isEmpty() && metrics.isEmpty() && tags.isEmpty() && adapter == null
+                    && metadata.isEmpty();
         }
 
         void attachTo(String testKey) {
@@ -341,6 +347,9 @@ public class TestNGAdapter implements Adapter, ITestListener, ISuiteListener, II
             }
             synchronized (tags) {
                 tags.forEach(t -> tagTest(testKey, t));
+            }
+            synchronized (metadata) {
+                metadata.forEach((name, value) -> putTestMetadata(testKey, name, value));
             }
         }
     }
@@ -414,6 +423,17 @@ public class TestNGAdapter implements Adapter, ITestListener, ISuiteListener, II
                 scope.tags.add(tag);
             } else if (key != null) {
                 tagTest(key, tag);
+            }
+        }
+
+        @Override
+        public void addMetadata(String name, String value) {
+            PendingSetup scope = scope();
+            String key = currentTestKey.get();
+            if (scope != null && name != null && value != null) {
+                scope.metadata.put(name, value);
+            } else if (key != null) {
+                putTestMetadata(key, name, value);
             }
         }
     }
@@ -682,6 +702,7 @@ public class TestNGAdapter implements Adapter, ITestListener, ISuiteListener, II
         assertionsByTest.keySet().removeIf(k -> k.startsWith(suitePrefix));
         adapterByTest.keySet().removeIf(k -> k.startsWith(suitePrefix));
         tagsByTest.keySet().removeIf(k -> k.startsWith(suitePrefix));
+        metadataByTest.keySet().removeIf(k -> k.startsWith(suitePrefix));
         keysByMethodName.values().forEach(set -> set.removeIf(k -> k.startsWith(suitePrefix)));
         keysByMethodName.entrySet().removeIf(e -> e.getValue().isEmpty());
         logger.debug("Cleared artifact, metric, and step entries for suite: {}", suite.getName());
@@ -1192,6 +1213,47 @@ public class TestNGAdapter implements Adapter, ITestListener, ISuiteListener, II
     }
 
     /**
+     * Records a detail of where a test ran, such as its device, shown with the test.
+     *
+     * @param testKey the test key
+     * @param name the label, e.g. "Device"
+     * @param value the value
+     */
+    protected static void putTestMetadata(String testKey, String name, String value) {
+        if (testKey != null && name != null && !name.isBlank() && value != null && !value.isBlank()) {
+            metadataByTest.computeIfAbsent(testKey, k -> Collections.synchronizedMap(new LinkedHashMap<>()))
+                    .put(name, value);
+        }
+    }
+
+    /**
+     * Forgets the details recorded for a test, before a new device replaces them.
+     *
+     * @param testKey the test key (ignored when null)
+     */
+    protected static void clearTestMetadata(String testKey) {
+        if (testKey != null) {
+            metadataByTest.remove(testKey);
+        }
+    }
+
+    /**
+     * Details recorded so far for a test (for subclasses and tests).
+     *
+     * @param testKey the test key
+     * @return a copy, empty when none
+     */
+    protected static Map<String, String> recordedMetadata(String testKey) {
+        Map<String, String> metadata = metadataByTest.get(testKey);
+        if (metadata == null) {
+            return Map.of();
+        }
+        synchronized (metadata) {
+            return new LinkedHashMap<>(metadata);
+        }
+    }
+
+    /**
      * Steps recorded so far for a test (for subclasses and tests).
      *
      * @param testKey the test key
@@ -1251,7 +1313,8 @@ public class TestNGAdapter implements Adapter, ITestListener, ISuiteListener, II
 
     /** Applies the adapter names, extra tags and test-level assertions recorded per test key. */
     private static TestRun applyTestLabels(TestRun run) {
-        if (run == null || (adapterByTest.isEmpty() && tagsByTest.isEmpty() && assertionsByTest.isEmpty())) {
+        if (run == null || (adapterByTest.isEmpty() && tagsByTest.isEmpty() && assertionsByTest.isEmpty()
+                && metadataByTest.isEmpty())) {
             return run;
         }
         boolean changed = false;
@@ -1262,7 +1325,9 @@ public class TestNGAdapter implements Adapter, ITestListener, ISuiteListener, II
                 String adapter = adapterByTest.get(tc.getId());
                 Set<String> extra = tagsByTest.get(tc.getId());
                 List<AssertionResult> assertions = assertionsByTest.get(tc.getId());
-                if (adapter == null && (extra == null || extra.isEmpty()) && (assertions == null || assertions.isEmpty())) {
+                Map<String, String> metadata = recordedMetadata(tc.getId());
+                if (adapter == null && (extra == null || extra.isEmpty()) && (assertions == null || assertions.isEmpty())
+                        && metadata.isEmpty()) {
                     cases.add(tc);
                     continue;
                 }
@@ -1274,6 +1339,11 @@ public class TestNGAdapter implements Adapter, ITestListener, ISuiteListener, II
                 }
                 TestCase.Builder updated = tc.toBuilder().adapter(adapter != null ? adapter : tc.getAdapter())
                         .tags(new ArrayList<>(tags));
+                if (!metadata.isEmpty()) {
+                    Map<String, String> all = new LinkedHashMap<>(tc.getMetadata());
+                    all.putAll(metadata);
+                    updated.metadata(all);
+                }
                 if (assertions != null && !assertions.isEmpty()) {
                     List<AssertionResult> all = new ArrayList<>(tc.getAssertions());
                     all.addAll(assertions);
