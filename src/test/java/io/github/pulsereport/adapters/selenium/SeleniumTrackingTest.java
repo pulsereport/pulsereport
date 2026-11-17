@@ -336,6 +336,77 @@ class SeleniumTrackingTest {
     }
 
     @Test
+    void aLookupFollowedByASuccessfulActionDoesNotExplainALaterTimeout() {
+        adapter.onTestStart(result);
+        WebDriver driver = adapter.track(browser);
+
+        assertThrows(NoSuchElementException.class, () -> driver.findElement(By.id("cookie-banner")));
+        driver.get("https://example.test/home");
+        TimeoutException failure = assertThrows(TimeoutException.class,
+                () -> new WebDriverWait(driver, Duration.ofMillis(50)).until(d -> false));
+        adapter.onTestFailure(withFailure(result, failure));
+
+        assertTrue(adapter.steps().stream().noneMatch(s -> s.getName().contains("cookie-banner")),
+                adapter.steps().toString());
+    }
+
+    @Test
+    void everyActionInAStepGetsItsOwnScreenshot() {
+        System.setProperty("pulsereport.screenshots.mode", "all");
+        SeleniumAdapter.resetSettings();
+        browser.element(By.id("first"), "button", "First", "");
+        browser.element(By.id("second"), "button", "Second", "");
+        adapter.onTestStart(result);
+        WebDriver driver = adapter.track(browser);
+
+        adapter.step("Press both", () -> {
+            driver.findElement(By.id("first")).click();
+            driver.findElement(By.id("second")).click();
+        });
+        adapter.onTestSuccess(result);
+
+        TestStep group = adapter.steps().get(0);
+        assertEquals(List.of("click-button-first.png", "click-button-second.png"), group.getChildren().stream()
+                .flatMap(c -> c.getArtifacts().stream()).map(Artifact::getName).toList());
+        assertTrue(group.getArtifacts().isEmpty(), "the actions' screenshots already show the step");
+    }
+
+    @Test
+    void anInterceptedDriverReportingPulseReportsOwnCallLeavesItsLockAlone() throws Exception {
+        adapter.onTestStart(result);
+        org.openqa.selenium.support.events.WebDriverListener listener =
+                SeleniumTracker.trackIntercepted(browser, "Appium", java.util.Map.of());
+        java.util.concurrent.locks.ReentrantLock lock = SeleniumTracker.active().lock();
+        java.lang.reflect.Method screenshot = org.openqa.selenium.TakesScreenshot.class
+                .getMethod("getScreenshotAs", org.openqa.selenium.OutputType.class);
+
+        // As the video recorder does: hold the lock and take a frame, which the intercepted driver reports
+        lock.lock();
+        try {
+            SeleniumTracker.internal(() -> {
+                Object[] args = {org.openqa.selenium.OutputType.BYTES};
+                listener.beforeAnyCall(browser, screenshot, args);
+                listener.afterAnyCall(browser, screenshot, args, new byte[0]);
+                return null;
+            });
+            assertTrue(lock.isHeldByCurrentThread(), "the recorder still holds its lock");
+        } finally {
+            lock.unlock();
+        }
+        assertTrue(adapter.steps().isEmpty(), "PulseReport's own calls are no steps");
+    }
+
+    @Test
+    void screenshotsAreNamedAfterTheirStep() {
+        assertEquals("click-button-log-in.png", SeleniumTracker.shotName("Click Button \"Log in\"", ""));
+        assertEquals("type-into-edittext-pin-failure.png",
+                SeleniumTracker.shotName("Type \"••••••\" into EditText \"pin\"", "-failure"));
+        assertEquals("open-https-www-example-test-a-very-long-path-that-goes-on.png",
+                SeleniumTracker.shotName("Open \"https://www.example.test/a/very/long/path/that/goes/on/and/on\"", ""));
+        assertEquals("step.png", SeleniumTracker.shotName("••••", ""));
+    }
+
+    @Test
     void waitForRecordsAStep() {
         browser.element(By.id("dashboard"), "div", "Dashboard", "");
         adapter.onTestStart(result);

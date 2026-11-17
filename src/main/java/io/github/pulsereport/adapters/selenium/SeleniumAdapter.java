@@ -424,6 +424,7 @@ public class SeleniumAdapter extends TestNGAdapter {
     @Override
     public void onTestStart(ITestResult result) {
         super.onTestStart(result);
+        markTestAdapter(getCurrentTestKey(), SeleniumTracker.ADAPTER_NAME);
         SeleniumTracker.resetThreadState();
         // A test whose finish event never arrived must not leave its recorder running
         releaseCapture(testCapture.get());

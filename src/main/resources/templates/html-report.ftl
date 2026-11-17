@@ -1728,12 +1728,24 @@
             outline: none;
         }
 
+        /* Left-aligned with the rest of the test; a narrow phone screenshot would float mid-page if centred */
         .car-stage,
         .car-head {
             display: grid;
-            grid-template-columns: minmax(36px, 1fr) var(--shot-w, minmax(0, 1fr)) minmax(36px, 1fr);
+            grid-template-columns: 36px var(--shot-w, minmax(0, 1fr)) minmax(36px, 1fr);
             align-items: center;
             gap: 10px;
+        }
+
+        .carousel.is-single:not(.is-expanded) .car-stage,
+        .carousel.is-single:not(.is-expanded) .car-head {
+            grid-template-columns: 0 var(--shot-w, minmax(0, 1fr)) minmax(0, 1fr);
+            column-gap: 0;
+        }
+
+        .carousel.is-expanded .car-stage,
+        .carousel.is-expanded .car-head {
+            grid-template-columns: minmax(36px, 1fr) var(--shot-w, minmax(0, 1fr)) minmax(36px, 1fr);
         }
 
         .car-head .car-meta {
@@ -1743,7 +1755,16 @@
         .car-thumbs {
             width: var(--shot-w, auto);
             max-width: 100%;
+            margin: 0 0 0 46px;
+        }
+
+        .carousel.is-expanded .car-thumbs {
             margin: 0 auto;
+        }
+
+        /* Under the image and as wide as it; more thumbnails scroll */
+        .carousel:not(.is-expanded) .car-thumbs {
+            max-width: calc(100% - 46px);
         }
 
         .side-btn.prev {
@@ -1758,6 +1779,12 @@
             width: 28px;
             height: 28px;
             margin: -4px -2px -4px 0;
+        }
+
+        /* Close stays at the right edge, however short the name */
+        .car-meta .side-btn.close {
+            flex: none;
+            margin-left: auto;
         }
 
         .car-meta .ghost {
@@ -1865,22 +1892,20 @@
             font-size: 12.5px;
         }
 
-        .car-count,
-        .car-file {
+        .car-count {
             flex: none;
             font: 11.5px var(--font-mono);
             color: var(--ink-muted);
         }
 
+        /* Up to two lines within the image's width; the full name and the file name are in its tooltip */
         .car-cap {
+            display: -webkit-box;
             min-width: 0;
             overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
-
-        .car-file {
-            margin-left: auto;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow-wrap: anywhere;
         }
 
         .car-meta .ghost.goto {
@@ -1978,9 +2003,10 @@
             grid-column: 3;
         }
 
+        /* The count stays centred on a step name that wraps to two lines */
         .car-live {
             display: flex;
-            align-items: baseline;
+            align-items: center;
             gap: 12px;
             min-width: 0;
         }
@@ -2622,8 +2648,7 @@
         }
 
         /* Expanded viewer sits directly on the dark backdrop in both themes */
-        .is-expanded .car-count,
-        .is-expanded .car-file {
+        .is-expanded .car-count {
             color: rgb(255 255 255 / 0.6);
         }
 
@@ -3643,12 +3668,35 @@
                 $('#chips').append(...chipEls);
             }
 
-            // Rows are built when a suite is first opened, so runs with thousands of tests load quickly
+            // Tests are listed by class (a TestNG suite is often just "Surefire test"); Cucumber
+            // scenarios by their feature, which is their suite
+            const groupName = (tc, suite) =>
+                tc.className && !tc.bddType ? tc.className.split('.').pop() : suite.name || suite.secondaryText || 'Unnamed suite';
+
+            function treeGroups() {
+                const byKey = new Map();
+                for (const suite of RUN.suites || []) {
+                    for (const tc of suite.testCases || []) {
+                        const key = tc.className && !tc.bddType ? `class:${tc.className}` : suite;
+                        let g = byKey.get(key);
+                        if (!g) {
+                            const tip = typeof key === 'string'
+                                ? tc.className
+                                : (suite.secondaryText || suite.name || '') + (suite.tags && suite.tags.length ? '\n' + suite.tags.join(' ') : '');
+                            g = { name: groupName(tc, suite), tip, cases: [] };
+                            byKey.set(key, g);
+                        }
+                        g.cases.push(tc);
+                    }
+                }
+                return [...byKey.values()];
+            }
+
+            // Rows are built when a group is first opened, so runs with thousands of tests load quickly
             function renderTree() {
                 const nodes = [];
-                for (const suite of RUN.suites || []) {
-                    const cases = suite.testCases || [];
-                    if (!cases.length) continue;
+                for (const group of treeGroups()) {
+                    const cases = group.cases;
                     const failed = cases.filter(c => c.status === 'FAILED').length;
                     const ul = h('ul', { class: 'items' });
                     const det = h(
@@ -3656,11 +3704,8 @@
                         { class: 'group dz' },
                         h(
                             'summary',
-                            {
-                                'data-tip': (suite.secondaryText || suite.name || '')
-                                    + (suite.tags && suite.tags.length ? '\n' + suite.tags.join(' ') : '')
-                            },
-                            h('span', { class: 'gname' }, suite.name || suite.secondaryText || 'Unnamed suite'),
+                            { 'data-tip': group.tip },
+                            h('span', { class: 'gname' }, group.name),
                             failed
                                 ? h('span', { class: 'gbadge' }, `${failed} failed`)
                                 : h('span', { class: 'gcount' }, String(cases.length))
@@ -4812,7 +4857,6 @@
                 const fail = h('span', { class: 'shot-fail', hidden: true }, 'Failure');
                 const cap = h('span', { class: 'car-cap', id: expanded ? 'lb-cap' : null });
                 const live = h('span', { class: 'car-live', 'aria-live': 'polite' }, count, fail, cap);
-                const file = h('span', { class: 'car-file' });
                 const goStep = h(
                     'button',
                     {
@@ -4850,14 +4894,14 @@
                 const root = h(
                     'div',
                     {
-                        class: `carousel${expanded ? ' is-expanded' : ''}`,
+                        class: `carousel${expanded ? ' is-expanded' : ''}${many ? '' : ' is-single'}`,
                         role: 'group',
                         'aria-roledescription': 'carousel',
                         'aria-label': 'Screenshots',
                         tabindex: '-1'
                     },
                     // Caption row on top (with close when expanded), aligned to the image and arrow columns
-                    h('div', { class: 'car-head' }, h('div', { class: 'car-meta' }, live, goStep, file, close)),
+                    h('div', { class: 'car-head' }, h('div', { class: 'car-meta' }, live, goStep, close)),
                     stage,
                     strip
                 );
@@ -5016,8 +5060,8 @@
                     if (!expanded) view.setAttribute('aria-label', `Open screenshot ${idx + 1} of ${items.length} full size`);
                     count.textContent = many ? `${idx + 1} / ${items.length}` : '';
                     fail.hidden = !it.failed;
-                    cap.textContent = it.step || 'Test';
-                    file.textContent = it.name;
+                    cap.textContent = it.step || it.name || 'Test';
+                    cap.setAttribute('data-tip', [it.step, it.name].filter(Boolean).join(' · '));
                     goStep.hidden = !it.stepRef;
                     thumbs.forEach((t, j) => {
                         t.tabIndex = j === idx ? 0 : -1;
@@ -5610,6 +5654,8 @@
                 if (tc.bddType) rows.push(['Feature', tc.featureName || suite.name], ['Type', tc.bddType.replace(/_/g, ' ')]);
                 if (tc.className) rows.push(['Class', tc.className]);
                 if (tc.methodName) rows.push(['Method', tc.methodName]);
+                // Where this test ran, e.g. a mobile test's device and OS version
+                for (const [k, v] of Object.entries(tc.metadata || {})) rows.push([k, v]);
                 if (tc.startTime) rows.push(['Started', new Date(tc.startTime).toLocaleString()]);
                 rows.push(['Duration', fmtDur(tc.duration)]);
                 if (tc.retryCount) rows.push(['Retries', String(tc.retryCount)]);
@@ -5726,7 +5772,7 @@
                                         'button',
                                         { type: 'button', class: 'item', onclick: () => select(t.tc.id, { reveal: true }) },
                                         glyph(t.tc.status),
-                                        h('span', { class: 'name' }, t.tc.name, h('span', { class: 'suite' }, t.suite.name)),
+                                        h('span', { class: 'name' }, t.tc.name, h('span', { class: 'suite' }, groupName(t.tc, t.suite))),
                                         h('span', { class: 'dur' }, fmtDur(t.tc.duration))
                                     )
                                 )
@@ -5770,7 +5816,7 @@
                 closeLightbox();
             });
             // The dialog box is wider than the screenshot, so its empty areas behave like the backdrop
-            const isEmptySpace = t => !t.closest('img, button, .car-live, .car-file');
+            const isEmptySpace = t => !t.closest('img, button, .car-live');
             let downOnEmpty = false;
             lightbox.addEventListener('pointerdown', e => {
                 downOnEmpty = isEmptySpace(e.target);

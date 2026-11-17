@@ -44,7 +44,7 @@ open target/pulsereport/test-report.html
 | `RestAssuredAdapter` | API tests | Request/response bodies, headers (masked by default), status codes | Stable |
 | `TestNGAdapter` | Core test execution | Pass/fail/skip, duration, parameters, exceptions | In development |
 | `SeleniumAdapter` | Web UI tests | Screenshots on pass/failure, page load metrics | In development |
-| `AppiumAdapter` | Mobile tests | Screenshots, device info, session details | In development |
+| `AppiumAdapter` | Mobile tests | Automatic steps, screenshots, video, device info, session details | In development |
 
 > **Note:** Adapters marked *In development* may not behave as expected. Cucumber and REST-assured integrations are fully tested and production-ready.
 

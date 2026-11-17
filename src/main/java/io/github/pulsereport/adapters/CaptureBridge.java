@@ -83,6 +83,16 @@ public final class CaptureBridge {
         }
 
         /**
+         * Records a detail of where the running test ran, such as its device
+         * (e.g. "Device" = "Pixel 8"), shown with the test. Optional.
+         *
+         * @param name the label
+         * @param value the value
+         */
+        default void addMetadata(String name, String value) {
+        }
+
+        /**
          * Whether a call made by a tool (e.g. a REST Assured request) should be
          * recorded as a step of its own, so the checks made on its response can be
          * listed with it. A Cucumber step already names the action, so there the

@@ -512,8 +512,9 @@ class HtmlReportGeneratorTest {
     void treeTooltipIncludesSuiteTags() throws IOException {
         String html = generateHtml(createSampleTestRun());
 
-        int tree = html.indexOf("class: 'group dz'");
-        assertTrue(tree >= 0, "Tree should render suite groups");
+        assertTrue(html.indexOf("class: 'group dz'") >= 0, "Tree should render groups");
+        int tree = html.indexOf("function treeGroups()");
+        assertTrue(tree >= 0, "Tree should build its groups");
         int marker = html.indexOf("suite.secondaryText || suite.name || ''", tree);
         assertTrue(marker >= 0, "Tree summary should keep its data-tip tooltip");
         String construction = html.substring(marker, Math.min(marker + 200, html.length()));

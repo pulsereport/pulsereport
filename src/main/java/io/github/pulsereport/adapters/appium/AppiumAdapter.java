@@ -1,11 +1,13 @@
 package io.github.pulsereport.adapters.appium;
 
-import io.github.pulsereport.adapters.testng.TestNGAdapter;
+import io.github.pulsereport.adapters.selenium.SeleniumAdapter;
+import io.github.pulsereport.adapters.selenium.SeleniumTracker;
 import io.github.pulsereport.core.model.Artifact;
 import io.github.pulsereport.core.model.Metric;
 import io.github.pulsereport.core.model.TestRun;
 import io.github.pulsereport.core.model.TestStatus;
 import io.github.pulsereport.core.model.TestStep;
+import org.openqa.selenium.HasCapabilities;
 import org.openqa.selenium.OutputType;
 import org.openqa.selenium.TakesScreenshot;
 import org.openqa.selenium.WebDriver;
@@ -17,6 +19,7 @@ import java.time.Instant;
 import java.util.Base64;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -63,6 +66,17 @@ import java.util.concurrent.ConcurrentHashMap;
  * }
  * }</pre>
  *
+ * <h2>Automatic steps</h2>
+ * <p>Create the driver through {@link #createDriver} and every tap, typed text,
+ * gesture and lookup made through it is recorded as a step, the same way
+ * {@link SeleniumAdapter} records browser actions: failed steps get a
+ * screenshot, {@code step(...)} and {@code waitFor(...)} group or name them,
+ * and checks made inside a step are listed with it. Needs java-client 10 or
+ * newer.</p>
+ * <pre>{@code
+ * AndroidDriver driver = appium.createDriver(AndroidDriver.class, new URL("http://localhost:4723"), options);
+ * }</pre>
+ *
  * <h2>Manual capture</h2>
  * <p>All capture methods remain available for explicit, on-demand use. The
  * adapter doesn't require the driver to be registered — you can still extract
@@ -70,10 +84,16 @@ import java.util.concurrent.ConcurrentHashMap;
  *
  * @author Pulse Report Team
  * @since 1.0.0
- * @see TestNGAdapter
+ * @see SeleniumAdapter
  * @see MobileDriverHolder
  */
-public class AppiumAdapter extends TestNGAdapter {
+public class AppiumAdapter extends SeleniumAdapter {
+
+    /** The adapter name each mobile test is labelled with in the report. */
+    static final String ADAPTER_NAME = "Appium";
+
+    /** The device this thread's tests run on, from {@link #recordSessionMetadata}. */
+    private static final ThreadLocal<Map<String, String>> threadDevice = new ThreadLocal<>();
 
     private static final Logger logger = LoggerFactory.getLogger(AppiumAdapter.class);
 
@@ -107,6 +127,46 @@ public class AppiumAdapter extends TestNGAdapter {
     // ------------------------------------------------------------------
     // Steps
     // ------------------------------------------------------------------
+
+    /**
+     * Creates an Appium driver whose actions are recorded as steps. It is a real
+     * instance of {@code driverClass}, so Appium-specific methods work as usual;
+     * pass the arguments of the constructor you would otherwise call. Needs
+     * Appium java-client 10 or newer.
+     *
+     * <pre>{@code
+     * AndroidDriver driver = appium.createDriver(AndroidDriver.class, url, options);
+     * IOSDriver driver = appium.createDriver(IOSDriver.class, url, options);
+     * }</pre>
+     *
+     * @param driverClass the driver class, e.g. {@code AndroidDriver.class}
+     * @param constructorArgs the arguments for one of its public constructors
+     * @param <T> the driver type
+     * @return the new, tracked driver
+     * @throws IllegalArgumentException if no single public constructor takes these arguments
+     */
+    public <T extends WebDriver> T createDriver(Class<T> driverClass, Object... constructorArgs) {
+        // The tracked driver now says where this thread's tests run, replacing any earlier device
+        threadDevice.remove();
+        clearTestMetadata(getCurrentTestKey());
+        T driver = AppiumStepReporter.createDriver(driverClass, constructorArgs);
+        if (driver instanceof HasCapabilities) {
+            recordPlatform(MobileSessionMetadata.fromCapabilities(((HasCapabilities) driver).getCapabilities()));
+        }
+        return driver;
+    }
+
+    /** Labels every test that runs under this adapter as an Appium test. */
+    @Override
+    public void onTestStart(ITestResult result) {
+        super.onTestStart(result);
+        String testKey = getCurrentTestKey();
+        markTestAdapter(testKey, ADAPTER_NAME);
+        Map<String, String> device = threadDevice.get();
+        if (device != null) {
+            device.forEach((name, value) -> putTestMetadata(testKey, name, value));
+        }
+    }
 
     /**
      * Records a completed mobile step (e.g. "tap login button") with a
@@ -463,10 +523,28 @@ public class AppiumAdapter extends TestNGAdapter {
         if (metadata == null) {
             throw new IllegalArgumentException("Metadata cannot be null");
         }
-        String suiteKey = currentSuiteKey();
-        sessionMetadataBySuite.computeIfAbsent(suiteKey, k -> Collections.synchronizedMap(new LinkedHashMap<>()))
-                .putAll(metadata.toEnvironmentMap());
-        logger.debug("Recorded mobile session metadata for suite '{}': {}", suiteKey, metadata);
+        recordPlatform(metadata);
+        // Device, OS version and app can differ per test, so they go on each test this thread runs
+        // from now on (and the running one); only the platform goes on the run
+        Map<String, String> details = metadata.toTestDetails();
+        threadDevice.set(details);
+        String testKey = getCurrentTestKey();
+        if (testKey != null) {
+            clearTestMetadata(testKey);
+            details.forEach((name, value) -> putTestMetadata(testKey, name, value));
+        }
+        logger.debug("Recorded mobile session metadata: {}", metadata);
+    }
+
+    /** The run shows only which platforms its tests ran on: "Android", "iOS" or "Android, iOS". */
+    private void recordPlatform(MobileSessionMetadata metadata) {
+        String platform = metadata.platformName();
+        if (platform == null) {
+            return;
+        }
+        sessionMetadataBySuite.computeIfAbsent(currentSuiteKey(), k -> Collections.synchronizedMap(new LinkedHashMap<>()))
+                .merge("mobile.platform", platform,
+                        (seen, added) -> List.of(seen.split(", ")).contains(added) ? seen : seen + ", " + added);
     }
 
     /**
@@ -507,6 +585,7 @@ public class AppiumAdapter extends TestNGAdapter {
      */
     @Override
     protected TestRun enrichTestRun(TestRun builtTestRun) {
+        builtTestRun = super.enrichTestRun(builtTestRun);
         if (builtTestRun == null) {
             return builtTestRun;
         }
@@ -657,7 +736,9 @@ public class AppiumAdapter extends TestNGAdapter {
      */
     @Override
     public void onTestFailure(ITestResult result) {
-        captureAutomaticFailureArtifacts(result.getName());
+        if (SeleniumTracker.driver() == null) { // a tracked driver gets its failure evidence from SeleniumAdapter
+            captureAutomaticFailureArtifacts(result.getName());
+        }
         super.onTestFailure(result);
     }
 

@@ -40,6 +40,7 @@ import org.openqa.selenium.logging.LogEntry;
 import org.openqa.selenium.logging.LogType;
 import org.openqa.selenium.remote.RemoteWebDriver;
 import org.openqa.selenium.support.events.EventFiringDecorator;
+import org.openqa.selenium.support.events.WebDriverListener;
 import org.openqa.selenium.support.ui.WebDriverWait;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -174,7 +175,9 @@ public final class SeleniumTracker {
     }
 
     /** The driver tracked on a thread. */
-    record Tracked(WebDriver raw, WebDriver decorated, ReentrantLock lock, BrowserInfo browser) {
+    /** A tracked driver; adapter and details label each test that uses it, e.g. "Appium" and its device. */
+    record Tracked(WebDriver raw, WebDriver decorated, ReentrantLock lock, BrowserInfo browser, String adapter,
+            Map<String, String> details) {
         Camera camera() {
             return new Camera(raw, lock);
         }
@@ -258,6 +261,8 @@ public final class SeleniumTracker {
     private static final ThreadLocal<Tracked> tracked = new ThreadLocal<>();
     private static final ThreadLocal<Deque<StepScope>> openSteps = new ThreadLocal<>();
     private static final ThreadLocal<FailedLookup> failedLookup = new ThreadLocal<>();
+    // PulseReport's own driver calls on this thread: screenshots, page reads, video frames
+    private static final ThreadLocal<Integer> internalCalls = ThreadLocal.withInitial(() -> 0);
     // Failures a screenshot was already taken for, so outer steps and the test don't take another
     private static final ThreadLocal<Deque<Throwable>> evidenced = new ThreadLocal<>();
     private static final ThreadLocal<Throwable> lastHandledFailure = new ThreadLocal<>();
@@ -292,10 +297,39 @@ public final class SeleniumTracker {
             return current.decorated();
         }
         ReentrantLock lock = new ReentrantLock();
-        BrowserInfo browser = detectBrowser(driver);
         WebDriver decorated = new EventFiringDecorator<WebDriver>(new SeleniumStepListener(driver, lock))
                 .decorate(driver);
-        Tracked t = new Tracked(driver, decorated, lock, browser);
+        register(driver, decorated, lock, ADAPTER_NAME, Map.of());
+        return decorated;
+    }
+
+    /**
+     * Tracks a driver whose own calls are already intercepted, such as an Appium
+     * proxy driver, and returns the listener to report each call to. The driver
+     * itself is used for screenshots and page reads, so calls made while a
+     * reported call is in progress must not be reported again. Used by
+     * {@code AppiumAdapter.createDriver}; test code calls {@link #track} instead.
+     *
+     * @param driver the intercepted driver
+     * @param adapterName the adapter each test that uses it is labelled with, e.g. "Appium"
+     * @param details where it runs (e.g. "Device" = "Pixel 8"), shown with each test that uses it
+     * @return the listener that turns its calls into steps
+     */
+    public static WebDriverListener trackIntercepted(WebDriver driver, String adapterName,
+            Map<String, String> details) {
+        if (driver == null) {
+            throw new IllegalArgumentException("driver cannot be null");
+        }
+        ReentrantLock lock = new ReentrantLock();
+        SeleniumStepListener listener = new SeleniumStepListener(driver, lock);
+        register(driver, driver, lock, adapterName, details == null ? Map.of() : details);
+        return listener;
+    }
+
+    private static void register(WebDriver raw, WebDriver decorated, ReentrantLock lock, String adapter,
+            Map<String, String> details) {
+        Tracked t = new Tracked(raw, decorated, lock, detectBrowser(raw), adapter,
+                Collections.unmodifiableMap(new LinkedHashMap<>(details)));
         tracked.set(t);
         CaptureBridge.Sink sink = CaptureBridge.current();
         if (sink != null) {
@@ -303,9 +337,8 @@ public final class SeleniumTracker {
         }
         Hooks h = hooks;
         if (h != null) {
-            h.onTrack(driver);
+            h.onTrack(raw);
         }
-        return decorated;
     }
 
     /**
@@ -565,10 +598,14 @@ public final class SeleniumTracker {
 
     /** Marks the sink's test as a Selenium test and tags it with the browser. */
     static void label(CaptureBridge.Sink sink, Tracked t) {
-        sink.markAdapter(ADAPTER_NAME);
-        if (t != null && t.browser() != null) {
+        if (t == null) {
+            return; // no driver: the adapter running the test names it (e.g. a manual step in an Appium test)
+        }
+        sink.markAdapter(t.adapter() != null ? t.adapter() : ADAPTER_NAME);
+        if (t.browser() != null) {
             sink.addTag(t.browser().label());
         }
+        t.details().forEach(sink::addMetadata);
     }
 
     // ------------------------------------------------------------------ recording
@@ -587,11 +624,18 @@ public final class SeleniumTracker {
         if (failure != null) {
             withError(step, failure);
             if (screenshotsEnabled()) {
-                Artifact shot = screenshot(camera, "step-failure.png");
+                Artifact shot = screenshot(camera, shotName(name, "-failure"));
                 if (shot != null) {
                     artifacts.add(shot);
                     markEvidenced(failure);
                 }
+            }
+        }
+        // Every action gets its own screenshot, also when a step(...) groups it
+        if (failure == null && MODE_ALL.equals(settings().screenshots())) {
+            Artifact shot = screenshot(camera, shotName(name, ""));
+            if (shot != null) {
+                artifacts.add(shot);
             }
         }
         StepScope scope = peekScope();
@@ -605,6 +649,11 @@ public final class SeleniumTracker {
     /** Remembers a lookup that failed, to explain the test failure it may cause. */
     static void rememberFailedLookup(String locator, Throwable error, Instant startedAt, long durationMs) {
         failedLookup.set(new FailedLookup(locator, error, startedAt, durationMs));
+    }
+
+    /** Forgets the failed lookup: a later driver call succeeded, so it did not cause what fails next. */
+    static void clearFailedLookup() {
+        failedLookup.remove();
     }
 
     /** Records page load timing for a navigation that loaded a new document. */
@@ -679,7 +728,7 @@ public final class SeleniumTracker {
             step.assertions(checks);
         }
         if (failure != null && !isEvidenced(failure) && screenshotsEnabled()) {
-            Artifact shot = screenshot(camera, "step-failure.png");
+            Artifact shot = screenshot(camera, shotName(step.build().getName(), "-failure"));
             if (shot != null) {
                 artifacts.add(shot);
                 markEvidenced(failure);
@@ -700,8 +749,10 @@ public final class SeleniumTracker {
             logger.debug("PulseReport: no test is running on this thread; step not recorded");
             return;
         }
-        if (passed && MODE_ALL.equals(settings().screenshots()) && artifacts.stream().noneMatch(SeleniumTracker::isImage)) {
-            Artifact shot = screenshot(camera, "step.png");
+        // A step without a screenshot of its own or of an action in it (e.g. a manual step) gets one
+        TestStep built = step.artifacts(artifacts).build();
+        if (passed && MODE_ALL.equals(settings().screenshots()) && !hasImage(built)) {
+            Artifact shot = screenshot(camera, shotName(built.getName(), ""));
             if (shot != null) {
                 artifacts.add(shot);
             }
@@ -762,8 +813,9 @@ public final class SeleniumTracker {
             return null;
         }
         Throwable timeout = firstInChain(failure, TimeoutException.class);
+        String name = (timeout != null ? "Wait for " : "Find element ") + lookup.locator();
         TestStep.Builder step = TestStep.builder()
-                .name((timeout != null ? "Wait for " : "Find element ") + lookup.locator())
+                .name(name)
                 .status(TestStatus.FAILED)
                 .startTime(lookup.startedAt())
                 .endTime(lookup.startedAt().plusMillis(lookup.durationMs()))
@@ -772,7 +824,7 @@ public final class SeleniumTracker {
         step.errorMessage(messageOf(explained));
         List<Artifact> artifacts = new ArrayList<>();
         if (!isEvidenced(failure) && screenshotsEnabled()) {
-            Artifact shot = screenshot(camera, "failure.png");
+            Artifact shot = screenshot(camera, shotName(name, "-failure"));
             Hooks h = hooks;
             if (shot == null && h != null) {
                 shot = h.fallbackScreenshot();
@@ -787,7 +839,9 @@ public final class SeleniumTracker {
 
     private static FailedLookup consumeFailedLookup(Throwable failure) {
         FailedLookup lookup = failedLookup.get();
-        if (lookup == null || !inChain(failure, lookup.error())) {
+        // Newer Selenium waits swallow the lookup error, so a timeout without it still points at the last failed lookup
+        Throwable timeout = firstInChain(failure, TimeoutException.class);
+        if (lookup == null || !(inChain(failure, lookup.error()) || (timeout != null && timeout.getCause() == null))) {
             return null;
         }
         failedLookup.remove();
@@ -913,6 +967,24 @@ public final class SeleniumTracker {
     }
 
     // ------------------------------------------------------------------ browser + files
+
+    private static boolean hasImage(TestStep step) {
+        return step.getArtifacts().stream().anyMatch(SeleniumTracker::isImage)
+                || step.getChildren().stream().anyMatch(SeleniumTracker::hasImage);
+    }
+
+    /**
+     * The file name of a step's screenshot, from the step: {@code Click Button "Log in"} becomes
+     * {@code click-button-log-in.png} ({@code click-button-log-in-failure.png} when it failed).
+     */
+    static String shotName(String stepName, String suffix) {
+        String slug = stepName == null ? ""
+                : stepName.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]+", "-").replaceAll("^-+|-+$", "");
+        if (slug.length() > 60) {
+            slug = slug.substring(0, 60).replaceAll("-[^-]*$", ""); // cut between words
+        }
+        return (slug.isEmpty() ? "step" : slug) + suffix + ".png";
+    }
 
     static Artifact screenshot(Camera camera, String name) {
         if (camera == null || !(camera.driver() instanceof TakesScreenshot)) {
@@ -1049,15 +1121,35 @@ public final class SeleniumTracker {
     }
 
     private static void lock(Camera camera) {
+        internalCalls.set(internalCalls.get() + 1);
         if (camera != null && camera.lock() != null) {
             camera.lock().lock();
         }
     }
 
     private static void unlock(Camera camera) {
+        internalCalls.set(Math.max(0, internalCalls.get() - 1));
         if (camera != null && camera.lock() != null && camera.lock().isHeldByCurrentThread()) {
             camera.lock().unlock();
         }
+    }
+
+    /**
+     * Runs a driver call PulseReport makes for itself, such as a video frame. An intercepted driver
+     * (an Appium proxy) reports it to the step listener like any other call; the listener ignores it.
+     */
+    static <T> T internal(java.util.function.Supplier<T> call) {
+        internalCalls.set(internalCalls.get() + 1);
+        try {
+            return call.get();
+        } finally {
+            internalCalls.set(Math.max(0, internalCalls.get() - 1));
+        }
+    }
+
+    /** @return true while this thread runs a driver call PulseReport makes for itself */
+    static boolean isInternalCall() {
+        return internalCalls.get() > 0;
     }
 
     private static BrowserInfo detectBrowser(WebDriver driver) {

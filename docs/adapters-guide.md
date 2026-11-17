@@ -386,7 +386,7 @@ See [Selenium Example](../examples/selenium-example/) for a complete working pro
 
 ## Appium Adapter
 
-Extends TestNGAdapter with Appium-specific features for mobile testing.
+Extends `SeleniumAdapter` with Appium-specific features for mobile testing.
 
 ### Installation
 
@@ -394,7 +394,7 @@ Extends TestNGAdapter with Appium-specific features for mobile testing.
 <dependency>
     <groupId>io.appium</groupId>
     <artifactId>java-client</artifactId>
-    <version>8.6.0</version>
+    <version>10.1.1</version> <!-- automatic steps need 10.0.0 or newer -->
 </dependency>
 ```
 
@@ -410,6 +410,58 @@ Extends TestNGAdapter with Appium-specific features for mobile testing.
 ```
 
 ### Features
+
+#### Automatic Steps
+
+Create the driver through the adapter and it records every tap, typed text,
+gesture and lookup as a step, like the [Selenium adapter](#selenium-adapter)
+does for browser actions:
+
+```java
+@Listeners(AppiumAdapter.class)
+public class MobileTest {
+    private final AppiumAdapter appium = new AppiumAdapter();
+    private AndroidDriver driver;
+
+    @BeforeMethod
+    public void setup() throws MalformedURLException {
+        UiAutomator2Options options = new UiAutomator2Options().setApp("/path/to/app.apk");
+        // instead of: new AndroidDriver(url, options)
+        driver = appium.createDriver(AndroidDriver.class, new URL("http://localhost:4723"), options);
+    }
+
+    @AfterMethod(alwaysRun = true)
+    public void teardown() {
+        driver.quit();
+    }
+}
+```
+
+- `createDriver` takes the driver class and the arguments of the constructor you
+  would otherwise call. It returns a real `AndroidDriver`/`IOSDriver`, so
+  Appium-only methods (`activateApp`, `hideKeyboard`, context switching, ...)
+  work as before.
+- Steps are named from the element's attributes: `Click Button "Log in"`, with
+  the locator in the step details. Android uses `content-desc`, then `text`,
+  then `resource-id`; iOS uses `label`, then `name`.
+- Text typed into password fields (Android `password=true`, iOS
+  `XCUIElementTypeSecureTextField`) is masked, as set by
+  `pulsereport.selenium.maskInputs`.
+- A failed step gets a screenshot; when the test fails, the page source is
+  attached as well. `MobileDriverHolder` is not needed with a tracked driver.
+- Each test is tagged `Appium` and lists its device, OS version and app in its
+  Details; the report header shows only the platform.
+- Set `pulsereport.screenshots.mode=all` for a screenshot after every step
+  (the default, `failed`, takes them only for failed steps).
+- `appium.step("Log in", () -> ...)` and `appium.waitFor(...)` group and name
+  steps, and checks made inside a step are listed with it.
+- Video works as for browsers (screenshots encoded with ffmpeg; see the
+  Selenium video settings).
+- Naming each step costs 3 to 4 extra driver calls. Set
+  `pulsereport.selenium.stepDetail=minimal` to name steps by locator only.
+
+The automatic steps are built for native app contexts. In a `WEBVIEW` context
+elements are still named from their attributes, not from the page.
 
 #### Automatic Failure Capture
 
@@ -517,22 +569,26 @@ String crashLog = // ... read from logcat crash buffer / iOS crash logs
 adapter.captureCrashReport("testLogin", "crash.log", crashLog);
 ```
 
-#### Session Metadata (Environment)
+#### Session Metadata (Device per Test)
 
-Recorded once per run, surfaced in the report header / CI filters:
+Tests in one run can use different devices, so the report header shows only the
+platform (`Android`, `iOS`, or `Android, iOS`). The device, OS version, UDID, app
+and automation name are listed in each test's **Details**.
+
+With `createDriver` this happens automatically. With a driver you create
+yourself, record it after creating the driver; it applies to every test that
+thread runs from then on:
 
 ```java
-@BeforeSuite
-public void recordSession() {
-    adapter.recordSessionMetadata(MobileSessionMetadata.builder()
-        .platformName("Android")
-        .platformVersion("14")
-        .deviceName("Pixel 7")
-        .appVersion("3.2.1")
-        .appiumServerVersion("2.4.1")
-        .build());
+@BeforeMethod
+public void setUp() {
+    driver = new AndroidDriver(url, options);
+    adapter.recordSessionMetadata(MobileSessionMetadata.fromCapabilities(driver.getCapabilities()));
 }
 ```
+
+`MobileSessionMetadata.builder()` sets the same fields by hand (for example the
+app version or the Appium server version, which the capabilities don't carry).
 
 #### Device Health Metrics
 
