@@ -1,5 +1,8 @@
 package io.github.pulsereport.adapters.appium;
 
+import com.sun.net.httpserver.HttpServer;
+import io.appium.java_client.android.AndroidDriver;
+import io.appium.java_client.ios.IOSDriver;
 import io.github.pulsereport.adapters.selenium.SeleniumTracker;
 import io.github.pulsereport.core.model.TestStatus;
 import io.github.pulsereport.core.model.TestStep;
@@ -13,6 +16,7 @@ import org.openqa.selenium.ElementClickInterceptedException;
 import org.openqa.selenium.MutableCapabilities;
 import org.openqa.selenium.NoSuchElementException;
 import org.openqa.selenium.WebElement;
+import org.openqa.selenium.json.Json;
 import org.openqa.selenium.remote.CommandPayload;
 import org.openqa.selenium.remote.DriverCommand;
 import org.openqa.selenium.remote.RemoteWebDriver;
@@ -24,6 +28,10 @@ import org.testng.ITestNGMethod;
 import org.testng.ITestResult;
 
 import java.io.File;
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -33,6 +41,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
@@ -50,6 +60,7 @@ class AppiumTrackingTest {
 
     private RecordingAdapter adapter;
     private ITestResult result;
+    private FakeAppiumServer server;
 
     /** Exposes what the adapter recorded for the test it last started. */
     private static final class RecordingAdapter extends AppiumAdapter {
@@ -153,6 +164,55 @@ class AppiumTrackingTest {
         }
     }
 
+    /**
+     * An Appium server over HTTP with one session ("s1"), answering what a tap on one
+     * element needs, so real {@code AndroidDriver}/{@code IOSDriver} instances can talk to it.
+     */
+    private static final class FakeAppiumServer {
+        final HttpServer http;
+        final List<String> requests = new CopyOnWriteArrayList<>();
+
+        FakeAppiumServer(Map<String, Object> sessionCaps) throws IOException {
+            http = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+            http.createContext("/", exchange -> {
+                exchange.getRequestBody().readAllBytes();
+                String method = exchange.getRequestMethod();
+                String path = exchange.getRequestURI().getPath();
+                requests.add(method + " " + path);
+                String value = "null";
+                if ("POST".equals(method) && "/session".equals(path)) {
+                    value = "{\"sessionId\":\"s1\",\"capabilities\":" + new Json().toJson(sessionCaps) + "}";
+                } else if (path.endsWith("/element")) {
+                    value = "{\"element-6066-11e4-a52e-4f735466cecf\":\"el-1\"}";
+                } else if (path.endsWith("/attribute/class")) {
+                    value = "\"android.widget.Button\"";
+                } else if (path.endsWith("/attribute/content-desc")) {
+                    value = "\"Log in\"";
+                } else if (path.endsWith("/screenshot")) {
+                    value = "\"" + PNG + "\"";
+                }
+                byte[] body = ("{\"value\":" + value + "}").getBytes(StandardCharsets.UTF_8);
+                exchange.getResponseHeaders().set("Content-Type", "application/json; charset=utf-8");
+                exchange.sendResponseHeaders(200, body.length);
+                exchange.getResponseBody().write(body);
+                exchange.close();
+            });
+            http.start();
+        }
+
+        URL url() throws IOException {
+            return new URL("http://127.0.0.1:" + http.getAddress().getPort());
+        }
+
+        long newSessions() {
+            return requests.stream().filter("POST /session"::equals).count();
+        }
+    }
+
+    private static MutableCapabilities options(String platform, String automation) {
+        return new MutableCapabilities(Map.of("platformName", platform, "appium:automationName", automation));
+    }
+
     @BeforeEach
     void setUp() {
         System.setProperty("pulsereport.output.directory", reportDir.getAbsolutePath());
@@ -165,6 +225,9 @@ class AppiumTrackingTest {
         System.clearProperty("pulsereport.output.directory");
         if (SeleniumTracker.driver() != null) {
             SeleniumTracker.driver().quit();
+        }
+        if (server != null) {
+            server.http.stop(0);
         }
     }
 
@@ -280,6 +343,57 @@ class AppiumTrackingTest {
         device.quit();
 
         assertEquals(null, SeleniumTracker.driver());
+    }
+
+    @Test
+    void anExistingDriverIsTrackedOnItsOwnSessionAndKeepsItsType() throws IOException {
+        server = new FakeAppiumServer(Map.of("platformName", "Android", "automationName", "UiAutomator2",
+                "deviceName", "emulator-5554", "platformVersion", "16"));
+        AndroidDriver original = new AndroidDriver(server.url(), options("Android", "UiAutomator2"));
+        adapter.onTestStart(result);
+
+        AndroidDriver driver = adapter.trackDriver(original);
+        driver.findElement(By.id("login")).click();
+        adapter.onTestSuccess(result);
+
+        assertNotSame(original, driver);
+        assertEquals(original.getSessionId(), driver.getSessionId());
+        assertEquals(1, server.newSessions(), "tracking must not start a second session");
+        assertEquals("emulator-5554", driver.getCapabilities().getCapability("deviceName"),
+                "the attached driver answers with the original session's capabilities");
+        assertTrue(server.requests.contains("POST /session/s1/element/el-1/click"), server.requests.toString());
+        assertEquals("Click Button \"Log in\"", adapter.steps().get(adapter.steps().size() - 1).getName());
+        assertTrue(adapter.labels().contains("Appium"), adapter.labels().toString());
+        assertTrue(adapter.metadata().containsValue("emulator-5554"), adapter.metadata().toString());
+
+        driver.quit();
+        assertTrue(server.requests.contains("DELETE /session/s1"), server.requests.toString());
+        assertNull(SeleniumTracker.driver());
+    }
+
+    @Test
+    void anExistingIosDriverStaysAnIosDriver() throws IOException {
+        server = new FakeAppiumServer(Map.of("platformName", "iOS", "automationName", "XCUITest",
+                "deviceName", "iPhone 16"));
+        IOSDriver original = new IOSDriver(server.url(), options("iOS", "XCUITest"));
+
+        IOSDriver driver = adapter.trackDriver(original);
+
+        assertInstanceOf(IOSDriver.class, driver);
+        assertEquals(original.getSessionId(), driver.getSessionId());
+        assertEquals(1, server.newSessions());
+        assertEquals("iPhone 16", driver.getCapabilities().getCapability("deviceName"));
+    }
+
+    @Test
+    void onlyLiveAppiumDriversCanBeTracked() throws IOException {
+        assertThrows(IllegalArgumentException.class, () -> adapter.trackDriver(new FakeDevice(platform("Android"))));
+        assertThrows(IllegalArgumentException.class, () -> adapter.trackDriver(null));
+
+        server = new FakeAppiumServer(Map.of("platformName", "Android"));
+        AndroidDriver original = new AndroidDriver(server.url(), options("Android", "UiAutomator2"));
+        original.quit();
+        assertThrows(IllegalStateException.class, () -> adapter.trackDriver(original));
     }
 
     @Test

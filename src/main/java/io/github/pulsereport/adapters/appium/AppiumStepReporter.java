@@ -1,8 +1,12 @@
 package io.github.pulsereport.adapters.appium;
 
+import io.appium.java_client.AppiumDriver;
+import io.appium.java_client.android.AndroidDriver;
+import io.appium.java_client.ios.IOSDriver;
 import io.appium.java_client.proxy.ElementAwareWebDriverListener;
 import io.appium.java_client.proxy.Helpers;
 import io.github.pulsereport.adapters.selenium.SeleniumTracker;
+import org.openqa.selenium.Capabilities;
 import org.openqa.selenium.HasCapabilities;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.remote.RemoteWebDriver;
@@ -14,6 +18,8 @@ import org.slf4j.LoggerFactory;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -37,15 +43,64 @@ final class AppiumStepReporter extends ElementAwareWebDriverListener {
     private final ThreadLocal<Boolean> reporting = ThreadLocal.withInitial(() -> false);
     private volatile WebDriverListener steps;
     private volatile RemoteWebDriver driver;
+    /** For a driver attached to an existing session: that session's capabilities, which the attached one lacks. */
+    private volatile Capabilities sessionCapabilities;
 
     static <T extends WebDriver> T createDriver(Class<T> driverClass, Object... args) {
         if (driverClass == null) {
             throw new IllegalArgumentException("driverClass cannot be null");
         }
-        Object[] constructorArgs = args == null ? new Object[0] : args;
-        Constructor<?> constructor = constructorFor(driverClass, constructorArgs);
+        return proxy(driverClass, args == null ? new Object[0] : args, null);
+    }
+
+    /**
+     * A tracked driver of the same class on {@code existing}'s session. It is built with
+     * java-client's attach constructor, so no new session is started and {@code existing}
+     * keeps working.
+     */
+    @SuppressWarnings("unchecked")
+    static <T extends WebDriver> T trackDriver(T existing) {
+        if (existing == null) {
+            throw new IllegalArgumentException("driver cannot be null");
+        }
+        Class<?> type = existing.getClass();
+        if (type != AndroidDriver.class && type != IOSDriver.class && type != AppiumDriver.class) {
+            throw new IllegalArgumentException("trackDriver takes an AndroidDriver, IOSDriver or AppiumDriver, not "
+                    + type.getName() + " (a driver from createDriver is tracked already)");
+        }
+        AppiumDriver appium = (AppiumDriver) existing;
+        if (appium.getSessionId() == null) {
+            throw new IllegalStateException("The driver has quit; track it before quitting");
+        }
+        Capabilities caps = appium.getCapabilities();
+        URL session = sessionAddress(appium.getRemoteAddress(), appium.getSessionId().toString());
+        Object automation = caps.getCapability("appium:automationName") != null
+                ? caps.getCapability("appium:automationName") : caps.getCapability("automationName");
+        Object[] args;
+        if (type == IOSDriver.class) {
+            args = new Object[] {session};
+        } else if (type == AndroidDriver.class) {
+            args = new Object[] {session, automation == null ? "UiAutomator2" : automation.toString()};
+        } else {
+            args = new Object[] {session, String.valueOf(caps.getCapability("platformName")), String.valueOf(automation)};
+        }
+        return proxy((Class<T>) type, args, caps);
+    }
+
+    private static URL sessionAddress(URL server, String sessionId) {
+        String base = server.toString().replaceAll("/+$", "");
+        try {
+            return new URL(base + "/session/" + sessionId);
+        } catch (MalformedURLException e) {
+            throw new IllegalArgumentException("Cannot build the session address from " + base, e);
+        }
+    }
+
+    private static <T extends WebDriver> T proxy(Class<T> driverClass, Object[] args, Capabilities attachedTo) {
+        Constructor<?> constructor = constructorFor(driverClass, args);
         AppiumStepReporter reporter = new AppiumStepReporter();
-        T driver = Helpers.createProxy(driverClass, constructorArgs, constructor.getParameterTypes(), List.of(reporter));
+        reporter.sessionCapabilities = attachedTo;
+        T driver = Helpers.createProxy(driverClass, args, constructor.getParameterTypes(), List.of(reporter));
         if (driver instanceof RemoteWebDriver) {
             reporter.driver = (RemoteWebDriver) driver;
         }
@@ -85,6 +140,11 @@ final class AppiumStepReporter extends ElementAwareWebDriverListener {
 
     @Override
     public Object call(Object target, Method method, Object[] args, Callable<?> original) throws Throwable {
+        Capabilities caps = sessionCapabilities;
+        if (caps != null && target instanceof WebDriver && "getCapabilities".equals(method.getName())
+                && method.getParameterCount() == 0) {
+            return caps;
+        }
         WebDriverListener s = steps;
         // Calls made while one is reported come from the driver itself (an element click runs a driver
         // command) or from PulseReport reading the screen; only the outermost call is a step

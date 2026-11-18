@@ -76,6 +76,9 @@ import java.util.concurrent.ConcurrentHashMap;
  * <pre>{@code
  * AndroidDriver driver = appium.createDriver(AndroidDriver.class, new URL("http://localhost:4723"), options);
  * }</pre>
+ * <p>A driver your framework already creates can be tracked instead, keeping its
+ * creation code: {@code driver = appium.trackDriver(new AndroidDriver(url, options));}
+ * (see {@link #trackDriver}).</p>
  *
  * <h2>Manual capture</h2>
  * <p>All capture methods remain available for explicit, on-demand use. The
@@ -154,6 +157,35 @@ public class AppiumAdapter extends SeleniumAdapter {
             recordPlatform(MobileSessionMetadata.fromCapabilities(((HasCapabilities) driver).getCapabilities()));
         }
         return driver;
+    }
+
+    /**
+     * Records the steps of a driver your code has already created, without starting
+     * a new session: it returns a driver of the same class joined to that session,
+     * whose actions are recorded as steps. Use the returned driver from then on;
+     * quitting either one ends the session. Driver creation, its retries and its
+     * errors stay as they are. Needs Appium java-client 10 or newer.
+     *
+     * <pre>{@code
+     * AndroidDriver driver = appium.trackDriver(new AndroidDriver(url, options));
+     * }</pre>
+     *
+     * <p>{@code getCapabilities()} on the returned driver answers with the original
+     * session's capabilities. HTTP settings of the original driver (a custom client
+     * config or timeouts) are not carried over; use {@link #createDriver} if you need them.</p>
+     *
+     * @param driver an {@code AndroidDriver}, {@code IOSDriver} or {@code AppiumDriver} with a live session
+     * @param <T> the driver type
+     * @return a tracked driver of the same class on the same session
+     * @throws IllegalArgumentException if the driver is of another class
+     * @throws IllegalStateException if the driver has quit
+     */
+    public <T extends WebDriver> T trackDriver(T driver) {
+        threadDevice.remove();
+        clearTestMetadata(getCurrentTestKey());
+        T tracked = AppiumStepReporter.trackDriver(driver);
+        recordPlatform(MobileSessionMetadata.fromCapabilities(((HasCapabilities) tracked).getCapabilities()));
+        return tracked;
     }
 
     /** Labels every test that runs under this adapter as an Appium test. */

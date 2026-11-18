@@ -92,7 +92,7 @@ import io.github.pulsereport.core.model.TestStep;
  * pulsereport.selenium.pageMetrics=true
  * pulsereport.selenium.trackScripts=false           # record executeScript calls as steps
  * pulsereport.selenium.autoSteps=true               # false: only step(...), waitFor(...) and failures are steps
- * pulsereport.appium.autoSteps=true                 # the same for drivers from AppiumAdapter.createDriver
+ * pulsereport.appium.autoSteps=true                 # the same for drivers from AppiumAdapter.createDriver or trackDriver
  * </pre>
  *
  * @since 1.3.0
@@ -318,7 +318,7 @@ public final class SeleniumTracker {
      * proxy driver, and returns the listener to report each call to. The driver
      * itself is used for screenshots and page reads, so calls made while a
      * reported call is in progress must not be reported again. Used by
-     * {@code AppiumAdapter.createDriver}; test code calls {@link #track} instead.
+     * {@code AppiumAdapter.createDriver} and {@code trackDriver}; test code calls {@link #track} instead.
      *
      * @param driver the intercepted driver
      * @param adapterName the adapter each test that uses it is labelled with, e.g. "Appium"

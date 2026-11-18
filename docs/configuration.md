@@ -95,7 +95,7 @@ For drivers wrapped with `SeleniumAdapter.track(...)` or `SeleniumTracker.track(
 | `pulsereport.selenium.pageMetrics` | Record `page.load.time` and `page.ttfb` for each navigation | `true` |
 | `pulsereport.selenium.trackScripts` | Record `executeScript` calls as steps | `false` |
 | `pulsereport.selenium.autoSteps` | `false`: browser actions are not steps on their own; only `step(...)`, `waitFor(...)` and failures are. Screenshots, video, page metrics and failure evidence still work | `true` |
-| `pulsereport.appium.autoSteps` | The same for drivers made with `AppiumAdapter.createDriver` | `true` |
+| `pulsereport.appium.autoSteps` | The same for drivers from `AppiumAdapter.createDriver` or `trackDriver` | `true` |
 
 Field names in `pulsereport.maskBody.fields` are also treated as sensitive input fields and URL parameters.
 
