@@ -442,6 +442,19 @@ public class MobileTest {
   would otherwise call. It returns a real `AndroidDriver`/`IOSDriver`, so
   Appium-only methods (`activateApp`, `hideKeyboard`, context switching, ...)
   work as before.
+- Already create the driver in your own factory (with retries, cloud setup and
+  so on)? Keep that code and pass its driver to `trackDriver`. It returns a
+  tracked driver of the same class joined to the same session, so no second
+  session is started; use it from then on (quitting either one ends the
+  session):
+
+  ```java
+  driver = appium.trackDriver(new AndroidDriver(url, options));
+  ```
+
+  Its `getCapabilities()` answers with the original session's capabilities.
+  HTTP settings of the original driver (a custom client config or timeouts) are
+  not carried over; use `createDriver` when you need them.
 - Steps are named from the element's attributes: `Click Button "Log in"`, with
   the locator in the step details. Android uses `content-desc`, then `text`,
   then `resource-id`; iOS uses `label`, then `name`.
@@ -580,8 +593,8 @@ Tests in one run can use different devices, so the report header shows only the
 platform (`Android`, `iOS`, or `Android, iOS`). The device, OS version, UDID, app
 and automation name are listed in each test's **Details**.
 
-With `createDriver` this happens automatically. With a driver you create
-yourself, record it after creating the driver; it applies to every test that
+With `createDriver` or `trackDriver` this happens automatically. With a driver
+you create yourself and don't track, record it after creating the driver; it applies to every test that
 thread runs from then on:
 
 ```java
