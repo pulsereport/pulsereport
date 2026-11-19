@@ -37,6 +37,7 @@ import io.github.pulsereport.config.ReporterConfig;
 import io.github.pulsereport.core.aggregator.TestResultAggregator;
 import io.github.pulsereport.core.model.Artifact;
 import io.github.pulsereport.core.model.AssertionResult;
+import io.github.pulsereport.core.model.LogLine;
 import io.github.pulsereport.core.model.Metric;
 import io.github.pulsereport.core.model.TestCase;
 import io.github.pulsereport.core.model.TestRun;
@@ -1084,7 +1085,7 @@ public class TestNGAdapter implements Adapter, ITestListener, ISuiteListener, II
             List<TestStep> children = new ArrayList<>(captured.steps);
             List<AssertionResult> own = attachAssertions(children, assertions, scope.startedAt);
             Instant end = Instant.now();
-            TestStatus status = failure != null ? TestStatus.FAILED
+            TestStatus status = failure != null || LogLine.firstError(children) != null ? TestStatus.FAILED
                     : testResult.getStatus() == ITestResult.SKIP ? TestStatus.SKIPPED : TestStatus.PASSED;
             TestStep.Builder step = TestStep.builder()
                     .keyword(scope.keyword)

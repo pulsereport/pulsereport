@@ -256,6 +256,8 @@ public class WebTest {
             driver.findElement(By.id("password")).sendKeys(secret);   // shown as ••••••
             driver.findElement(By.id("login")).click();
         });
+        adapter.step("Open profile", "id: profile",    // a detail shown under the step name
+                () -> driver.findElement(By.id("profile")).click());
         adapter.waitFor("dashboard", Duration.ofSeconds(10),
                 ExpectedConditions.visibilityOfElementLocated(By.id("dashboard")));
         adapter.screenshot("Dashboard");
@@ -323,6 +325,29 @@ In the report, steps that happened during a recording get a "Play from here" but
 
 > **Note:** The adapter's stores are **static**, so any `SeleniumAdapter` instance you create in
 > test code shares data with the TestNG-registered listener — no singleton plumbing required.
+
+#### Log Lines
+
+`log(...)`, `warn(...)` and `error(...)` write a line into the running step, or into the test
+when no step is running, in the order they are written. Route your framework's logger to them to
+keep its messages in the report:
+
+```java
+selenium.log("Fetched balance: 120");          // Info
+selenium.warn("Balance below the limit");      // Warn: shown in amber, fails nothing
+selenium.error("Post-test cleanup failed");    // Error: fails the step, the steps around it and the test
+```
+
+- An `error(...)` line fails the step it is written in, and the steps around that step, even when
+  nothing threw. The innermost failed step gets a screenshot.
+- A test that passed (or passed on retry) but wrote an error line is reported as failed, with the
+  line as its error message, and counts as failed in the totals. Its TestNG result is unchanged,
+  so the build outcome stays TestNG's.
+- Written in a configuration method (`@AfterMethod`, `@BeforeMethod`, ...), the line fails that
+  method's step and the test it belongs to.
+- A step whose only children are log lines shows them as its details; otherwise they are listed
+  with its sub-steps.
+- Lines are shown as written: don't log passwords, tokens or one-time codes.
 
 #### Videos Stored Elsewhere (MinIO, S3, Selenium Grid)
 
@@ -467,6 +492,9 @@ public class MobileTest {
   Details; the report header shows only the platform.
 - Set `pulsereport.screenshots.mode=all` for a screenshot after every step
   (the default, `failed`, takes them only for failed steps).
+- `appium.log(...)`, `appium.warn(...)` and `appium.error(...)` write log lines into the
+  running step; an error line fails the step and the test (see
+  [Log Lines](#log-lines)).
 - `appium.step("Log in", () -> ...)` and `appium.waitFor(...)` group and name
   steps, and checks made inside a step are listed with it.
 - Video works as for browsers (screenshots encoded with ffmpeg; see the

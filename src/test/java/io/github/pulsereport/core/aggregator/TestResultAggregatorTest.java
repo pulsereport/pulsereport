@@ -497,6 +497,31 @@ public class TestResultAggregatorTest {
      * NOT leaked into the TestCase.
      */
     @Test
+    public void aPassedTestThatWroteAnErrorLineIsReportedFailedInTheTotals() {
+        ITestResult result = createMockTestResult("loanTest", "com.Test", ITestResult.SUCCESS, 100L, 200L, null);
+        ISuite suite = wiredSuiteWithResult("Suite", "Automation suite", result);
+        aggregator.recordTestResult(result);
+        Map<String, List<io.github.pulsereport.core.model.TestStep>> steps = new HashMap<>();
+        steps.put(aggregator.getTestKey(result), new ArrayList<>(List.of(
+                io.github.pulsereport.core.model.LogLine.step(io.github.pulsereport.core.model.LogLine.Level.WARN,
+                        "Slow response", Instant.now()),
+                io.github.pulsereport.core.model.LogLine.step(io.github.pulsereport.core.model.LogLine.Level.ERROR,
+                        "Cleanup failed", Instant.now()))));
+
+        TestRun run = aggregator.buildTestRun(suite, new HashMap<>(), new HashMap<>(), steps);
+
+        TestCase tc = run.getSuites().get(0).getTestCases().get(0);
+        assertEquals(TestStatus.FAILED, tc.getStatus());
+        assertEquals("Error logged: Cleanup failed", tc.getErrorMessage());
+        assertEquals(TestStatus.FAILED, run.getSuites().get(0).getStatus());
+        assertEquals(1, run.getSuites().get(0).getFailedTests());
+        assertEquals(0, run.getSuites().get(0).getPassedTests());
+        assertEquals(TestStatus.FAILED, run.getStatus());
+        assertEquals(1, run.getFailedTests());
+        assertEquals(0, run.getPassedTests());
+    }
+
+    @Test
     public void mergesArtifactsFromFullKeyAndMethodName() {
         ITestResult result = createMockTestResult(
                 "customerLoginTest", "com.Test", ITestResult.FAILURE, 100L, 200L, new AssertionError("boom"));

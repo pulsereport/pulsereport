@@ -50,6 +50,7 @@ import io.github.pulsereport.assertions.AssertionCollector;
 import io.github.pulsereport.config.ReporterConfig;
 import io.github.pulsereport.core.model.Artifact;
 import io.github.pulsereport.core.model.AssertionResult;
+import io.github.pulsereport.core.model.LogLine;
 import io.github.pulsereport.core.model.Metric;
 import io.github.pulsereport.core.model.TestStatus;
 import io.github.pulsereport.core.model.TestStep;
@@ -263,6 +264,10 @@ public final class SeleniumTracker {
         final List<Artifact> artifacts = new ArrayList<>();
         /** Collects the step's assertions, nested in the test's or Gherkin step's collector; null when none is open. */
         final Object assertions = AssertionCollector.isActive() ? AssertionCollector.open() : null;
+        /** The first error line written in this step or a step inside it; it fails the step. */
+        String loggedError;
+        /** Whether a step inside already took the screenshot for that error line. */
+        boolean loggedErrorShot;
     }
 
     private record FailedLookup(String locator, Throwable error, Instant startedAt, long durationMs) {
@@ -378,10 +383,22 @@ public final class SeleniumTracker {
      * @param action the step body
      */
     public static void step(String message, StepAction action) {
+        step(message, null, action);
+    }
+
+    /**
+     * Runs {@code action} as a named step with a detail line under its name, e.g. the
+     * locator of the element it acts on.
+     *
+     * @param message the step name shown in the report
+     * @param detail shown under the name; null or blank for none
+     * @param action the step body
+     */
+    public static void step(String message, String detail, StepAction action) {
         if (action == null) {
             throw new IllegalArgumentException("action cannot be null");
         }
-        step(message, () -> {
+        step(message, detail, () -> {
             action.run();
             return null;
         });
@@ -396,6 +413,19 @@ public final class SeleniumTracker {
      * @return the value returned by {@code action}
      */
     public static <T> T step(String message, StepSupplier<T> action) {
+        return step(message, null, action);
+    }
+
+    /**
+     * Runs {@code action} as a named step with a detail line under its name, and returns its result.
+     *
+     * @param message the step name shown in the report
+     * @param detail shown under the name; null or blank for none
+     * @param action the step body
+     * @param <T> the result type
+     * @return the value returned by {@code action}
+     */
+    public static <T> T step(String message, String detail, StepSupplier<T> action) {
         if (action == null) {
             throw new IllegalArgumentException("action cannot be null");
         }
@@ -420,11 +450,37 @@ public final class SeleniumTracker {
                 openSteps.remove();
             }
             try {
-                finishStep(message, scope, failure, startedAt, elapsedMs(start));
+                finishStep(message, detail, scope, failure, startedAt, elapsedMs(start));
             } catch (RuntimeException e) {
                 logger.debug("PulseReport: could not record step '{}'", message, e);
             }
         }
+    }
+
+    /**
+     * Writes a log line into the step running on this thread, or into the test when no step is
+     * running. An {@link LogLine.Level#ERROR} line fails that step, the steps around it and the
+     * test, even when nothing threw. Lines written outside any test are dropped.
+     *
+     * @param level the line's level
+     * @param message the text
+     */
+    public static void log(LogLine.Level level, String message) {
+        TestStep line = LogLine.step(level, message, Instant.now());
+        StepScope scope = peekScope();
+        if (scope != null) {
+            scope.children.add(line);
+            if (level == LogLine.Level.ERROR && scope.loggedError == null) {
+                scope.loggedError = line.getName();
+            }
+            return;
+        }
+        CaptureBridge.Sink sink = CaptureBridge.current();
+        if (sink == null) {
+            logger.debug("PulseReport: no test is running on this thread; log line '{}' not recorded", message);
+            return;
+        }
+        sink.addStep(line);
     }
 
     /**
@@ -699,8 +755,8 @@ public final class SeleniumTracker {
         return true;
     }
 
-    private static void finishStep(String message, StepScope scope, Throwable failure, Instant startedAt,
-            long durationMs) {
+    private static void finishStep(String message, String detail, StepScope scope, Throwable failure,
+            Instant startedAt, long durationMs) {
         List<AssertionResult> checks = scope.assertions == null ? List.of() : AssertionCollector.close(scope.assertions);
         Tracked t = active();
         Camera camera = t == null ? null : t.camera();
@@ -710,11 +766,13 @@ public final class SeleniumTracker {
                 scope.children.add(lookup);
             }
         }
+        boolean failed = failure != null || scope.loggedError != null;
         boolean named = message != null && !message.isBlank();
+        boolean described = detail != null && !detail.isBlank();
         TestStep only = scope.children.size() == 1 ? scope.children.get(0) : null;
         TestStep.Builder step;
         List<Artifact> artifacts;
-        if (!named && only != null && scope.artifacts.isEmpty() && checks.isEmpty()
+        if (!named && !described && only != null && scope.artifacts.isEmpty() && checks.isEmpty()
                 && (failure == null || only.getStatus() == TestStatus.FAILED)) {
             // A single unnamed action needs no wrapper step
             step = only.toBuilder();
@@ -726,7 +784,8 @@ public final class SeleniumTracker {
                             + (scope.children.size() > 1 ? " (+" + (scope.children.size() - 1) + " more)" : "");
             step = TestStep.builder()
                     .name(name)
-                    .status(failure == null ? TestStatus.PASSED : TestStatus.FAILED)
+                    .description(described ? detail : null)
+                    .status(failed ? TestStatus.FAILED : TestStatus.PASSED)
                     .startTime(startedAt)
                     .endTime(startedAt.plusMillis(durationMs))
                     .duration(durationMs)
@@ -737,19 +796,27 @@ public final class SeleniumTracker {
             }
             step.assertions(checks);
         }
-        if (failure != null && !isEvidenced(failure) && screenshotsEnabled()) {
+        // Like a thrown failure, an error line is photographed once, by the innermost step it failed
+        boolean unshot = failure != null ? !isEvidenced(failure) : failed && !scope.loggedErrorShot;
+        if (failed && unshot && screenshotsEnabled()) {
             Artifact shot = screenshot(camera, shotName(step.build().getName(), "-failure"));
             if (shot != null) {
                 artifacts.add(shot);
-                markEvidenced(failure);
+                if (failure != null) {
+                    markEvidenced(failure);
+                }
             }
         }
         StepScope parent = peekScope();
         if (parent != null) {
+            if (scope.loggedError != null && parent.loggedError == null) {
+                parent.loggedError = scope.loggedError;
+                parent.loggedErrorShot = failure == null;
+            }
             parent.children.add(step.artifacts(artifacts).build());
             return;
         }
-        emit(step, artifacts, failure == null, camera);
+        emit(step, artifacts, !failed, camera);
     }
 
     /** Sends a finished top-level step to the running test. */

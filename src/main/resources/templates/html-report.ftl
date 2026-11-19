@@ -1087,6 +1087,36 @@
             color: var(--ink-muted);
         }
 
+        /* Log lines (Info/Warn/Error keyword, no duration): a level mark instead of a pass/fail dot */
+        .step.is-log {
+            padding-top: 3px;
+            padding-bottom: 3px;
+        }
+
+        .step.is-log .glyph {
+            color: var(--ink-muted);
+            background: none;
+            border: 1.5px solid currentColor;
+        }
+
+        .step.log-warn .glyph,
+        .step.log-warn .kw {
+            color: var(--skip);
+        }
+
+        .step.log-error .glyph {
+            color: var(--fail);
+            background: currentColor;
+        }
+
+        .step.log-error .kw {
+            color: var(--fail);
+        }
+
+        .step.log-info .stext {
+            color: var(--ink-muted);
+        }
+
         .step .stext {
             overflow-wrap: anywhere;
         }
@@ -2880,6 +2910,14 @@
             .step.is-hook .kw {
                 display: inline;
             }
+
+            .step.is-log {
+                grid-template-columns: 16px auto minmax(0, 1fr) auto;
+            }
+
+            .step.is-log .kw {
+                display: inline;
+            }
         }
 
         @media print {
@@ -4121,7 +4159,28 @@
                     );
             }
 
+            // Log lines written with log/warn/error: a zero-length step whose keyword is the level
+            function logLevel(s) {
+                const m = /^(info|warn|error)$/i.exec((s.keyword || '').trim());
+                return m && !s.duration && !(s.children || []).length ? m[1].toLowerCase() : null;
+            }
+
             function stepEl(s, ctx) {
+                const lvl = logLevel(s);
+                if (lvl)
+                    return h(
+                        'li',
+                        { class: `step is-log log-${lvl}` },
+                        h('span', { class: 'glyph', 'aria-hidden': 'true' }),
+                        h('span', { class: 'kw' }, s.keyword),
+                        h(
+                            'span',
+                            { class: 'stext' },
+                            h('span', { class: 'sr-only' }, `${lvl === 'warn' ? 'Warning' : s.keyword}: `),
+                            stepText(s.name || '')
+                        ),
+                        h('span', { class: 'step-end' }, playBtn(s, ctx.sync))
+                    );
                 const failed = s.status === 'FAILED';
                 // @BeforeMethod, @After...; Setup/Teardown in reports from older versions
                 const hook = /^(setup|teardown|@(before|after)\w*)$/i.test((s.keyword || '').trim());
@@ -4153,7 +4212,10 @@
                     ctx.errors.includes(s.errorMessage) ||
                     asserts.some(a => a.errorMessage === s.errorMessage);
                 if (s.errorMessage && !errShown) extra.push(h('pre', { class: 'step-err' }, s.errorMessage));
-                if (kids.length) {
+                if (kids.length && kids.every(logLevel)) {
+                    // Only log lines: shown as the step's details, not behind a collapsed "1 step"
+                    extra.push(h('ol', { class: 'steps sub has-kw', style: kwStyle(kids) }, kids.map(k => stepEl(k, { ...ctx, kw: true }))));
+                } else if (kids.length) {
                     const sub = subSteps(kids, { ...ctx, errors: s.errorMessage ? [...ctx.errors, s.errorMessage] : ctx.errors });
                     if (nested) {
                         const syncShots = () => {

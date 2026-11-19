@@ -24,6 +24,7 @@ import org.testng.ITestResult;
 
 import io.github.pulsereport.core.ci.GitHubActionsDetector;
 import io.github.pulsereport.core.model.Artifact;
+import io.github.pulsereport.core.model.LogLine;
 import io.github.pulsereport.core.model.Metric;
 import io.github.pulsereport.core.model.TestCase;
 import io.github.pulsereport.core.model.TestRun;
@@ -595,35 +596,45 @@ public class TestResultAggregator {
                 enrichedTestCases.add(enrichTestCase(testCase, artifactsByTest, metricsByTest, stepsByTest));
             }
 
+            // A test that wrote an error line now counts as failed
+            int passed = (int) enrichedTestCases.stream().filter(tc -> tc.getStatus() == TestStatus.PASSED).count();
+            int failed = (int) enrichedTestCases.stream().filter(tc -> tc.getStatus() == TestStatus.FAILED).count();
+            int skipped = (int) enrichedTestCases.stream().filter(tc -> tc.getStatus() == TestStatus.SKIPPED).count();
+            int flaky = (int) enrichedTestCases.stream().filter(tc -> tc.getStatus() == TestStatus.FLAKY).count();
+            boolean recount = failed != suite1.getFailedTests();
             TestSuite enrichedSuite = TestSuite.builder()
                     .id(suite1.getId())
                     .name(suite1.getName())
                     .startTime(suite1.getStartTime())
                     .endTime(suite1.getEndTime())
                     .duration(suite1.getDuration())
-                    .status(suite1.getStatus())
+                    .status(recount ? calculateSuiteStatus(passed, failed, skipped, flaky, enrichedTestCases.size())
+                            : suite1.getStatus())
                     .testCases(enrichedTestCases)
                     .totalTests(suite1.getTotalTests())
-                    .passedTests(suite1.getPassedTests())
-                    .failedTests(suite1.getFailedTests())
+                    .passedTests(recount ? passed : suite1.getPassedTests())
+                    .failedTests(recount ? failed : suite1.getFailedTests())
                     .skippedTests(suite1.getSkippedTests())
                     .build();
 
             enrichedSuites.add(enrichedSuite);
         }
 
+        int failedTests = enrichedSuites.stream().mapToInt(TestSuite::getFailedTests).sum();
+        boolean recount = failedTests != baseTestRun.getFailedTests();
         return TestRun.builder()
                 .id(baseTestRun.getId())
                 .name(baseTestRun.getName())
                 .startTime(baseTestRun.getStartTime())
                 .endTime(baseTestRun.getEndTime())
                 .duration(baseTestRun.getDuration())
-                .status(baseTestRun.getStatus())
+                .status(recount ? calculateOverallStatus(enrichedSuites) : baseTestRun.getStatus())
                 .suites(enrichedSuites)
                 .environment(withCiMetadata(baseTestRun.getEnvironment()))
                 .totalTests(baseTestRun.getTotalTests())
-                .passedTests(baseTestRun.getPassedTests())
-                .failedTests(baseTestRun.getFailedTests())
+                .passedTests(recount ? enrichedSuites.stream().mapToInt(TestSuite::getPassedTests).sum()
+                        : baseTestRun.getPassedTests())
+                .failedTests(failedTests)
                 .skippedTests(baseTestRun.getSkippedTests())
                 .build();
     }
@@ -661,7 +672,7 @@ public class TestResultAggregator {
             steps = testCase.getSteps();
         }
 
-        return TestCase.builder()
+        return LogLine.failIfErrorLogged(TestCase.builder()
                 .id(testCase.getId())
                 .name(testCase.getName())
                 .className(testCase.getClassName())
@@ -676,6 +687,6 @@ public class TestResultAggregator {
                 .artifacts(artifacts)
                 .metrics(metrics)
                 .retryCount(testCase.getRetryCount())
-                .build();
+                .build());
     }
 }

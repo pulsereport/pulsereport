@@ -43,6 +43,7 @@ import io.github.pulsereport.assertions.AssertionCollector;
 import io.github.pulsereport.core.ci.GitHubActionsDetector;
 import io.github.pulsereport.core.model.Artifact;
 import io.github.pulsereport.core.model.AssertionResult;
+import io.github.pulsereport.core.model.LogLine;
 import io.github.pulsereport.core.model.Metric;
 import io.github.pulsereport.core.model.TestCase;
 import io.github.pulsereport.core.model.TestRun;
@@ -512,7 +513,8 @@ public class CucumberAdapter implements EventListener {
 
         for (Map.Entry<URI, List<TestCase>> entry : testCasesByFeature.entrySet()) {
             URI featureUri = entry.getKey();
-            List<TestCase> cases = Collections.unmodifiableList(entry.getValue());
+            // A scenario that wrote an error line counts as failed
+            List<TestCase> cases = entry.getValue().stream().map(LogLine::failIfErrorLogged).toList();
 
             String featureName = featureNameByUri.getOrDefault(featureUri,
                     deriveFeatureNameFromUri(featureUri.toString()));
