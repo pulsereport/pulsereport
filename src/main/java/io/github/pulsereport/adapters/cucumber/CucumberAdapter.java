@@ -605,14 +605,15 @@ public class CucumberAdapter implements EventListener {
             File reportDir = resolveOutputDirectory(outputDir);
             reportDir.mkdirs();
 
-            File htmlReport = new File(reportDir, "test-report.html");
+            String name = ReporterConfig.resolveProperty("pulsereport.output.name", "test-report");
+            File htmlReport = new File(reportDir, name + ".html");
             new HtmlReportGenerator().generate(testRun, htmlReport);
             logger.info("\n========================================\n"
                     + "PulseReport: HTML report generated\n"
                     + "Location: {}\n"
                     + "========================================", htmlReport.getAbsolutePath());
 
-            File jsonReport = new File(reportDir, "test-report.json");
+            File jsonReport = new File(reportDir, name + ".json");
             new JsonReportGenerator().generate(testRun, jsonReport);
             logger.info("PulseReport: JSON report generated at {}", jsonReport.getAbsolutePath());
 

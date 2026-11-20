@@ -139,6 +139,28 @@ public void userIsCreated() {
 }
 ```
 
+#### Run Information
+
+`addRunInfo(name, value)` adds a field to the run's environment, shown at the top of the report,
+for values only your framework knows, such as the target environment or the build under test:
+
+```java
+adapter.addRunInfo("Environment", "automation");
+adapter.addRunInfo("Build Number", buildNumber);   // a blank value is ignored
+```
+
+#### Several Runs in One JVM
+
+Each report covers every TestNG run that finished in the same JVM, so a second run started from a
+listener, such as a rerun of the failed tests, adds its suite to the report instead of replacing the
+first run's results. The totals count both runs.
+
+#### Report File Name
+
+`pulsereport.output.name` sets the base name of the HTML and JSON files (default `test-report`), for
+example `-Dpulsereport.output.name=Smoke_1700000000` writes `Smoke_1700000000.html` and
+`Smoke_1700000000.json` in the output directory.
+
 ### Adding Artifacts
 
 ```java

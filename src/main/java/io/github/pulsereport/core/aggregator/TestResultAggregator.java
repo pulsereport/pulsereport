@@ -2,12 +2,14 @@ package io.github.pulsereport.core.aggregator;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -509,9 +511,48 @@ public class TestResultAggregator {
     }
 
     /**
+     * Combines two runs into one: the suites of both in the order they started, summed totals, the earliest start
+     * and the latest end.
+     * Used when several TestNG runs finish in one JVM, e.g. an end-of-run rerun of the failed tests.
+     *
+     * @param earlier the run reported first
+     * @param later the run that finished after it
+     * @return one run holding both; its id and name are the earlier run's
+     */
+    public static TestRun combine(TestRun earlier, TestRun later) {
+        List<TestSuite> suites = new ArrayList<>(earlier.getSuites());
+        suites.addAll(later.getSuites());
+        // A run started from a listener can finish first; list the suites in the order they ran
+        suites.sort(Comparator.comparing(TestSuite::getStartTime, Comparator.nullsLast(Comparator.naturalOrder())));
+        Instant start = earlier.getStartTime().isBefore(later.getStartTime()) ? earlier.getStartTime() : later.getStartTime();
+        Instant end = later.getEndTime() == null
+                || (earlier.getEndTime() != null && earlier.getEndTime().isAfter(later.getEndTime()))
+                ? earlier.getEndTime() : later.getEndTime();
+        Map<String, String> environment = new LinkedHashMap<>();
+        if (earlier.getEnvironment() != null) {
+            environment.putAll(earlier.getEnvironment());
+        }
+        if (later.getEnvironment() != null) {
+            environment.putAll(later.getEnvironment());
+        }
+        return earlier.toBuilder()
+                .suites(suites)
+                .startTime(start)
+                .endTime(end)
+                .duration(end == null ? earlier.getDuration() + later.getDuration() : Duration.between(start, end).toMillis())
+                .status(calculateOverallStatus(suites))
+                .environment(environment)
+                .totalTests(earlier.getTotalTests() + later.getTotalTests())
+                .passedTests(earlier.getPassedTests() + later.getPassedTests())
+                .failedTests(earlier.getFailedTests() + later.getFailedTests())
+                .skippedTests(earlier.getSkippedTests() + later.getSkippedTests())
+                .build();
+    }
+
+    /**
      * Calculates the overall status of a test run based on its suites.
      */
-    private TestStatus calculateOverallStatus(List<TestSuite> suites) {
+    private static TestStatus calculateOverallStatus(List<TestSuite> suites) {
         if (suites.isEmpty()) {
             return TestStatus.PASSED;
         }

@@ -67,6 +67,8 @@ Create the PulseReport configuration file at `src/main/resources/pulsereport.pro
 # Enable output formats
 pulsereport.output.formats=html,json,junit
 pulsereport.output.directory=target/pulsereport
+# Base name of the HTML and JSON files (default test-report)
+pulsereport.output.name=test-report
 ```
 
 All adapters and the CLI auto-detect this file (working directory, `src/main/resources/`, or classpath), so no client-side configuration code is needed. If present, `-Dpulsereport.output.directory` overrides the file's `pulsereport.output.directory`; otherwise reports go to the directory in the file, falling back to `target/pulsereport`.

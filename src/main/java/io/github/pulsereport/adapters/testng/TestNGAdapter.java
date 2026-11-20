@@ -444,6 +444,16 @@ public class TestNGAdapter implements Adapter, ITestListener, ISuiteListener, II
      */
     private TestRun testRun;
 
+    /** Run-level fields added through {@link #addRunInfo}, shown with the run's environment. */
+    private static final Map<String, String> runInfo = Collections.synchronizedMap(new LinkedHashMap<>());
+
+    /**
+     * What the reports written so far in this JVM cover. Each TestNG run that finishes adds its suites, so a
+     * second run started from a listener (e.g. a rerun of the failed tests) does not replace the first one's
+     * results in the report. Guarded by {@code TestNGAdapter.class}.
+     */
+    private static TestRun reportedRun;
+
     /**
      * Constructs a new TestNGAdapter.
      */
@@ -688,8 +698,8 @@ public class TestNGAdapter implements Adapter, ITestListener, ISuiteListener, II
     public void onFinish(ISuite suite) {
         onSuiteFinish(suite.getName());
 
-        testRun = enrichTestRun(applyTestLabels(
-                aggregator.buildTestRun(suite, artifactsByTest, metricsByTest, stepsByTest)));
+        testRun = enrichTestRun(applyTestLabels(withRunInfo(
+                aggregator.buildTestRun(suite, artifactsByTest, metricsByTest, stepsByTest))));
         logger.info("TestRun built for suite: {}", suite.getName());
 
         // The shared stores are static (shared across all adapter instances), so a
@@ -708,7 +718,49 @@ public class TestNGAdapter implements Adapter, ITestListener, ISuiteListener, II
         keysByMethodName.entrySet().removeIf(e -> e.getValue().isEmpty());
         logger.debug("Cleared artifact, metric, and step entries for suite: {}", suite.getName());
 
-        generateReports();
+        generateReports(withEarlierRuns(testRun));
+    }
+
+    /**
+     * Adds a field to the run's environment, e.g. the build number or the target environment. A later value
+     * for the same name replaces the earlier one; a blank name or value is ignored.
+     *
+     * @param name the field name shown in the report, e.g. "Build Number"
+     * @param value its value
+     */
+    public void addRunInfo(String name, String value) {
+        if (name != null && !name.isBlank() && value != null && !value.isBlank()) {
+            runInfo.put(name.trim(), value.trim());
+        }
+    }
+
+    /** Adds the fields from {@link #addRunInfo} to the run's environment. */
+    private static TestRun withRunInfo(TestRun run) {
+        if (run == null || runInfo.isEmpty()) {
+            return run;
+        }
+        Map<String, String> environment = new LinkedHashMap<>();
+        if (run.getEnvironment() != null) {
+            environment.putAll(run.getEnvironment());
+        }
+        synchronized (runInfo) {
+            environment.putAll(runInfo);
+        }
+        return run.toBuilder().environment(environment).build();
+    }
+
+    /** Adds the run to what earlier reports in this JVM covered, and returns the run the report should show. */
+    private static synchronized TestRun withEarlierRuns(TestRun run) {
+        if (run != null) {
+            reportedRun = reportedRun == null ? run : TestResultAggregator.combine(reportedRun, run);
+        }
+        return reportedRun;
+    }
+
+    /** Forgets earlier runs and run fields; for tests that run several suites in one JVM. */
+    static synchronized void resetReportedRuns() {
+        reportedRun = null;
+        runInfo.clear();
     }
 
     /**
@@ -755,10 +807,12 @@ public class TestNGAdapter implements Adapter, ITestListener, ISuiteListener, II
 
     /**
      * Generates HTML and JSON reports automatically. Reports are saved to the
-     * PulseReport output directory.
+     * PulseReport output directory, named by {@code pulsereport.output.name}.
+     *
+     * @param run the run to report
      */
-    private void generateReports() {
-        if (testRun == null) {
+    private void generateReports(TestRun run) {
+        if (run == null) {
             logger.warn("Cannot generate reports: TestRun is null");
             return;
         }
@@ -769,9 +823,10 @@ public class TestNGAdapter implements Adapter, ITestListener, ISuiteListener, II
             File reportDir = resolveOutputDirectory(outputDir);
             reportDir.mkdirs();
 
-            File htmlReport = new File(reportDir, "test-report.html");
+            String name = ReporterConfig.resolveProperty("pulsereport.output.name", "test-report");
+            File htmlReport = new File(reportDir, name + ".html");
             HtmlReportGenerator htmlGenerator = new HtmlReportGenerator();
-            htmlGenerator.generate(testRun, htmlReport);
+            htmlGenerator.generate(run, htmlReport);
             logger.info("""
                 
                 ========================================
@@ -783,9 +838,9 @@ public class TestNGAdapter implements Adapter, ITestListener, ISuiteListener, II
                     htmlReport.getAbsolutePath(),
                     htmlReport.getAbsolutePath());
 
-            File jsonReport = new File(reportDir, "test-report.json");
+            File jsonReport = new File(reportDir, name + ".json");
             JsonReportGenerator jsonGenerator = new JsonReportGenerator();
-            jsonGenerator.generate(testRun, jsonReport);
+            jsonGenerator.generate(run, jsonReport);
             logger.info("PulseReport: JSON report generated at {}", jsonReport.getAbsolutePath());
 
         } catch (Exception e) {

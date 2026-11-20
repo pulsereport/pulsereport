@@ -49,6 +49,7 @@ public class TestNGAdapterTest {
 
     @BeforeEach
     public void setUp() {
+        TestNGAdapter.resetReportedRuns();
         adapter = new TestNGAdapter();
     }
 
@@ -181,6 +182,62 @@ public class TestNGAdapterTest {
 
         TestRun testRun = adapter.getTestRun();
         assertNotNull(testRun, "TestRun should not be null after suite finishes");
+    }
+
+    @Test
+    public void aSecondRunInTheSameJvmIsAddedToTheReportUnderTheConfiguredName() throws Exception {
+        System.setProperty("pulsereport.output.directory", tempDir.toString());
+        System.setProperty("pulsereport.output.name", "AppiumReport_Smoke_1");
+        try {
+            adapter.addRunInfo("Build Number", "1234");
+            adapter.addRunInfo("Environment", " ");
+            runSuite(adapter, "Suite", "loginTest", ITestResult.FAILURE);
+            runSuite(new TestNGAdapter(), "Suite - rerun", "loginTest", ITestResult.SUCCESS);
+
+            com.fasterxml.jackson.databind.JsonNode report = new com.fasterxml.jackson.databind.ObjectMapper()
+                    .readTree(tempDir.resolve("AppiumReport_Smoke_1.json").toFile());
+            assertTrue(Files.exists(tempDir.resolve("AppiumReport_Smoke_1.html")), "HTML report under the configured name");
+            assertEquals(2, report.get("suites").size(), "both runs' suites are in the report");
+            assertEquals("Suite - rerunContext", report.get("suites").get(1).get("name").asText(), "report suites are the <test> contexts");
+            assertEquals(2, report.get("totalTests").asInt());
+            assertEquals(1, report.get("failedTests").asInt());
+            assertEquals("1234", report.get("environment").get("Build Number").asText());
+            assertFalse(report.get("environment").has("Environment"), "a blank value is ignored");
+        } finally {
+            System.clearProperty("pulsereport.output.directory");
+            System.clearProperty("pulsereport.output.name");
+        }
+    }
+
+    private void runSuite(TestNGAdapter suiteAdapter, String suiteName, String methodName, int status) {
+        ISuite mockSuite = mock(ISuite.class);
+        when(mockSuite.getName()).thenReturn(suiteName);
+        ITestContext mockContext = createMockTestContext(suiteName + "Context");
+        org.testng.ISuiteResult mockSuiteResult = mock(org.testng.ISuiteResult.class);
+        when(mockSuiteResult.getTestContext()).thenReturn(mockContext);
+        org.testng.IResultMap passedTests = mock(org.testng.IResultMap.class);
+        org.testng.IResultMap failedTests = mock(org.testng.IResultMap.class);
+        org.testng.IResultMap skippedTests = mock(org.testng.IResultMap.class);
+        when(mockContext.getPassedTests()).thenReturn(passedTests);
+        when(mockContext.getFailedTests()).thenReturn(failedTests);
+        when(mockContext.getSkippedTests()).thenReturn(skippedTests);
+        ITestResult mockResult = createMockTestResult(methodName, status);
+        java.util.Set<ITestResult> results = new java.util.HashSet<>(java.util.List.of(mockResult));
+        when(passedTests.getAllResults()).thenReturn(status == ITestResult.SUCCESS ? results : new java.util.HashSet<>());
+        when(failedTests.getAllResults()).thenReturn(status == ITestResult.FAILURE ? results : new java.util.HashSet<>());
+        when(skippedTests.getAllResults()).thenReturn(new java.util.HashSet<>());
+        when(mockSuite.getResults()).thenReturn(java.util.Collections.singletonMap(suiteName + "Context", mockSuiteResult));
+
+        suiteAdapter.onStart(mockSuite);
+        suiteAdapter.onStart(mockContext);
+        suiteAdapter.onTestStart(mockResult);
+        if (status == ITestResult.SUCCESS) {
+            suiteAdapter.onTestSuccess(mockResult);
+        } else {
+            suiteAdapter.onTestFailure(mockResult);
+        }
+        suiteAdapter.onFinish(mockContext);
+        suiteAdapter.onFinish(mockSuite);
     }
 
     @Test
