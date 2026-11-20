@@ -3,6 +3,7 @@ package io.github.pulsereport.adapters.appium;
 import io.appium.java_client.AppiumDriver;
 import io.appium.java_client.android.AndroidDriver;
 import io.appium.java_client.ios.IOSDriver;
+import io.appium.java_client.remote.AppiumCommandExecutor;
 import io.appium.java_client.proxy.ElementAwareWebDriverListener;
 import io.appium.java_client.proxy.Helpers;
 import io.github.pulsereport.adapters.selenium.SeleniumTracker;
@@ -103,6 +104,10 @@ final class AppiumStepReporter extends ElementAwareWebDriverListener {
         T driver = Helpers.createProxy(driverClass, args, constructor.getParameterTypes(), List.of(reporter));
         if (driver instanceof RemoteWebDriver) {
             reporter.driver = (RemoteWebDriver) driver;
+            // java-client's attach constructor skips this, so Appium's own commands (e.g. startRecordingScreen) are unknown
+            if (attachedTo != null && reporter.driver.getCommandExecutor() instanceof AppiumCommandExecutor) {
+                ((AppiumCommandExecutor) reporter.driver.getCommandExecutor()).refreshAdditionalCommands();
+            }
         }
         Map<String, String> device = driver instanceof HasCapabilities
                 ? MobileSessionMetadata.fromCapabilities(((HasCapabilities) driver).getCapabilities()).toTestDetails()

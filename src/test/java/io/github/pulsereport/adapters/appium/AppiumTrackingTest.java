@@ -188,6 +188,8 @@ class AppiumTrackingTest {
                     value = "\"android.widget.Button\"";
                 } else if (path.endsWith("/attribute/content-desc")) {
                     value = "\"Log in\"";
+                } else if (path.endsWith("/start_recording_screen")) {
+                    value = "\"\"";
                 } else if (path.endsWith("/screenshot")) {
                     value = "\"" + PNG + "\"";
                 }
@@ -383,6 +385,10 @@ class AppiumTrackingTest {
         assertEquals(original.getSessionId(), driver.getSessionId());
         assertEquals(1, server.newSessions());
         assertEquals("iPhone 16", driver.getCapabilities().getCapability("deviceName"));
+
+        driver.startRecordingScreen();
+        assertTrue(server.requests.contains("POST /session/s1/appium/start_recording_screen"),
+                "Appium's own commands work on the attached driver: " + server.requests);
     }
 
     @Test
