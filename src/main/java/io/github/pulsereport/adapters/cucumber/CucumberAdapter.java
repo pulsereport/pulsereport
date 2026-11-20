@@ -43,6 +43,7 @@ import io.github.pulsereport.assertions.AssertionCollector;
 import io.github.pulsereport.core.ci.GitHubActionsDetector;
 import io.github.pulsereport.core.model.Artifact;
 import io.github.pulsereport.core.model.AssertionResult;
+import io.github.pulsereport.core.model.LogLine;
 import io.github.pulsereport.core.model.Metric;
 import io.github.pulsereport.core.model.TestCase;
 import io.github.pulsereport.core.model.TestRun;
@@ -512,7 +513,8 @@ public class CucumberAdapter implements EventListener {
 
         for (Map.Entry<URI, List<TestCase>> entry : testCasesByFeature.entrySet()) {
             URI featureUri = entry.getKey();
-            List<TestCase> cases = Collections.unmodifiableList(entry.getValue());
+            // A scenario that wrote an error line counts as failed
+            List<TestCase> cases = entry.getValue().stream().map(LogLine::failIfErrorLogged).toList();
 
             String featureName = featureNameByUri.getOrDefault(featureUri,
                     deriveFeatureNameFromUri(featureUri.toString()));
@@ -603,14 +605,15 @@ public class CucumberAdapter implements EventListener {
             File reportDir = resolveOutputDirectory(outputDir);
             reportDir.mkdirs();
 
-            File htmlReport = new File(reportDir, "test-report.html");
+            String name = ReporterConfig.resolveProperty("pulsereport.output.name", "test-report");
+            File htmlReport = new File(reportDir, name + ".html");
             new HtmlReportGenerator().generate(testRun, htmlReport);
             logger.info("\n========================================\n"
                     + "PulseReport: HTML report generated\n"
                     + "Location: {}\n"
                     + "========================================", htmlReport.getAbsolutePath());
 
-            File jsonReport = new File(reportDir, "test-report.json");
+            File jsonReport = new File(reportDir, name + ".json");
             new JsonReportGenerator().generate(testRun, jsonReport);
             logger.info("PulseReport: JSON report generated at {}", jsonReport.getAbsolutePath());
 

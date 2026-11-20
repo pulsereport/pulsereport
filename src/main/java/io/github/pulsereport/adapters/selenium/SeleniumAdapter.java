@@ -35,6 +35,7 @@ import io.github.pulsereport.adapters.CaptureBridge;
 import io.github.pulsereport.adapters.testng.TestNGAdapter;
 import io.github.pulsereport.config.ReporterConfig;
 import io.github.pulsereport.core.model.Artifact;
+import io.github.pulsereport.core.model.LogLine;
 import io.github.pulsereport.core.model.TestRun;
 
 /**
@@ -284,6 +285,62 @@ public class SeleniumAdapter extends TestNGAdapter {
      */
     public <T> T step(String message, StepSupplier<T> action) {
         return SeleniumTracker.step(message, action);
+    }
+
+    /**
+     * Runs {@code action} as a named step with a detail line under its name, e.g. the locator of
+     * the element it acts on.
+     *
+     * @param message the step name shown in the report
+     * @param detail shown under the name; null or blank for none
+     * @param action the step body
+     */
+    public void step(String message, String detail, StepAction action) {
+        SeleniumTracker.step(message, detail, action);
+    }
+
+    /**
+     * Runs {@code action} as a named step with a detail line under its name, and returns its result.
+     *
+     * @param message the step name shown in the report
+     * @param detail shown under the name; null or blank for none
+     * @param action the step body
+     * @param <T> the result type
+     * @return the value returned by {@code action}
+     */
+    public <T> T step(String message, String detail, StepSupplier<T> action) {
+        return SeleniumTracker.step(message, detail, action);
+    }
+
+    /**
+     * Writes an info line into the running step, or into the test outside a step.
+     *
+     * @param message the text
+     */
+    public void log(String message) {
+        SeleniumTracker.log(LogLine.Level.INFO, message);
+    }
+
+    /**
+     * Writes a warning line into the running step, or into the test outside a step.
+     * It does not fail anything.
+     *
+     * @param message the text
+     */
+    public void warn(String message) {
+        SeleniumTracker.log(LogLine.Level.WARN, message);
+    }
+
+    /**
+     * Writes an error line into the running step, or into the test outside a step.
+     * It fails that step, the steps around it and the test, even when nothing threw;
+     * written in a configuration method (e.g. {@code @AfterMethod}), it fails that
+     * method's step and the test it belongs to.
+     *
+     * @param message the text
+     */
+    public void error(String message) {
+        SeleniumTracker.log(LogLine.Level.ERROR, message);
     }
 
     /**

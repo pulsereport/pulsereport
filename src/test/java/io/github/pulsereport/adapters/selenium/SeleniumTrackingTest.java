@@ -6,6 +6,7 @@ import java.lang.reflect.Method;
 import java.nio.file.Files;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
@@ -598,6 +599,85 @@ class SeleniumTrackingTest {
         TestStep teardown = adapter.steps().get(adapter.steps().size() - 1);
         assertEquals("@AfterMethod", teardown.getKeyword());
         assertEquals("Open \"https://example.test/logout\"", teardown.getChildren().get(0).getName());
+    }
+
+    @Test
+    void logLinesSitAmongTheStepsAndAnErrorFailsItsStepAndTheStepsAroundIt() {
+        browser.element(By.id("login"), "button", "Sign in", "submit");
+        adapter.onTestStart(result);
+        WebDriver driver = adapter.track(browser);
+
+        adapter.log("Opening the login page");
+        adapter.step("Log in", () -> {
+            adapter.step("Submit", () -> {
+                driver.findElement(By.id("login")).click();
+                adapter.error("Login service answered 500");
+            });
+            adapter.warn("Slow response");
+        });
+        adapter.onTestSuccess(result);
+
+        TestStep info = adapter.steps().get(0);
+        assertEquals("Info", info.getKeyword());
+        assertEquals("Opening the login page", info.getName());
+        assertEquals(TestStatus.PASSED, info.getStatus());
+        TestStep login = adapter.steps().get(1);
+        assertEquals(TestStatus.FAILED, login.getStatus(), "nothing threw, but an error line fails the steps around it");
+        TestStep submit = login.getChildren().get(0);
+        assertEquals(TestStatus.FAILED, submit.getStatus());
+        assertEquals("Error", submit.getChildren().get(1).getKeyword());
+        assertEquals("Login service answered 500", submit.getChildren().get(1).getName());
+        assertEquals("Warn", login.getChildren().get(1).getKeyword());
+        assertTrue(submit.getArtifacts().stream().anyMatch(a -> "screenshot".equals(a.getType())),
+                "the step the error was written in gets a screenshot");
+        assertTrue(login.getArtifacts().stream().noneMatch(a -> "screenshot".equals(a.getType())),
+                "the steps around it don't take another");
+    }
+
+    @Test
+    void infoAndWarningLinesLeaveTheStepPassed() {
+        adapter.onTestStart(result);
+
+        adapter.step("Check balance", () -> {
+            adapter.log("Balance: 120");
+            adapter.warn("Balance below 200");
+        });
+        adapter.onTestSuccess(result);
+
+        TestStep check = adapter.steps().get(0);
+        assertEquals(TestStatus.PASSED, check.getStatus());
+        assertEquals(List.of("Info", "Warn"), check.getChildren().stream().map(TestStep::getKeyword).toList());
+    }
+
+    @Test
+    void aStepCanCarryADetailUnderItsName() {
+        adapter.onTestStart(result);
+
+        adapter.step("Click Log in", "id: login", () -> { });
+        String total = adapter.step("Read total", "id: total", () -> "120");
+        adapter.step("Plain", () -> { });
+        adapter.onTestSuccess(result);
+
+        assertEquals("120", total);
+        assertEquals(Arrays.asList("id: login", "id: total", null),
+                adapter.steps().stream().map(TestStep::getDescription).toList());
+    }
+
+    @Test
+    void anErrorWrittenInTeardownFailsItsStep() {
+        adapter.onTestStart(result);
+        adapter.onTestSuccess(result);
+
+        IInvokedMethod tearDown = configMethod("cleanUpLoan", false);
+        ITestResult configResult = configResult(ITestResult.SUCCESS, null);
+        adapter.beforeInvocation(tearDown, configResult);
+        adapter.error("Post-test loan cleanup failed: 404");
+        adapter.afterInvocation(tearDown, configResult);
+
+        TestStep teardown = adapter.steps().get(adapter.steps().size() - 1);
+        assertEquals("@AfterMethod", teardown.getKeyword());
+        assertEquals(TestStatus.FAILED, teardown.getStatus());
+        assertEquals("Post-test loan cleanup failed: 404", teardown.getChildren().get(0).getName());
     }
 
     @Test

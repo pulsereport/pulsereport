@@ -2,12 +2,14 @@ package io.github.pulsereport.core.aggregator;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -24,6 +26,7 @@ import org.testng.ITestResult;
 
 import io.github.pulsereport.core.ci.GitHubActionsDetector;
 import io.github.pulsereport.core.model.Artifact;
+import io.github.pulsereport.core.model.LogLine;
 import io.github.pulsereport.core.model.Metric;
 import io.github.pulsereport.core.model.TestCase;
 import io.github.pulsereport.core.model.TestRun;
@@ -508,9 +511,48 @@ public class TestResultAggregator {
     }
 
     /**
+     * Combines two runs into one: the suites of both in the order they started, summed totals, the earliest start
+     * and the latest end.
+     * Used when several TestNG runs finish in one JVM, e.g. an end-of-run rerun of the failed tests.
+     *
+     * @param earlier the run reported first
+     * @param later the run that finished after it
+     * @return one run holding both; its id and name are the earlier run's
+     */
+    public static TestRun combine(TestRun earlier, TestRun later) {
+        List<TestSuite> suites = new ArrayList<>(earlier.getSuites());
+        suites.addAll(later.getSuites());
+        // A run started from a listener can finish first; list the suites in the order they ran
+        suites.sort(Comparator.comparing(TestSuite::getStartTime, Comparator.nullsLast(Comparator.naturalOrder())));
+        Instant start = earlier.getStartTime().isBefore(later.getStartTime()) ? earlier.getStartTime() : later.getStartTime();
+        Instant end = later.getEndTime() == null
+                || (earlier.getEndTime() != null && earlier.getEndTime().isAfter(later.getEndTime()))
+                ? earlier.getEndTime() : later.getEndTime();
+        Map<String, String> environment = new LinkedHashMap<>();
+        if (earlier.getEnvironment() != null) {
+            environment.putAll(earlier.getEnvironment());
+        }
+        if (later.getEnvironment() != null) {
+            environment.putAll(later.getEnvironment());
+        }
+        return earlier.toBuilder()
+                .suites(suites)
+                .startTime(start)
+                .endTime(end)
+                .duration(end == null ? earlier.getDuration() + later.getDuration() : Duration.between(start, end).toMillis())
+                .status(calculateOverallStatus(suites))
+                .environment(environment)
+                .totalTests(earlier.getTotalTests() + later.getTotalTests())
+                .passedTests(earlier.getPassedTests() + later.getPassedTests())
+                .failedTests(earlier.getFailedTests() + later.getFailedTests())
+                .skippedTests(earlier.getSkippedTests() + later.getSkippedTests())
+                .build();
+    }
+
+    /**
      * Calculates the overall status of a test run based on its suites.
      */
-    private TestStatus calculateOverallStatus(List<TestSuite> suites) {
+    private static TestStatus calculateOverallStatus(List<TestSuite> suites) {
         if (suites.isEmpty()) {
             return TestStatus.PASSED;
         }
@@ -595,35 +637,45 @@ public class TestResultAggregator {
                 enrichedTestCases.add(enrichTestCase(testCase, artifactsByTest, metricsByTest, stepsByTest));
             }
 
+            // A test that wrote an error line now counts as failed
+            int passed = (int) enrichedTestCases.stream().filter(tc -> tc.getStatus() == TestStatus.PASSED).count();
+            int failed = (int) enrichedTestCases.stream().filter(tc -> tc.getStatus() == TestStatus.FAILED).count();
+            int skipped = (int) enrichedTestCases.stream().filter(tc -> tc.getStatus() == TestStatus.SKIPPED).count();
+            int flaky = (int) enrichedTestCases.stream().filter(tc -> tc.getStatus() == TestStatus.FLAKY).count();
+            boolean recount = failed != suite1.getFailedTests();
             TestSuite enrichedSuite = TestSuite.builder()
                     .id(suite1.getId())
                     .name(suite1.getName())
                     .startTime(suite1.getStartTime())
                     .endTime(suite1.getEndTime())
                     .duration(suite1.getDuration())
-                    .status(suite1.getStatus())
+                    .status(recount ? calculateSuiteStatus(passed, failed, skipped, flaky, enrichedTestCases.size())
+                            : suite1.getStatus())
                     .testCases(enrichedTestCases)
                     .totalTests(suite1.getTotalTests())
-                    .passedTests(suite1.getPassedTests())
-                    .failedTests(suite1.getFailedTests())
+                    .passedTests(recount ? passed : suite1.getPassedTests())
+                    .failedTests(recount ? failed : suite1.getFailedTests())
                     .skippedTests(suite1.getSkippedTests())
                     .build();
 
             enrichedSuites.add(enrichedSuite);
         }
 
+        int failedTests = enrichedSuites.stream().mapToInt(TestSuite::getFailedTests).sum();
+        boolean recount = failedTests != baseTestRun.getFailedTests();
         return TestRun.builder()
                 .id(baseTestRun.getId())
                 .name(baseTestRun.getName())
                 .startTime(baseTestRun.getStartTime())
                 .endTime(baseTestRun.getEndTime())
                 .duration(baseTestRun.getDuration())
-                .status(baseTestRun.getStatus())
+                .status(recount ? calculateOverallStatus(enrichedSuites) : baseTestRun.getStatus())
                 .suites(enrichedSuites)
                 .environment(withCiMetadata(baseTestRun.getEnvironment()))
                 .totalTests(baseTestRun.getTotalTests())
-                .passedTests(baseTestRun.getPassedTests())
-                .failedTests(baseTestRun.getFailedTests())
+                .passedTests(recount ? enrichedSuites.stream().mapToInt(TestSuite::getPassedTests).sum()
+                        : baseTestRun.getPassedTests())
+                .failedTests(failedTests)
                 .skippedTests(baseTestRun.getSkippedTests())
                 .build();
     }
@@ -661,7 +713,7 @@ public class TestResultAggregator {
             steps = testCase.getSteps();
         }
 
-        return TestCase.builder()
+        return LogLine.failIfErrorLogged(TestCase.builder()
                 .id(testCase.getId())
                 .name(testCase.getName())
                 .className(testCase.getClassName())
@@ -676,6 +728,6 @@ public class TestResultAggregator {
                 .artifacts(artifacts)
                 .metrics(metrics)
                 .retryCount(testCase.getRetryCount())
-                .build();
+                .build());
     }
 }

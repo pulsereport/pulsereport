@@ -497,6 +497,31 @@ public class TestResultAggregatorTest {
      * NOT leaked into the TestCase.
      */
     @Test
+    public void aPassedTestThatWroteAnErrorLineIsReportedFailedInTheTotals() {
+        ITestResult result = createMockTestResult("loanTest", "com.Test", ITestResult.SUCCESS, 100L, 200L, null);
+        ISuite suite = wiredSuiteWithResult("Suite", "Automation suite", result);
+        aggregator.recordTestResult(result);
+        Map<String, List<io.github.pulsereport.core.model.TestStep>> steps = new HashMap<>();
+        steps.put(aggregator.getTestKey(result), new ArrayList<>(List.of(
+                io.github.pulsereport.core.model.LogLine.step(io.github.pulsereport.core.model.LogLine.Level.WARN,
+                        "Slow response", Instant.now()),
+                io.github.pulsereport.core.model.LogLine.step(io.github.pulsereport.core.model.LogLine.Level.ERROR,
+                        "Cleanup failed", Instant.now()))));
+
+        TestRun run = aggregator.buildTestRun(suite, new HashMap<>(), new HashMap<>(), steps);
+
+        TestCase tc = run.getSuites().get(0).getTestCases().get(0);
+        assertEquals(TestStatus.FAILED, tc.getStatus());
+        assertEquals("Error logged: Cleanup failed", tc.getErrorMessage());
+        assertEquals(TestStatus.FAILED, run.getSuites().get(0).getStatus());
+        assertEquals(1, run.getSuites().get(0).getFailedTests());
+        assertEquals(0, run.getSuites().get(0).getPassedTests());
+        assertEquals(TestStatus.FAILED, run.getStatus());
+        assertEquals(1, run.getFailedTests());
+        assertEquals(0, run.getPassedTests());
+    }
+
+    @Test
     public void mergesArtifactsFromFullKeyAndMethodName() {
         ITestResult result = createMockTestResult(
                 "customerLoginTest", "com.Test", ITestResult.FAILURE, 100L, 200L, new AssertionError("boom"));
@@ -698,5 +723,45 @@ public class TestResultAggregatorTest {
         when(mockSuite.getXmlSuite()).thenReturn(mockXmlSuite);
 
         return mockSuite;
+    }
+
+    @Test
+    void combiningTwoRunsKeepsBothSuitesAndSumsTheTotals() {
+        Instant t0 = Instant.parse("2026-11-19T10:00:00Z");
+        TestRun first = run("first", t0, t0.plusSeconds(60), suite("Automation suite", TestStatus.FAILED, t0), 10, 8, 2, 0);
+        TestRun rerun = run("rerun", t0.plusSeconds(70), t0.plusSeconds(90),
+                suite("Rerun of failed tests", TestStatus.PASSED, t0.plusSeconds(70)), 2, 2, 0, 0);
+
+        TestRun combined = TestResultAggregator.combine(first, rerun);
+        assertEquals(List.of("Automation suite", "Rerun of failed tests"),
+                TestResultAggregator.combine(rerun, first).getSuites().stream().map(TestSuite::getName).toList(),
+                "a rerun that finished first is still listed after the run it repeats");
+
+        assertEquals(List.of("Automation suite", "Rerun of failed tests"),
+                combined.getSuites().stream().map(TestSuite::getName).toList());
+        assertEquals(12, combined.getTotalTests());
+        assertEquals(10, combined.getPassedTests());
+        assertEquals(2, combined.getFailedTests());
+        assertEquals(TestStatus.FAILED, combined.getStatus());
+        assertEquals(t0, combined.getStartTime());
+        assertEquals(t0.plusSeconds(90), combined.getEndTime());
+        assertEquals(90_000, combined.getDuration());
+        assertEquals("first", combined.getId());
+
+        TestRun unfinished = run("unfinished", t0.plusSeconds(95), null, suite("Late", TestStatus.PASSED, t0.plusSeconds(95)), 1, 1, 0, 0);
+        assertEquals(t0.plusSeconds(90), TestResultAggregator.combine(combined, unfinished).getEndTime(),
+                "a run without an end time does not break the combined report");
+    }
+
+    private static TestSuite suite(String name, TestStatus status, Instant start) {
+        return TestSuite.builder().id(name).name(name).status(status).startTime(start).endTime(start)
+                .testCases(List.of()).build();
+    }
+
+    private static TestRun run(String id, Instant start, Instant end, TestSuite suite, int total, int passed, int failed,
+            int skipped) {
+        return TestRun.builder().id(id).name(id).startTime(start).endTime(end).status(suite.getStatus())
+                .suites(List.of(suite)).totalTests(total).passedTests(passed).failedTests(failed).skippedTests(skipped)
+                .build();
     }
 }
