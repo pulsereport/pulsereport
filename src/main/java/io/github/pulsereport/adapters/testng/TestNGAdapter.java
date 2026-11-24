@@ -291,6 +291,9 @@ public class TestNGAdapter implements Adapter, ITestListener, ISuiteListener, II
     /** Extra tags per test key (e.g. the browser a Selenium test ran in), in insertion order. */
     private static final Map<String, Set<String>> tagsByTest = new ConcurrentHashMap<>();
 
+    /** The groups of each test's class (its {@code @Test} and its superclasses'), by test key. */
+    private static final Map<String, List<String>> classTagsByTest = new ConcurrentHashMap<>();
+
     /** Details of where each test ran (e.g. its device), by test key, in display order. */
     private static final Map<String, Map<String, String>> metadataByTest = new ConcurrentHashMap<>();
 
@@ -713,6 +716,7 @@ public class TestNGAdapter implements Adapter, ITestListener, ISuiteListener, II
         assertionsByTest.keySet().removeIf(k -> k.startsWith(suitePrefix));
         adapterByTest.keySet().removeIf(k -> k.startsWith(suitePrefix));
         tagsByTest.keySet().removeIf(k -> k.startsWith(suitePrefix));
+        classTagsByTest.keySet().removeIf(k -> k.startsWith(suitePrefix));
         metadataByTest.keySet().removeIf(k -> k.startsWith(suitePrefix));
         keysByMethodName.values().forEach(set -> set.removeIf(k -> k.startsWith(suitePrefix)));
         keysByMethodName.entrySet().removeIf(e -> e.getValue().isEmpty());
@@ -890,6 +894,7 @@ public class TestNGAdapter implements Adapter, ITestListener, ISuiteListener, II
         currentTestKey.set(testKey);
         setRestAssuredTestContext(testKey);
         registerMethodKey(result, testKey);
+        recordGroups(result, testKey);
         // Setup captured in @BeforeMethod/@BeforeClass (which run before this event) belongs to this test
         PendingSetup setup = pendingSetup.get();
         pendingSetup.remove();
@@ -1291,6 +1296,35 @@ public class TestNGAdapter implements Adapter, ITestListener, ISuiteListener, II
     }
 
     /**
+     * Records a test's TestNG groups as declared: its method's {@code @Test} groups as its tags, and
+     * its class's (and superclasses', as TestNG applies them) as its class tags.
+     */
+    private static void recordGroups(ITestResult result, String testKey) {
+        ITestNGMethod m = result.getMethod();
+        java.lang.reflect.Method method = m == null || m.getConstructorOrMethod() == null ? null
+                : m.getConstructorOrMethod().getMethod();
+        if (method == null) {
+            return;
+        }
+        org.testng.annotations.Test own = method.getAnnotation(org.testng.annotations.Test.class);
+        if (own != null) {
+            for (String group : own.groups()) {
+                tagTest(testKey, group);
+            }
+        }
+        Set<String> classGroups = new LinkedHashSet<>();
+        for (Class<?> c = m.getRealClass(); c != null && c != Object.class; c = c.getSuperclass()) {
+            org.testng.annotations.Test onClass = c.getAnnotation(org.testng.annotations.Test.class);
+            if (onClass != null) {
+                classGroups.addAll(List.of(onClass.groups()));
+            }
+        }
+        if (!classGroups.isEmpty()) {
+            classTagsByTest.put(testKey, new ArrayList<>(classGroups));
+        }
+    }
+
+    /**
      * Adds a tag to a test, e.g. the browser it ran in.
      *
      * @param testKey the test key
@@ -1403,8 +1437,8 @@ public class TestNGAdapter implements Adapter, ITestListener, ISuiteListener, II
 
     /** Applies the adapter names, extra tags and test-level assertions recorded per test key. */
     private static TestRun applyTestLabels(TestRun run) {
-        if (run == null || (adapterByTest.isEmpty() && tagsByTest.isEmpty() && assertionsByTest.isEmpty()
-                && metadataByTest.isEmpty())) {
+        if (run == null || (adapterByTest.isEmpty() && tagsByTest.isEmpty() && classTagsByTest.isEmpty()
+                && assertionsByTest.isEmpty() && metadataByTest.isEmpty())) {
             return run;
         }
         boolean changed = false;
@@ -1414,10 +1448,11 @@ public class TestNGAdapter implements Adapter, ITestListener, ISuiteListener, II
             for (TestCase tc : suite.getTestCases()) {
                 String adapter = adapterByTest.get(tc.getId());
                 Set<String> extra = tagsByTest.get(tc.getId());
+                List<String> classTags = classTagsByTest.get(tc.getId());
                 List<AssertionResult> assertions = assertionsByTest.get(tc.getId());
                 Map<String, String> metadata = recordedMetadata(tc.getId());
-                if (adapter == null && (extra == null || extra.isEmpty()) && (assertions == null || assertions.isEmpty())
-                        && metadata.isEmpty()) {
+                if (adapter == null && (extra == null || extra.isEmpty()) && classTags == null
+                        && (assertions == null || assertions.isEmpty()) && metadata.isEmpty()) {
                     cases.add(tc);
                     continue;
                 }
@@ -1428,7 +1463,8 @@ public class TestNGAdapter implements Adapter, ITestListener, ISuiteListener, II
                     }
                 }
                 TestCase.Builder updated = tc.toBuilder().adapter(adapter != null ? adapter : tc.getAdapter())
-                        .tags(new ArrayList<>(tags));
+                        .tags(new ArrayList<>(tags))
+                        .classTags(classTags != null ? classTags : tc.getClassTags());
                 if (!metadata.isEmpty()) {
                     Map<String, String> all = new LinkedHashMap<>(tc.getMetadata());
                     all.putAll(metadata);

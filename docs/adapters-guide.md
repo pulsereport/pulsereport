@@ -117,15 +117,21 @@ public void testWithParameters(int a, int b, int expected) {
 // Each parameter combination is tracked separately
 ```
 
-#### Groups and Priorities
+#### Groups
 
 ```java
-@Test(groups = {"smoke", "regression"}, priority = 1)
-public void criticalTest() {
-    // Test logic
+@Test(groups = {"regression", "smoke"})
+public class LoginTest {
+    @Test(groups = "login")
+    public void criticalTest() {
+        // Test logic
+    }
 }
-// Groups and priorities are captured in the report
 ```
+
+A method's own groups are the test's tags, shown in the test's header (`TestCase.tags`). The class's
+groups, including those on its superclasses' `@Test`, are its class tags (`TestCase.classTags`), shown
+when you hover the class in the sidebar. Both are searchable.
 
 #### Assertions
 

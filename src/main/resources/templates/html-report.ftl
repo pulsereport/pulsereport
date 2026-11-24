@@ -3397,7 +3397,8 @@
                         tc.className,
                         tc.methodName,
                         tc.errorMessage,
-                        ...(tc.tags || [])
+                        ...(tc.tags || []),
+                        ...(tc.classTags || [])
                     ]
                         .filter(Boolean)
                         .join('\n')
@@ -3719,8 +3720,9 @@
                         const key = tc.className && !tc.bddType ? `class:${tc.className}` : suite;
                         let g = byKey.get(key);
                         if (!g) {
+                            // A class's tags (e.g. its TestNG groups) are shown when hovering it, like a feature's
                             const tip = typeof key === 'string'
-                                ? tc.className
+                                ? tc.className + (tc.classTags && tc.classTags.length ? '\n' + tc.classTags.join(' ') : '')
                                 : (suite.secondaryText || suite.name || '') + (suite.tags && suite.tags.length ? '\n' + suite.tags.join(' ') : '');
                             g = { name: groupName(tc, suite), tip, cases: [] };
                             byKey.set(key, g);
