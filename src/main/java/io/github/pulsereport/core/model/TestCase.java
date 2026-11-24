@@ -41,6 +41,7 @@ public final class TestCase {
     private final String featureDescription;
     private final List<TestStep> backgroundSteps;
     private final List<String> tags;
+    private final List<String> classTags;
     private final String adapter;
     private final List<AssertionResult> assertions;
     private final Map<String, String> metadata;
@@ -66,6 +67,7 @@ public final class TestCase {
             @JsonProperty("featureDescription") String featureDescription,
             @JsonProperty("backgroundSteps") List<TestStep> backgroundSteps,
             @JsonProperty("tags") List<String> tags,
+            @JsonProperty("classTags") List<String> classTags,
             @JsonProperty("adapter") String adapter,
             @JsonProperty("assertions") List<AssertionResult> assertions,
             @JsonProperty("metadata") Map<String, String> metadata) {
@@ -88,6 +90,7 @@ public final class TestCase {
         this.featureDescription = featureDescription;
         this.backgroundSteps = backgroundSteps != null ? new ArrayList<>(backgroundSteps) : new ArrayList<>();
         this.tags = tags != null ? new ArrayList<>(tags) : new ArrayList<>();
+        this.classTags = classTags != null ? new ArrayList<>(classTags) : new ArrayList<>();
         this.adapter = adapter;
         this.assertions = assertions != null ? new ArrayList<>(assertions) : new ArrayList<>();
         this.metadata = metadata != null ? new LinkedHashMap<>(metadata) : new LinkedHashMap<>();
@@ -265,6 +268,16 @@ public final class TestCase {
     }
 
     /**
+     * Gets the tags of the class the test belongs to, e.g. the groups of a TestNG class's
+     * {@code @Test}. They apply to every test in the class; {@link #getTags()} holds the test's own.
+     *
+     * @return an unmodifiable list of class tags
+     */
+    public List<String> getClassTags() {
+        return Collections.unmodifiableList(classTags);
+    }
+
+    /**
      * Creates a new builder for TestCase.
      *
      * @return a new builder instance
@@ -316,7 +329,7 @@ public final class TestCase {
                 .errorMessage(errorMessage).stackTrace(stackTrace).steps(steps).artifacts(artifacts)
                 .metrics(metrics).retryCount(retryCount).bddType(bddType).featureName(featureName)
                 .featureDescription(featureDescription).backgroundSteps(backgroundSteps).tags(tags)
-                .adapter(adapter).assertions(assertions).metadata(metadata);
+                .classTags(classTags).adapter(adapter).assertions(assertions).metadata(metadata);
     }
 
     /**
@@ -353,6 +366,7 @@ public final class TestCase {
                 && Objects.equals(featureDescription, testCase.featureDescription)
                 && Objects.equals(backgroundSteps, testCase.backgroundSteps)
                 && Objects.equals(tags, testCase.tags)
+                && Objects.equals(classTags, testCase.classTags)
                 && Objects.equals(adapter, testCase.adapter)
                 && Objects.equals(metadata, testCase.metadata)
                 && Objects.equals(assertions, testCase.assertions);
@@ -367,7 +381,8 @@ public final class TestCase {
     public int hashCode() {
         return Objects.hash(id, name, className, methodName, startTime, endTime,
                 duration, status, errorMessage, stackTrace, steps, artifacts, metrics, retryCount,
-                bddType, featureName, featureDescription, backgroundSteps, tags, adapter, assertions, metadata);
+                bddType, featureName, featureDescription, backgroundSteps, tags, classTags, adapter, assertions,
+                metadata);
     }
 
     /**
@@ -420,6 +435,7 @@ public final class TestCase {
         private String featureDescription;
         private List<TestStep> backgroundSteps;
         private List<String> tags;
+        private List<String> classTags;
         private String adapter;
         private List<AssertionResult> assertions;
         private Map<String, String> metadata;
@@ -671,6 +687,17 @@ public final class TestCase {
         }
 
         /**
+         * Sets the tags of the class the test belongs to.
+         *
+         * @param classTags the class tags (optional)
+         * @return this builder
+         */
+        public Builder classTags(List<String> classTags) {
+            this.classTags = classTags;
+            return this;
+        }
+
+        /**
          * Builds the TestCase instance.
          *
          * @return a new TestCase
@@ -688,7 +715,8 @@ public final class TestCase {
             }
             return new TestCase(id, name, className, methodName, startTime, endTime,
                     duration, status, errorMessage, stackTrace, steps, artifacts, metrics, retryCount,
-                    bddType, featureName, featureDescription, backgroundSteps, tags, adapter, assertions, metadata);
+                    bddType, featureName, featureDescription, backgroundSteps, tags, classTags, adapter, assertions,
+                    metadata);
         }
     }
 }

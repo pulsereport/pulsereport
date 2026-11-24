@@ -24,6 +24,7 @@ import org.testng.ITestResult;
 import io.github.pulsereport.adapters.selenium.SeleniumTracker;
 import io.github.pulsereport.assertions.AssertionCapture;
 import io.github.pulsereport.core.model.AssertionResult;
+import io.github.pulsereport.core.model.LogLine;
 import io.github.pulsereport.core.model.TestStatus;
 import io.github.pulsereport.core.model.TestStep;
 
@@ -126,6 +127,86 @@ class TestNGAssertionCaptureTest {
         assertEquals(List.of("orders are listed"), messages(adapter.steps().get(1)));
         assertEquals(List.of("before any step"), adapter.assertions().stream().map(AssertionResult::getMessage).toList(),
                 "an assertion made before any step stays on the test");
+    }
+
+    @Test
+    void aFailedAssertionFailsTheStepItBelongsTo() {
+        adapter.onTestStart(result);
+        adapter.beforeInvocation(testMethod, result);
+        SeleniumTracker.step("Open cart", () -> { });
+        Assert.assertTrue(true, "cart is shown");
+        SeleniumTracker.step("Check totals", () -> {
+            try {
+                Assert.assertEquals(10, 12, "total");
+            } catch (AssertionError caught) {
+                // checked softly: the step goes on
+            }
+        });
+        SeleniumTracker.step("Enter passcode", () -> { });
+        try {
+            Assert.assertTrue(false, "new passcode title is shown");
+        } catch (AssertionError expected) {
+            // the test fails on it
+        }
+        adapter.afterInvocation(testMethod, result);
+        adapter.onTestFailure(result);
+
+        assertEquals(List.of(TestStatus.PASSED, TestStatus.FAILED, TestStatus.FAILED),
+                adapter.steps().stream().map(TestStep::getStatus).toList());
+        assertEquals(List.of("new passcode title is shown"), messages(adapter.steps().get(2)));
+    }
+
+    @Test
+    void aFailedStepFailsEveryStepAroundIt() {
+        adapter.onTestStart(result);
+        adapter.beforeInvocation(testMethod, result);
+        SeleniumTracker.step("Change passcode", () -> SeleniumTracker.step("Enter old passcode",
+                () -> SeleniumTracker.step("Click digit 1", () -> {
+                    try {
+                        Assert.assertTrue(false, "digit accepted");
+                    } catch (AssertionError caught) {
+                        // checked softly: the steps go on
+                    }
+                })));
+        adapter.afterInvocation(testMethod, result);
+        adapter.onTestSuccess(result);
+
+        TestStep outer = adapter.steps().get(0);
+        TestStep middle = outer.getChildren().get(0);
+        TestStep inner = middle.getChildren().get(0);
+        assertEquals(List.of(TestStatus.FAILED, TestStatus.FAILED, TestStatus.FAILED),
+                List.of(outer.getStatus(), middle.getStatus(), inner.getStatus()));
+    }
+
+    @Test
+    void aFailureOutsideTheStepsIsListedAfterThem() {
+        adapter.onTestStart(result);
+        adapter.beforeInvocation(testMethod, result);
+        SeleniumTracker.step("Open cart", () -> { });
+        when(result.getThrowable()).thenReturn(new RuntimeException("Toast did not appear\nBuild info: version: '4.0'"));
+        adapter.afterInvocation(testMethod, result);
+        adapter.onTestFailure(result);
+
+        List<TestStep> steps = adapter.steps();
+        assertEquals(2, steps.size());
+        assertTrue(LogLine.isError(steps.get(1)));
+        assertEquals("Toast did not appear", steps.get(1).getName());
+    }
+
+    @Test
+    void aFailureAStepShowsGetsNoErrorLine() {
+        adapter.onTestStart(result);
+        adapter.beforeInvocation(testMethod, result);
+        SeleniumTracker.step("Open cart", () -> { });
+        try {
+            Assert.assertTrue(false, "cart is shown");
+        } catch (AssertionError failure) {
+            when(result.getThrowable()).thenReturn(failure);
+        }
+        adapter.afterInvocation(testMethod, result);
+        adapter.onTestFailure(result);
+
+        assertEquals(List.of(TestStatus.FAILED), adapter.steps().stream().map(TestStep::getStatus).toList());
     }
 
     private static List<String> messages(TestStep step) {

@@ -1104,7 +1104,8 @@
             color: var(--skip);
         }
 
-        .step.log-error .glyph {
+        .step.log-error .glyph,
+        .step.is-log.is-fail .glyph {
             color: var(--fail);
             background: currentColor;
         }
@@ -3396,7 +3397,8 @@
                         tc.className,
                         tc.methodName,
                         tc.errorMessage,
-                        ...(tc.tags || [])
+                        ...(tc.tags || []),
+                        ...(tc.classTags || [])
                     ]
                         .filter(Boolean)
                         .join('\n')
@@ -3718,8 +3720,9 @@
                         const key = tc.className && !tc.bddType ? `class:${tc.className}` : suite;
                         let g = byKey.get(key);
                         if (!g) {
+                            // A class's tags (e.g. its TestNG groups) are shown when hovering it, like a feature's
                             const tip = typeof key === 'string'
-                                ? tc.className
+                                ? tc.className + (tc.classTags && tc.classTags.length ? '\n' + tc.classTags.join(' ') : '')
                                 : (suite.secondaryText || suite.name || '') + (suite.tags && suite.tags.length ? '\n' + suite.tags.join(' ') : '');
                             g = { name: groupName(tc, suite), tip, cases: [] };
                             byKey.set(key, g);
@@ -4167,10 +4170,11 @@
 
             function stepEl(s, ctx) {
                 const lvl = logLevel(s);
-                if (lvl)
-                    return h(
+                if (lvl) {
+                    const line = h(
                         'li',
-                        { class: `step is-log log-${lvl}` },
+                        // An Info/Warn line is failed by a failed assertion made right after it
+                        { class: `step is-log log-${lvl}${s.status === 'FAILED' ? ' is-fail' : ''}` },
                         h('span', { class: 'glyph', 'aria-hidden': 'true' }),
                         h('span', { class: 'kw' }, s.keyword),
                         h(
@@ -4181,6 +4185,11 @@
                         ),
                         h('span', { class: 'step-end' }, playBtn(s, ctx.sync))
                     );
+                    // An assertion made right after the line (e.g. on the text it reports) is listed under it
+                    const checks = assertionList(s.assertions || []);
+                    if (checks) line.append(h('div', { class: 'step-extra' }, checks));
+                    return line;
+                }
                 const failed = s.status === 'FAILED';
                 // @BeforeMethod, @After...; Setup/Teardown in reports from older versions
                 const hook = /^(setup|teardown|@(before|after)\w*)$/i.test((s.keyword || '').trim());

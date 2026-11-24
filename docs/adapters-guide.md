@@ -117,19 +117,27 @@ public void testWithParameters(int a, int b, int expected) {
 // Each parameter combination is tracked separately
 ```
 
-#### Groups and Priorities
+#### Groups
 
 ```java
-@Test(groups = {"smoke", "regression"}, priority = 1)
-public void criticalTest() {
-    // Test logic
+@Test(groups = {"regression", "smoke"})
+public class LoginTest {
+    @Test(groups = "login")
+    public void criticalTest() {
+        // Test logic
+    }
 }
-// Groups and priorities are captured in the report
 ```
+
+A method's own groups are the test's tags, shown in the test's header (`TestCase.tags`). The class's
+groups, including those on its superclasses' `@Test`, are its class tags (`TestCase.classTags`), shown
+when you hover the class in the sidebar. Both are searchable.
 
 #### Assertions
 
-Assertions in test methods are listed in the report with their expected and actual values, passing or failing, with no change to your tests. Each one is listed with the step it followed (the browser action, REST call or `step(...)` made just before it), so you can see what was checked after what. Assertions made before any step are listed in the test's **Assertions** section. Assertions in `@BeforeMethod`/`@AfterMethod` appear on that method's step. JUnit, TestNG, Hamcrest and AssertJ assertions and REST Assured `then()` checks are covered; see [Assertion Capture](#assertion-capture).
+Assertions in test methods are listed in the report with their expected and actual values, passing or failing, with no change to your tests. Each one is listed with the step it followed (the browser action, REST call or `step(...)` made just before it), so you can see what was checked after what. Assertions made before any step are listed in the test's **Assertions** section. Assertions in `@BeforeMethod`/`@AfterMethod` appear on that method's step.
+
+A step is failed when it throws, when an assertion listed with it fails, or when a step inside it failed, however deep, so a failure shows on every step around it. When a test fails on something thrown outside its steps (for example a wait in a helper), the failure is added after its last step as an **Error** line. JUnit, TestNG, Hamcrest and AssertJ assertions and REST Assured `then()` checks are covered; see [Assertion Capture](#assertion-capture).
 
 ```java
 @Test

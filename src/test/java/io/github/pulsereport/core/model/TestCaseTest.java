@@ -207,8 +207,11 @@ class TestCaseTest {
 
     @Test
     void jsonDeserialization() throws Exception {
-        String json = "{\"id\":\"test-004\",\"name\":\"Test REST\",\"className\":\"RestTest\",\"methodName\":\"testGet\",\"status\":\"PASSED\",\"startTime\":\"2026-02-16T10:00:00Z\",\"endTime\":\"2026-02-16T10:00:01Z\",\"duration\":1000,\"retryCount\":0}";
+        String json = "{\"id\":\"test-004\",\"name\":\"Test REST\",\"className\":\"RestTest\",\"methodName\":\"testGet\",\"status\":\"PASSED\",\"startTime\":\"2026-02-16T10:00:00Z\",\"endTime\":\"2026-02-16T10:00:01Z\",\"duration\":1000,\"retryCount\":0,\"tags\":[\"login\"],\"classTags\":[\"smoke\"]}";
         TestCase testCase = objectMapper.readValue(json, TestCase.class);
+
+        assertEquals(List.of("login"), testCase.getTags());
+        assertEquals(List.of("smoke"), testCase.getClassTags());
 
         assertEquals("test-004", testCase.getId());
         assertEquals("Test REST", testCase.getName());

@@ -291,6 +291,9 @@ public class TestNGAdapter implements Adapter, ITestListener, ISuiteListener, II
     /** Extra tags per test key (e.g. the browser a Selenium test ran in), in insertion order. */
     private static final Map<String, Set<String>> tagsByTest = new ConcurrentHashMap<>();
 
+    /** The groups of each test's class (its {@code @Test} and its superclasses'), by test key. */
+    private static final Map<String, List<String>> classTagsByTest = new ConcurrentHashMap<>();
+
     /** Details of where each test ran (e.g. its device), by test key, in display order. */
     private static final Map<String, Map<String, String>> metadataByTest = new ConcurrentHashMap<>();
 
@@ -713,6 +716,7 @@ public class TestNGAdapter implements Adapter, ITestListener, ISuiteListener, II
         assertionsByTest.keySet().removeIf(k -> k.startsWith(suitePrefix));
         adapterByTest.keySet().removeIf(k -> k.startsWith(suitePrefix));
         tagsByTest.keySet().removeIf(k -> k.startsWith(suitePrefix));
+        classTagsByTest.keySet().removeIf(k -> k.startsWith(suitePrefix));
         metadataByTest.keySet().removeIf(k -> k.startsWith(suitePrefix));
         keysByMethodName.values().forEach(set -> set.removeIf(k -> k.startsWith(suitePrefix)));
         keysByMethodName.entrySet().removeIf(e -> e.getValue().isEmpty());
@@ -890,6 +894,7 @@ public class TestNGAdapter implements Adapter, ITestListener, ISuiteListener, II
         currentTestKey.set(testKey);
         setRestAssuredTestContext(testKey);
         registerMethodKey(result, testKey);
+        recordGroups(result, testKey);
         // Setup captured in @BeforeMethod/@BeforeClass (which run before this event) belongs to this test
         PendingSetup setup = pendingSetup.get();
         pendingSetup.remove();
@@ -925,6 +930,7 @@ public class TestNGAdapter implements Adapter, ITestListener, ISuiteListener, II
     public void onTestFailure(ITestResult result) {
         // Capture code (e.g. the Selenium tracker) adds its evidence while the test context is open
         CaptureBridge.fireFailure(result.getThrowable());
+        listFailureOutsideSteps(result);
         aggregator.recordTestResult(result);
         mergeRestAssuredDataForTest(aggregator.getTestKey(result));
         clearRestAssuredTestContext();
@@ -1075,6 +1081,32 @@ public class TestNGAdapter implements Adapter, ITestListener, ISuiteListener, II
         return setup ? "@BeforeMethod" : "@AfterMethod";
     }
 
+    /**
+     * When a test failed on something thrown outside its steps (e.g. a wait in a helper), no step is
+     * failed; the failure is added after the steps as an error line, so the list shows where the test
+     * stopped. A retried attempt is reported as skipped, so only the final failure gets a line.
+     */
+    private void listFailureOutsideSteps(ITestResult result) {
+        Throwable failure = result.getThrowable();
+        List<TestStep> steps = stepsByTest.get(aggregator.getTestKey(result));
+        if (failure == null || steps == null || steps.stream().noneMatch(s -> !isHookStep(s))
+                || anyFailed(steps.stream().filter(s -> !isHookStep(s)).toList())) {
+            return;
+        }
+        String message = failure.getMessage() != null ? failure.getMessage() : failure.toString();
+        // Selenium appends a docs link and its environment to every message
+        for (String tail : List.of("\nFor documentation", "\nBuild info:")) {
+            int cut = message.indexOf(tail);
+            message = cut > 0 ? message.substring(0, cut) : message;
+        }
+        steps.add(LogLine.step(LogLine.Level.ERROR, message, Instant.now()));
+    }
+
+    /** Whether any of the steps, or a step inside one, failed. */
+    private static boolean anyFailed(List<TestStep> steps) {
+        return steps.stream().anyMatch(s -> s.getStatus() == TestStatus.FAILED || anyFailed(s.getChildren()));
+    }
+
     /** A step recorded for a configuration method or hook rather than by the test itself. */
     static boolean isHookStep(TestStep step) {
         String keyword = step.getKeyword();
@@ -1085,7 +1117,8 @@ public class TestNGAdapter implements Adapter, ITestListener, ISuiteListener, II
     /**
      * Gives each assertion to the step it followed: the last step (an action, a call,
      * a named step) that started before it, among those that started at or after
-     * {@code from} and aren't hooks. Assertions made before any such step are returned.
+     * {@code from} and aren't hooks. A step given a failed assertion is failed. Assertions made
+     * before any such step are returned.
      *
      * @param steps steps in execution order; updated in place
      * @param assertions assertions in execution order
@@ -1117,7 +1150,12 @@ public class TestNGAdapter implements Adapter, ITestListener, ISuiteListener, II
             TestStep step = steps.get(i);
             List<AssertionResult> all = new ArrayList<>(step.getAssertions());
             all.addAll(added);
-            steps.set(i, step.toBuilder().assertions(all).build());
+            TestStep.Builder updated = step.toBuilder().assertions(all);
+            // A failed check right after a step means the step didn't lead where the test expected
+            if (added.stream().anyMatch(a -> a.getStatus() == TestStatus.FAILED)) {
+                updated.status(TestStatus.FAILED);
+            }
+            steps.set(i, updated.build());
         });
         return unattached;
     }
@@ -1140,7 +1178,8 @@ public class TestNGAdapter implements Adapter, ITestListener, ISuiteListener, II
             List<TestStep> children = new ArrayList<>(captured.steps);
             List<AssertionResult> own = attachAssertions(children, assertions, scope.startedAt);
             Instant end = Instant.now();
-            TestStatus status = failure != null || LogLine.firstError(children) != null ? TestStatus.FAILED
+            TestStatus status = failure != null || LogLine.firstError(children) != null || anyFailed(children)
+                    ? TestStatus.FAILED
                     : testResult.getStatus() == ITestResult.SKIP ? TestStatus.SKIPPED : TestStatus.PASSED;
             TestStep.Builder step = TestStep.builder()
                     .keyword(scope.keyword)
@@ -1257,6 +1296,35 @@ public class TestNGAdapter implements Adapter, ITestListener, ISuiteListener, II
     }
 
     /**
+     * Records a test's TestNG groups as declared: its method's {@code @Test} groups as its tags, and
+     * its class's (and superclasses', as TestNG applies them) as its class tags.
+     */
+    private static void recordGroups(ITestResult result, String testKey) {
+        ITestNGMethod m = result.getMethod();
+        java.lang.reflect.Method method = m == null || m.getConstructorOrMethod() == null ? null
+                : m.getConstructorOrMethod().getMethod();
+        if (method == null) {
+            return;
+        }
+        org.testng.annotations.Test own = method.getAnnotation(org.testng.annotations.Test.class);
+        if (own != null) {
+            for (String group : own.groups()) {
+                tagTest(testKey, group);
+            }
+        }
+        Set<String> classGroups = new LinkedHashSet<>();
+        for (Class<?> c = m.getRealClass(); c != null && c != Object.class; c = c.getSuperclass()) {
+            org.testng.annotations.Test onClass = c.getAnnotation(org.testng.annotations.Test.class);
+            if (onClass != null) {
+                classGroups.addAll(List.of(onClass.groups()));
+            }
+        }
+        if (!classGroups.isEmpty()) {
+            classTagsByTest.put(testKey, new ArrayList<>(classGroups));
+        }
+    }
+
+    /**
      * Adds a tag to a test, e.g. the browser it ran in.
      *
      * @param testKey the test key
@@ -1369,8 +1437,8 @@ public class TestNGAdapter implements Adapter, ITestListener, ISuiteListener, II
 
     /** Applies the adapter names, extra tags and test-level assertions recorded per test key. */
     private static TestRun applyTestLabels(TestRun run) {
-        if (run == null || (adapterByTest.isEmpty() && tagsByTest.isEmpty() && assertionsByTest.isEmpty()
-                && metadataByTest.isEmpty())) {
+        if (run == null || (adapterByTest.isEmpty() && tagsByTest.isEmpty() && classTagsByTest.isEmpty()
+                && assertionsByTest.isEmpty() && metadataByTest.isEmpty())) {
             return run;
         }
         boolean changed = false;
@@ -1380,10 +1448,11 @@ public class TestNGAdapter implements Adapter, ITestListener, ISuiteListener, II
             for (TestCase tc : suite.getTestCases()) {
                 String adapter = adapterByTest.get(tc.getId());
                 Set<String> extra = tagsByTest.get(tc.getId());
+                List<String> classTags = classTagsByTest.get(tc.getId());
                 List<AssertionResult> assertions = assertionsByTest.get(tc.getId());
                 Map<String, String> metadata = recordedMetadata(tc.getId());
-                if (adapter == null && (extra == null || extra.isEmpty()) && (assertions == null || assertions.isEmpty())
-                        && metadata.isEmpty()) {
+                if (adapter == null && (extra == null || extra.isEmpty()) && classTags == null
+                        && (assertions == null || assertions.isEmpty()) && metadata.isEmpty()) {
                     cases.add(tc);
                     continue;
                 }
@@ -1394,7 +1463,8 @@ public class TestNGAdapter implements Adapter, ITestListener, ISuiteListener, II
                     }
                 }
                 TestCase.Builder updated = tc.toBuilder().adapter(adapter != null ? adapter : tc.getAdapter())
-                        .tags(new ArrayList<>(tags));
+                        .tags(new ArrayList<>(tags))
+                        .classTags(classTags != null ? classTags : tc.getClassTags());
                 if (!metadata.isEmpty()) {
                     Map<String, String> all = new LinkedHashMap<>(tc.getMetadata());
                     all.putAll(metadata);

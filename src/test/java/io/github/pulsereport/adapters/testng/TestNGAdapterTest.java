@@ -209,7 +209,32 @@ public class TestNGAdapterTest {
         }
     }
 
+    @org.testng.annotations.Test(groups = {"regression", "smoke"})
+    static class GroupedFixture {
+        @org.testng.annotations.Test(groups = "login")
+        public void loginTest() {
+        }
+    }
+
+    @Test
+    public void methodGroupsAreTheTestsTagsAndClassGroupsItsClassTags() throws Exception {
+        ITestResult result = createMockTestResult("loginTest", ITestResult.SUCCESS);
+        when(result.getMethod().getRealClass()).thenReturn(GroupedFixture.class);
+        when(result.getMethod().getConstructorOrMethod())
+                .thenReturn(new org.testng.internal.ConstructorOrMethod(GroupedFixture.class.getMethod("loginTest")));
+
+        runSuite(adapter, "Suite", ITestResult.SUCCESS, result);
+
+        TestCase tc = adapter.getTestRun().getSuites().get(0).getTestCases().get(0);
+        assertEquals(List.of("login"), tc.getTags());
+        assertEquals(List.of("regression", "smoke"), tc.getClassTags());
+    }
+
     private void runSuite(TestNGAdapter suiteAdapter, String suiteName, String methodName, int status) {
+        runSuite(suiteAdapter, suiteName, status, createMockTestResult(methodName, status));
+    }
+
+    private void runSuite(TestNGAdapter suiteAdapter, String suiteName, int status, ITestResult mockResult) {
         ISuite mockSuite = mock(ISuite.class);
         when(mockSuite.getName()).thenReturn(suiteName);
         ITestContext mockContext = createMockTestContext(suiteName + "Context");
@@ -221,7 +246,6 @@ public class TestNGAdapterTest {
         when(mockContext.getPassedTests()).thenReturn(passedTests);
         when(mockContext.getFailedTests()).thenReturn(failedTests);
         when(mockContext.getSkippedTests()).thenReturn(skippedTests);
-        ITestResult mockResult = createMockTestResult(methodName, status);
         java.util.Set<ITestResult> results = new java.util.HashSet<>(java.util.List.of(mockResult));
         when(passedTests.getAllResults()).thenReturn(status == ITestResult.SUCCESS ? results : new java.util.HashSet<>());
         when(failedTests.getAllResults()).thenReturn(status == ITestResult.FAILURE ? results : new java.util.HashSet<>());
