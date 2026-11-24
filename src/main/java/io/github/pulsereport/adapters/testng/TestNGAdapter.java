@@ -925,6 +925,7 @@ public class TestNGAdapter implements Adapter, ITestListener, ISuiteListener, II
     public void onTestFailure(ITestResult result) {
         // Capture code (e.g. the Selenium tracker) adds its evidence while the test context is open
         CaptureBridge.fireFailure(result.getThrowable());
+        listFailureOutsideSteps(result);
         aggregator.recordTestResult(result);
         mergeRestAssuredDataForTest(aggregator.getTestKey(result));
         clearRestAssuredTestContext();
@@ -1075,6 +1076,32 @@ public class TestNGAdapter implements Adapter, ITestListener, ISuiteListener, II
         return setup ? "@BeforeMethod" : "@AfterMethod";
     }
 
+    /**
+     * When a test failed on something thrown outside its steps (e.g. a wait in a helper), no step is
+     * failed; the failure is added after the steps as an error line, so the list shows where the test
+     * stopped. A retried attempt is reported as skipped, so only the final failure gets a line.
+     */
+    private void listFailureOutsideSteps(ITestResult result) {
+        Throwable failure = result.getThrowable();
+        List<TestStep> steps = stepsByTest.get(aggregator.getTestKey(result));
+        if (failure == null || steps == null || steps.stream().noneMatch(s -> !isHookStep(s))
+                || anyFailed(steps.stream().filter(s -> !isHookStep(s)).toList())) {
+            return;
+        }
+        String message = failure.getMessage() != null ? failure.getMessage() : failure.toString();
+        // Selenium appends a docs link and its environment to every message
+        for (String tail : List.of("\nFor documentation", "\nBuild info:")) {
+            int cut = message.indexOf(tail);
+            message = cut > 0 ? message.substring(0, cut) : message;
+        }
+        steps.add(LogLine.step(LogLine.Level.ERROR, message, Instant.now()));
+    }
+
+    /** Whether any of the steps, or a step inside one, failed. */
+    private static boolean anyFailed(List<TestStep> steps) {
+        return steps.stream().anyMatch(s -> s.getStatus() == TestStatus.FAILED || anyFailed(s.getChildren()));
+    }
+
     /** A step recorded for a configuration method or hook rather than by the test itself. */
     static boolean isHookStep(TestStep step) {
         String keyword = step.getKeyword();
@@ -1085,7 +1112,8 @@ public class TestNGAdapter implements Adapter, ITestListener, ISuiteListener, II
     /**
      * Gives each assertion to the step it followed: the last step (an action, a call,
      * a named step) that started before it, among those that started at or after
-     * {@code from} and aren't hooks. Assertions made before any such step are returned.
+     * {@code from} and aren't hooks. A step given a failed assertion is failed. Assertions made
+     * before any such step are returned.
      *
      * @param steps steps in execution order; updated in place
      * @param assertions assertions in execution order
@@ -1117,7 +1145,12 @@ public class TestNGAdapter implements Adapter, ITestListener, ISuiteListener, II
             TestStep step = steps.get(i);
             List<AssertionResult> all = new ArrayList<>(step.getAssertions());
             all.addAll(added);
-            steps.set(i, step.toBuilder().assertions(all).build());
+            TestStep.Builder updated = step.toBuilder().assertions(all);
+            // A failed check right after a step means the step didn't lead where the test expected
+            if (added.stream().anyMatch(a -> a.getStatus() == TestStatus.FAILED)) {
+                updated.status(TestStatus.FAILED);
+            }
+            steps.set(i, updated.build());
         });
         return unattached;
     }
@@ -1140,7 +1173,8 @@ public class TestNGAdapter implements Adapter, ITestListener, ISuiteListener, II
             List<TestStep> children = new ArrayList<>(captured.steps);
             List<AssertionResult> own = attachAssertions(children, assertions, scope.startedAt);
             Instant end = Instant.now();
-            TestStatus status = failure != null || LogLine.firstError(children) != null ? TestStatus.FAILED
+            TestStatus status = failure != null || LogLine.firstError(children) != null || anyFailed(children)
+                    ? TestStatus.FAILED
                     : testResult.getStatus() == ITestResult.SKIP ? TestStatus.SKIPPED : TestStatus.PASSED;
             TestStep.Builder step = TestStep.builder()
                     .keyword(scope.keyword)

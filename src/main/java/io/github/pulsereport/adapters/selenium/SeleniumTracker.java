@@ -766,7 +766,10 @@ public final class SeleniumTracker {
                 scope.children.add(lookup);
             }
         }
-        boolean failed = failure != null || scope.loggedError != null;
+        boolean checkFailed = checks.stream().anyMatch(a -> a.getStatus() == TestStatus.FAILED);
+        // A failed step inside fails this one too, so a failure shows on every step around it, however deep
+        boolean childFailed = scope.children.stream().anyMatch(c -> c.getStatus() == TestStatus.FAILED);
+        boolean failed = failure != null || scope.loggedError != null || checkFailed || childFailed;
         boolean named = message != null && !message.isBlank();
         boolean described = detail != null && !detail.isBlank();
         TestStep only = scope.children.size() == 1 ? scope.children.get(0) : null;
@@ -797,7 +800,9 @@ public final class SeleniumTracker {
             step.assertions(checks);
         }
         // Like a thrown failure, an error line is photographed once, by the innermost step it failed
-        boolean unshot = failure != null ? !isEvidenced(failure) : failed && !scope.loggedErrorShot;
+        // A step that only failed because a step inside did leaves the screenshot to that step
+        boolean unshot = failure != null ? !isEvidenced(failure)
+                : (checkFailed || scope.loggedError != null) && !scope.loggedErrorShot;
         if (failed && unshot && screenshotsEnabled()) {
             Artifact shot = screenshot(camera, shotName(step.build().getName(), "-failure"));
             if (shot != null) {

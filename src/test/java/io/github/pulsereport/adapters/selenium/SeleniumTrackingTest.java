@@ -38,6 +38,7 @@ import org.testng.ITestNGMethod;
 import org.testng.ITestResult;
 
 import io.github.pulsereport.core.model.Artifact;
+import io.github.pulsereport.core.model.LogLine;
 import io.github.pulsereport.core.model.Metric;
 import io.github.pulsereport.core.model.TestRun;
 import io.github.pulsereport.core.model.TestStatus;
@@ -390,9 +391,12 @@ class SeleniumTrackingTest {
                 () -> driver.findElement(By.id("missing")));
         adapter.onTestFailure(withFailure(result, failure));
 
-        assertEquals(1, adapter.steps().size(), adapter.steps().toString());
+        assertEquals(2, adapter.steps().size(), adapter.steps().toString());
         TestStep step = adapter.steps().get(0);
         assertEquals("Log in", step.getName());
+        // No step failed, so the failure is listed after the steps, without Selenium's docs link
+        assertEquals("no such element: By.id: missing", adapter.steps().get(1).getName());
+        assertTrue(LogLine.isError(adapter.steps().get(1)));
         assertTrue(step.getChildren().isEmpty(), "actions are not steps of their own");
         assertEquals(List.of("log-in.png"), step.getArtifacts().stream().map(Artifact::getName).toList());
         assertTrue(adapter.metrics().stream().anyMatch(m -> m.getName().equals("page.load.time")));

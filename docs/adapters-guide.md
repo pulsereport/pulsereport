@@ -129,7 +129,9 @@ public void criticalTest() {
 
 #### Assertions
 
-Assertions in test methods are listed in the report with their expected and actual values, passing or failing, with no change to your tests. Each one is listed with the step it followed (the browser action, REST call or `step(...)` made just before it), so you can see what was checked after what. Assertions made before any step are listed in the test's **Assertions** section. Assertions in `@BeforeMethod`/`@AfterMethod` appear on that method's step. JUnit, TestNG, Hamcrest and AssertJ assertions and REST Assured `then()` checks are covered; see [Assertion Capture](#assertion-capture).
+Assertions in test methods are listed in the report with their expected and actual values, passing or failing, with no change to your tests. Each one is listed with the step it followed (the browser action, REST call or `step(...)` made just before it), so you can see what was checked after what. Assertions made before any step are listed in the test's **Assertions** section. Assertions in `@BeforeMethod`/`@AfterMethod` appear on that method's step.
+
+A step is failed when it throws, when an assertion listed with it fails, or when a step inside it failed, however deep, so a failure shows on every step around it. When a test fails on something thrown outside its steps (for example a wait in a helper), the failure is added after its last step as an **Error** line. JUnit, TestNG, Hamcrest and AssertJ assertions and REST Assured `then()` checks are covered; see [Assertion Capture](#assertion-capture).
 
 ```java
 @Test
